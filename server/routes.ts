@@ -911,7 +911,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate: endDate ? new Date(endDate as string) : undefined,
       });
       
-      res.json(results);
+      // Convert data to CSV using csv-writer
+      const { createObjectCsvStringifier } = require('csv-writer');
+      
+      if (results.length === 0) {
+        return res.status(404).json({ message: "No transactions found matching your criteria" });
+      }
+      
+      // Define CSV headers based on data fields
+      const headers = Object.keys(results[0]).map(key => ({
+        id: key,
+        title: key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, str => str.toUpperCase())
+          .trim()
+      }));
+      
+      const csvStringifier = createObjectCsvStringifier({
+        header: headers
+      });
+      
+      const csvString = csvStringifier.getHeaderString() + csvStringifier.stringifyRecords(results);
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=transactions-export-${new Date().toISOString().slice(0, 10)}.csv`);
+      
+      // Send CSV data
+      res.send(csvString);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to export transactions" });
     }
