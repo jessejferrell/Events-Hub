@@ -216,7 +216,7 @@ export default function AuthPage() {
                     
                     <Button 
                       type="submit" 
-                      className="w-full bg-secondary hover:bg-secondary/90"
+                      className="w-full bg-primary hover:bg-primary/90 text-white"
                       disabled={loginMutation.isPending}
                     >
                       {loginMutation.isPending ? "Logging in..." : "Log in"}
@@ -241,9 +241,9 @@ export default function AuthPage() {
             
             {/* Registration Form */}
             <TabsContent value="register">
-              <div className="border border-neutral-200 rounded-lg p-8 bg-white shadow-sm">
-                <h1 className="text-2xl font-bold mb-1 text-neutral-900">Create an Account</h1>
-                <p className="text-neutral-500 mb-6 text-sm">Join City Event Hub to discover and attend local events</p>
+              <div className="border border-border rounded-xl p-8 bg-white shadow-md">
+                <h1 className="text-2xl font-bold mb-1 text-foreground">Create an Account</h1>
+                <p className="text-muted-foreground mb-6 text-sm">Join City Event Hub to discover and attend local events</p>
                 
                 <Form {...registerForm}>
                   <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
@@ -357,7 +357,7 @@ export default function AuthPage() {
                     
                     <Button 
                       type="submit" 
-                      className="w-full bg-secondary hover:bg-secondary/90"
+                      className="w-full bg-primary hover:bg-primary/90 text-white"
                       disabled={registerMutation.isPending}
                     >
                       {registerMutation.isPending ? "Creating account..." : "Create Account"}
@@ -384,34 +384,63 @@ export default function AuthPage() {
       </div>
       
       {/* Right Side: Welcome Banner */}
-      <div className="hidden md:flex md:w-1/2 bg-secondary items-center justify-center">
-        <div className="px-8 py-12 text-white max-w-md">
-          <h2 className="text-3xl font-bold mb-4">Welcome Back!</h2>
-          <p className="mb-8">Sign in to access your City Event Hub account and manage your event activities.</p>
+      <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-primary to-secondary items-center justify-center relative overflow-hidden">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+            <defs>
+              <pattern id="a" patternUnits="userSpaceOnUse" width="40" height="40" patternTransform="scale(2) rotate(0)">
+                <rect x="0" y="0" width="100%" height="100%" fill="none"/>
+                <path d="M0 20h40M20 0v40" strokeWidth="2" stroke="#fff" fill="none"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#a)"/>
+          </svg>
+        </div>
+        
+        <div className="px-12 py-16 text-white max-w-lg relative z-10">
+          <div className="mb-8">
+            <h2 className="text-4xl font-bold mb-4 drop-shadow-sm">Welcome to City Event Hub</h2>
+            <p className="text-lg opacity-90 leading-relaxed mb-8">
+              Your gateway to discovering, creating, and managing the best events in your city.
+            </p>
+          </div>
           
           {/* Features List */}
-          <div className="space-y-6">
-            <div className="flex items-start">
-              <User className="h-6 w-6 mr-3" />
+          <div className="space-y-8">
+            <div className="flex items-start bg-white/10 p-4 rounded-lg backdrop-blur-sm">
+              <div className="bg-white/20 p-2 rounded-full mr-4">
+                <User className="h-6 w-6" />
+              </div>
               <div>
-                <h3 className="font-semibold mb-1">Manage Your Profile</h3>
-                <p className="text-white/80 text-sm">Update your information and preferences at any time</p>
+                <h3 className="font-semibold text-lg mb-1">Personalized Experience</h3>
+                <p className="text-white/80 text-sm leading-relaxed">
+                  Customize your profile, set preferences, and receive tailored event recommendations.
+                </p>
               </div>
             </div>
             
-            <div className="flex items-start">
-              <CalendarCheck className="h-6 w-6 mr-3" />
+            <div className="flex items-start bg-white/10 p-4 rounded-lg backdrop-blur-sm">
+              <div className="bg-white/20 p-2 rounded-full mr-4">
+                <CalendarCheck className="h-6 w-6" />
+              </div>
               <div>
-                <h3 className="font-semibold mb-1">Track Your Registrations</h3>
-                <p className="text-white/80 text-sm">View and manage your event tickets and vendor applications</p>
+                <h3 className="font-semibold text-lg mb-1">Event Management</h3>
+                <p className="text-white/80 text-sm leading-relaxed">
+                  Track tickets, manage registrations, and stay updated with your upcoming events.
+                </p>
               </div>
             </div>
             
-            <div className="flex items-start">
-              <Building className="h-6 w-6 mr-3" />
+            <div className="flex items-start bg-white/10 p-4 rounded-lg backdrop-blur-sm">
+              <div className="bg-white/20 p-2 rounded-full mr-4">
+                <Building className="h-6 w-6" />
+              </div>
               <div>
-                <h3 className="font-semibold mb-1">Event Owner Access</h3>
-                <p className="text-white/80 text-sm">Create and manage your own events if you're an event organizer</p>
+                <h3 className="font-semibold text-lg mb-1">Host & Organize</h3>
+                <p className="text-white/80 text-sm leading-relaxed">
+                  Create your own events, sell tickets, and grow your community with powerful tools.
+                </p>
               </div>
             </div>
           </div>
