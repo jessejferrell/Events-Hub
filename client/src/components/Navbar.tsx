@@ -56,8 +56,8 @@ export default function Navbar() {
           {!user ? (
             <div className="flex items-center space-x-2">
               <Link href="/auth">
-                <Button variant="outline" className="text-white border-white hover:bg-white/20 hover:text-white">
-                  Log In
+                <Button className="bg-white text-primary hover:bg-white/90 font-medium px-4 py-2 rounded-md">
+                  Log In / Register
                 </Button>
               </Link>
             </div>
