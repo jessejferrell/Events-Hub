@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,11 +28,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CalendarIcon } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, CalendarIcon, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import ProductManager from "@/components/ui/product-manager";
 
 // Create a more detailed event schema for the form
 const eventFormSchema = z.object({
@@ -45,6 +48,10 @@ const eventFormSchema = z.object({
   eventType: z.string().min(1, "Event type is required"),
   price: z.coerce.number().min(0, "Price must be a positive number or zero"),
   isActive: z.boolean().default(true),
+  vendorOptions: z.boolean().default(false),
+  volunteerOptions: z.boolean().default(false),
+  hasMerchandise: z.boolean().default(false),
+  hasAddons: z.boolean().default(false),
 }).refine((data) => {
   return data.endDate >= data.startDate;
 }, {
@@ -61,12 +68,15 @@ interface EventFormProps {
 
 export default function EventForm({ event, onSuccess }: EventFormProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [formStartDate, setFormStartDate] = useState<Date | undefined>(
     event ? new Date(event.startDate) : new Date()
   );
   const [formEndDate, setFormEndDate] = useState<Date | undefined>(
     event ? new Date(event.endDate) : new Date()
   );
+  const [currentStep, setCurrentStep] = useState(1);
+  const [newEventId, setNewEventId] = useState<number | null>(null);
 
   // Event types options
   const eventTypes = [
@@ -91,6 +101,10 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
     eventType: event?.eventType || "",
     price: event?.price || 0,
     isActive: event?.isActive ?? true,
+    vendorOptions: event?.vendorOptions ?? false,
+    volunteerOptions: event?.volunteerOptions ?? false,
+    hasMerchandise: event?.hasMerchandise ?? false,
+    hasAddons: event?.hasAddons ?? false,
   };
 
   // Create form
@@ -103,21 +117,26 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
   const createEventMutation = useMutation({
     mutationFn: async (data: EventFormValues) => {
       const res = await apiRequest("POST", "/api/events", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create event");
+      }
       return await res.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Event created",
-        description: "Your event has been created successfully.",
-      });
-      form.reset();
-      if (onSuccess) onSuccess();
+    onSuccess: (data) => {
+      toast({ title: "Success", description: "Event details saved! Now you can add products." });
+      // Store the new event ID and advance to the next step
+      setNewEventId(data.id);
+      setCurrentStep(2);
+      // Invalidate event queries
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-events"] });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to create event",
-        description: error.message || "An error occurred while creating the event",
-        variant: "destructive",
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to create event", 
+        variant: "destructive" 
       });
     },
   });
@@ -127,26 +146,35 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
     mutationFn: async (data: EventFormValues & { id: number }) => {
       const { id, ...eventData } = data;
       const res = await apiRequest("PUT", `/api/events/${id}`, eventData);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update event");
+      }
       return await res.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Event updated",
-        description: "Your event has been updated successfully.",
-      });
-      if (onSuccess) onSuccess();
+    onSuccess: (data) => {
+      if (currentStep === 1) {
+        toast({ title: "Success", description: "Event details updated! Now you can manage products." });
+        setCurrentStep(2);
+      } else {
+        toast({ title: "Success", description: "Event updated successfully" });
+        if (onSuccess) onSuccess();
+      }
+      // Invalidate event queries
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-events"] });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to update event",
-        description: error.message || "An error occurred while updating the event",
-        variant: "destructive",
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to update event", 
+        variant: "destructive" 
       });
     },
   });
 
-  // Handle form submission
-  function onSubmit(data: EventFormValues) {
+  // Handle step 1 submission (basic event details)
+  function onSubmitStep1(data: EventFormValues) {
     if (event) {
       updateEventMutation.mutate({ ...data, id: event.id });
     } else {
@@ -154,9 +182,46 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
     }
   }
 
-  return (
+  // Handle step 2 completion (products management)
+  function handleCompleteStep2() {
+    toast({ title: "Success", description: "Event and products saved successfully" });
+    if (onSuccess) onSuccess();
+  }
+
+  // Render step indicators
+  const renderStepIndicators = () => {
+    return (
+      <div className="flex items-center mb-6 justify-center">
+        <div className={`flex items-center ${currentStep === 1 ? "text-primary" : "text-muted-foreground"}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            currentStep === 1 ? "bg-primary text-white" : 
+            currentStep > 1 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+          }`}>
+            {currentStep > 1 ? <Check className="h-4 w-4" /> : "1"}
+          </div>
+          <span className="ml-2 font-medium">Event Details</span>
+        </div>
+        
+        <div className="w-10 h-1 mx-3 bg-muted-foreground/30">
+          <div className={`h-full bg-primary ${currentStep > 1 ? "w-full" : "w-0"} transition-all`}></div>
+        </div>
+        
+        <div className={`flex items-center ${currentStep === 2 ? "text-primary" : "text-muted-foreground"}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            currentStep === 2 ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+          }`}>
+            2
+          </div>
+          <span className="ml-2 font-medium">Products & Tickets</span>
+        </div>
+      </div>
+    );
+  };
+
+  // Step 1: Event Details Form
+  const renderStep1 = () => (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmitStep1)} className="space-y-4">
         <FormField
           control={form.control}
           name="title"
@@ -347,7 +412,7 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Ticket Price</FormLabel>
+                <FormLabel>Base Price ($)</FormLabel>
                 <FormControl>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
@@ -387,6 +452,104 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
           />
         </div>
         
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="hasMerchandise"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={field.onChange}
+                      className="h-4 w-4 mt-1"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Merchandise</FormLabel>
+                    <FormDescription>
+                      Sell merchandise items
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="hasAddons"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={field.onChange}
+                      className="h-4 w-4 mt-1"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Add-ons</FormLabel>
+                    <FormDescription>
+                      Offer optional add-ons
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+          </div>
+          
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="vendorOptions"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={field.onChange}
+                      className="h-4 w-4 mt-1"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Vendor Options</FormLabel>
+                    <FormDescription>
+                      Allow vendor registrations
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="volunteerOptions"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={field.onChange}
+                      className="h-4 w-4 mt-1"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Volunteer Options</FormLabel>
+                    <FormDescription>
+                      Allow volunteer sign-ups
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+        
         <FormField
           control={form.control}
           name="isActive"
@@ -409,8 +572,8 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
             </FormItem>
           )}
         />
-        
-        <div className="flex justify-end space-x-2 pt-4">
+
+        <div className="flex justify-between space-x-2 pt-4">
           <Button
             type="button"
             variant="outline"
@@ -426,10 +589,55 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
           >
             {createEventMutation.isPending || updateEventMutation.isPending
               ? "Saving..."
-              : event ? "Update Event" : "Create Event"}
+              : "Save & Continue"}
           </Button>
         </div>
       </form>
     </Form>
+  );
+
+  // Step 2: Product Management
+  const renderStep2 = () => (
+    <div className="space-y-6">
+      <Alert className="mb-6">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Important</AlertTitle>
+        <AlertDescription>
+          All items sold at your event should be added as products to track sales and manage inventory.
+          At minimum, you should create at least one ticket product for your event.
+        </AlertDescription>
+      </Alert>
+      
+      <ProductManager eventId={event?.id || newEventId!} />
+      
+      <div className="flex justify-between pt-6">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setCurrentStep(1)}
+          className="flex items-center"
+        >
+          <ChevronLeft className="mr-1 h-4 w-4" />
+          Back to Details
+        </Button>
+        
+        <Button 
+          onClick={handleCompleteStep2}
+          className="flex items-center"
+        >
+          Complete
+          <ChevronRight className="ml-1 h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {renderStepIndicators()}
+      
+      {currentStep === 1 && renderStep1()}
+      {currentStep === 2 && renderStep2()}
+    </div>
   );
 }

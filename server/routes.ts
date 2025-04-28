@@ -202,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === PRODUCTS API (Merchandise & Addons) ===
   
-  // Get products for an event
+  // Get products for an event (via event ID param)
   app.get("/api/events/:eventId/products", async (req, res) => {
     try {
       const eventId = parseInt(req.params.eventId);
@@ -212,6 +212,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(products);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch products" });
+    }
+  });
+  
+  // Get products by eventId (via query param) - for product manager component
+  app.get("/api/products", async (req, res) => {
+    try {
+      const eventId = req.query.eventId ? parseInt(req.query.eventId as string) : undefined;
+      const type = req.query.type as string;
+      
+      if (!eventId) {
+        return res.status(400).json({ message: "Event ID is required" });
+      }
+      
+      const products = await storage.getProducts(eventId, type);
+      res.json(products);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch products" });
+    }
+  });
+  
+  // Get single product by ID
+  app.get("/api/products/:id", async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      res.json(product);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch product" });
     }
   });
   
@@ -281,6 +314,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Direct product creation endpoint (for product manager component)
+  app.post("/api/products", requireAuth, async (req, res) => {
+    try {
+      const eventId = req.body.eventId;
+      if (!eventId) {
+        return res.status(400).json({ message: "Event ID is required" });
+      }
+      
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Check permissions
+      if (req.user.role !== "admin" && event.ownerId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to add products to this event" });
+      }
+      
+      const validatedData = insertProductSchema.parse(req.body);
+      const product = await storage.createProduct(validatedData);
+      
+      // Update event to indicate appropriate product type
+      if (validatedData.type === "merchandise" && !event.hasMerchandise) {
+        await storage.updateEvent(eventId, { hasMerchandise: true });
+      } else if (validatedData.type === "addon" && !event.hasAddons) {
+        await storage.updateEvent(eventId, { hasAddons: true });
+      } else if (validatedData.type === "vendor_spot" && !event.vendorOptions) {
+        await storage.updateEvent(eventId, { vendorOptions: true });
+      } else if (validatedData.type === "volunteer_shift" && !event.volunteerOptions) {
+        await storage.updateEvent(eventId, { volunteerOptions: true });
+      }
+      
+      res.status(201).json(product);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid product data", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message || "Failed to create product" });
+    }
+  });
+
   // Delete product (protected, event owner/admin only)
   app.delete("/api/products/:id", requireAuth, async (req, res) => {
     try {
