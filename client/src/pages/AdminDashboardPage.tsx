@@ -12,13 +12,26 @@ import {
   BarChart2, 
   PieChart, 
   Users, 
-  Settings 
+  Settings,
+  ShoppingCart,
+  Store,
+  Clock,
+  Download,
+  Search,
+  Filter,
+  RefreshCw,
+  FileText
 } from "lucide-react";
 import { format } from "date-fns";
-import { Event, Payment } from "@shared/schema";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Event, Order } from "@shared/schema";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 
 // Types for admin stats
 interface AdminStats {
@@ -27,11 +40,33 @@ interface AdminStats {
   monthlyRevenue: number;
   ticketsSoldMTD: number;
   recentEvents: Event[];
-  recentPayments: Payment[];
+  recentOrders: Order[];
+}
+
+// Transaction type for all transaction records
+interface Transaction {
+  id: number;
+  type: "order" | "ticket" | "vendor" | "volunteer";
+  reference: string;
+  userId: number;
+  eventId: number;
+  status: string;
+  amount: number;
+  createdAt: string;
+  notes?: string;
+  userName?: string;
+  userEmail?: string;
+  eventTitle?: string;
 }
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEventId, setSelectedEventId] = useState<string>("");
+  const [selectedTransactionType, setSelectedTransactionType] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
 
   // Fetch admin stats
   const { data: stats, isLoading } = useQuery<AdminStats>({
@@ -42,6 +77,62 @@ export default function AdminDashboardPage() {
       return await res.json();
     },
   });
+
+  // Fetch transactions
+  const { data: transactions, isLoading: isLoadingTransactions, refetch: refetchTransactions } = useQuery<Transaction[]>({
+    queryKey: ["/api/admin/search", searchQuery, selectedEventId, selectedTransactionType, selectedStatus],
+    queryFn: async () => {
+      let queryParams = new URLSearchParams();
+      
+      if (searchQuery) queryParams.append("q", searchQuery);
+      if (selectedEventId) queryParams.append("eventId", selectedEventId);
+      if (selectedTransactionType) queryParams.append("type", selectedTransactionType);
+      if (selectedStatus) queryParams.append("status", selectedStatus);
+      
+      const res = await fetch(`/api/admin/search?${queryParams.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch transactions");
+      return await res.json();
+    },
+    enabled: activeTab === "transactions"
+  });
+
+  const handleSearch = () => {
+    refetchTransactions();
+  };
+
+  const handleExport = async () => {
+    let queryParams = new URLSearchParams();
+    
+    if (searchQuery) queryParams.append("q", searchQuery);
+    if (selectedEventId) queryParams.append("eventId", selectedEventId);
+    if (selectedTransactionType) queryParams.append("type", selectedTransactionType);
+    if (selectedStatus) queryParams.append("status", selectedStatus);
+    
+    if (startDate) queryParams.append("startDate", startDate.toISOString());
+    if (endDate) queryParams.append("endDate", endDate.toISOString());
+    
+    window.open(`/api/admin/export?${queryParams.toString()}`, "_blank");
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'active':
+      case 'approved':
+      case 'paid':
+      case 'success':
+        return 'success';
+      case 'pending':
+      case 'awaiting':
+        return 'warning';
+      case 'refunded':
+      case 'rejected':
+      case 'cancelled':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -78,9 +169,10 @@ export default function AdminDashboardPage() {
             value={isLoading ? "-" : `$${stats?.monthlyRevenue.toFixed(2) || "0.00"}`} 
             icon={<DollarSign />} 
             linkText="View financial reports" 
-            linkHref="#analytics" 
+            linkHref="#transactions" 
             iconBgClass="bg-blue-100"
             isLoading={isLoading}
+            onClick={() => setActiveTab("transactions")}
           />
           
           <StatCard 
@@ -88,9 +180,13 @@ export default function AdminDashboardPage() {
             value={isLoading ? "-" : stats?.ticketsSoldMTD.toString() || "0"} 
             icon={<Ticket />} 
             linkText="View ticket reports" 
-            linkHref="#analytics" 
+            linkHref="#transactions" 
             iconBgClass="bg-purple-100"
             isLoading={isLoading}
+            onClick={() => {
+              setActiveTab("transactions");
+              setSelectedTransactionType("ticket");
+            }}
           />
         </div>
         
@@ -102,6 +198,12 @@ export default function AdminDashboardPage() {
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2 data-[state=active]:text-primary"
             >
               Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="transactions" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2 data-[state=active]:text-primary"
+            >
+              Transactions
             </TabsTrigger>
             <TabsTrigger 
               value="users" 
@@ -138,7 +240,7 @@ export default function AdminDashboardPage() {
                   <div>
                     <CardTitle className="text-lg">Recent Events</CardTitle>
                   </div>
-                  <Button variant="link" size="sm" className="text-secondary p-0">
+                  <Button variant="link" size="sm" className="text-secondary p-0" onClick={() => setActiveTab("events")}>
                     View all
                   </Button>
                 </CardHeader>
@@ -176,13 +278,21 @@ export default function AdminDashboardPage() {
                 </CardContent>
               </Card>
               
-              {/* Recent Payments */}
+              {/* Recent Orders */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
                   <div>
-                    <CardTitle className="text-lg">Recent Payments</CardTitle>
+                    <CardTitle className="text-lg">Recent Orders</CardTitle>
                   </div>
-                  <Button variant="link" size="sm" className="text-secondary p-0">
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    className="text-secondary p-0" 
+                    onClick={() => {
+                      setActiveTab("transactions");
+                      setSelectedTransactionType("order");
+                    }}
+                  >
                     View all
                   </Button>
                 </CardHeader>
@@ -191,37 +301,34 @@ export default function AdminDashboardPage() {
                     <div className="flex justify-center py-8">
                       <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
                     </div>
-                  ) : stats && stats.recentPayments && stats.recentPayments.length > 0 ? (
+                  ) : stats && stats.recentOrders && stats.recentOrders.length > 0 ? (
                     <table className="min-w-full">
                       <thead>
                         <tr>
-                          <th className="py-2 px-2 text-left text-sm font-medium text-neutral-500">Transaction</th>
+                          <th className="py-2 px-2 text-left text-sm font-medium text-neutral-500">Order #</th>
                           <th className="py-2 px-2 text-left text-sm font-medium text-neutral-500">Amount</th>
                           <th className="py-2 px-2 text-left text-sm font-medium text-neutral-500">Status</th>
                           <th className="py-2 px-2 text-left text-sm font-medium text-neutral-500">Date</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {stats.recentPayments.map((payment) => (
-                          <tr key={payment.id}>
-                            <td className="py-2 px-2 text-sm">{payment.stripePaymentId || `PMT-${payment.id}`}</td>
-                            <td className="py-2 px-2 text-sm">${payment.amount.toFixed(2)}</td>
+                        {stats.recentOrders.map((order) => (
+                          <tr key={order.id}>
+                            <td className="py-2 px-2 text-sm">{order.orderNumber}</td>
+                            <td className="py-2 px-2 text-sm">${order.totalAmount.toFixed(2)}</td>
                             <td className="py-2 px-2 text-sm">
-                              <Badge variant={
-                                payment.status === "completed" ? "success" : 
-                                payment.status === "refunded" ? "destructive" : "secondary"
-                              }>
-                                {payment.status}
+                              <Badge variant={getStatusBadgeVariant(order.status)}>
+                                {order.status}
                               </Badge>
                             </td>
-                            <td className="py-2 px-2 text-sm">{format(new Date(payment.createdAt), "MMM d, yyyy")}</td>
+                            <td className="py-2 px-2 text-sm">{format(new Date(order.createdAt), "MMM d, yyyy")}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   ) : (
                     <div className="text-center py-8 text-neutral-500">
-                      No payments found
+                      No orders found
                     </div>
                   )}
                 </CardContent>
@@ -259,7 +366,180 @@ export default function AdminDashboardPage() {
             </div>
           </TabsContent>
           
-          {/* Other tabs content */}
+          {/* Transactions Tab Content */}
+          <TabsContent value="transactions" className="m-0">
+            <Card>
+              <CardHeader>
+                <CardTitle>Transaction Management</CardTitle>
+                <CardDescription>View and manage all transactions across the platform</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                  <div>
+                    <Label htmlFor="search" className="mb-1.5 block">Search</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-neutral-500" />
+                      <Input
+                        id="search"
+                        placeholder="Order #, transaction ID..."
+                        className="pl-9"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="event" className="mb-1.5 block">Event</Label>
+                    <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                      <SelectTrigger id="event">
+                        <SelectValue placeholder="All Events" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All Events</SelectItem>
+                        {stats?.recentEvents?.map(event => (
+                          <SelectItem key={event.id} value={event.id.toString()}>
+                            {event.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="type" className="mb-1.5 block">Transaction Type</Label>
+                    <Select value={selectedTransactionType} onValueChange={setSelectedTransactionType}>
+                      <SelectTrigger id="type">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All Types</SelectItem>
+                        <SelectItem value="order">Orders</SelectItem>
+                        <SelectItem value="ticket">Tickets</SelectItem>
+                        <SelectItem value="vendor">Vendor Registrations</SelectItem>
+                        <SelectItem value="volunteer">Volunteer Assignments</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="status" className="mb-1.5 block">Status</Label>
+                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                      <SelectTrigger id="status">
+                        <SelectValue placeholder="All Statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All Statuses</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="completed">Completed/Active</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="refunded">Refunded</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <Button onClick={handleSearch} className="w-full">
+                      <Filter className="h-4 w-4 mr-2" />
+                      Apply Filters
+                    </Button>
+                  </div>
+                </div>
+                
+                <Separator className="my-6" />
+                
+                {/* Transaction table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-neutral-50">
+                        <th className="py-3 px-4 text-left text-sm font-medium text-neutral-500 border-b">Type</th>
+                        <th className="py-3 px-4 text-left text-sm font-medium text-neutral-500 border-b">Reference</th>
+                        <th className="py-3 px-4 text-left text-sm font-medium text-neutral-500 border-b">Event</th>
+                        <th className="py-3 px-4 text-left text-sm font-medium text-neutral-500 border-b">User</th>
+                        <th className="py-3 px-4 text-left text-sm font-medium text-neutral-500 border-b">Amount</th>
+                        <th className="py-3 px-4 text-left text-sm font-medium text-neutral-500 border-b">Status</th>
+                        <th className="py-3 px-4 text-left text-sm font-medium text-neutral-500 border-b">Date</th>
+                        <th className="py-3 px-4 text-left text-sm font-medium text-neutral-500 border-b">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {isLoadingTransactions ? (
+                        <tr>
+                          <td colSpan={8} className="py-8 text-center">
+                            <div className="flex justify-center">
+                              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                            </div>
+                          </td>
+                        </tr>
+                      ) : transactions && transactions.length > 0 ? (
+                        transactions.map((transaction) => (
+                          <tr key={`${transaction.type}-${transaction.id}`} className="border-b hover:bg-neutral-50">
+                            <td className="py-4 px-4">
+                              {transaction.type === "order" && <ShoppingCart className="h-5 w-5 text-blue-500" />}
+                              {transaction.type === "ticket" && <Ticket className="h-5 w-5 text-green-500" />}
+                              {transaction.type === "vendor" && <Store className="h-5 w-5 text-purple-500" />}
+                              {transaction.type === "volunteer" && <Clock className="h-5 w-5 text-amber-500" />}
+                            </td>
+                            <td className="py-4 px-4 font-medium">{transaction.reference}</td>
+                            <td className="py-4 px-4">{transaction.eventTitle || `Event #${transaction.eventId}`}</td>
+                            <td className="py-4 px-4">{transaction.userName || transaction.userEmail || `User #${transaction.userId}`}</td>
+                            <td className="py-4 px-4 font-medium">${transaction.amount.toFixed(2)}</td>
+                            <td className="py-4 px-4">
+                              <Badge variant={getStatusBadgeVariant(transaction.status)}>
+                                {transaction.status}
+                              </Badge>
+                            </td>
+                            <td className="py-4 px-4">{format(new Date(transaction.createdAt), "MMM d, yyyy")}</td>
+                            <td className="py-4 px-4">
+                              <Button variant="outline" size="sm">
+                                View
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={8} className="py-8 text-center text-neutral-500">
+                            No transactions found matching your criteria
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <div className="flex items-center space-x-2">
+                  <Label>Date Range:</Label>
+                  <DatePicker
+                    date={startDate}
+                    setDate={setStartDate}
+                    placeholder="Start Date"
+                  />
+                  <span>to</span>
+                  <DatePicker
+                    date={endDate}
+                    setDate={setEndDate}
+                    placeholder="End Date"
+                  />
+                </div>
+                <div className="flex space-x-2">
+                  <Button variant="outline" onClick={() => refetchTransactions()}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                  <Button onClick={handleExport}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          {/* Users tab content */}
           <TabsContent value="users" className="m-0">
             <Card>
               <CardHeader>
@@ -278,6 +558,7 @@ export default function AdminDashboardPage() {
             </Card>
           </TabsContent>
           
+          {/* Events tab content */}
           <TabsContent value="events" className="m-0">
             <Card>
               <CardHeader>
@@ -296,6 +577,7 @@ export default function AdminDashboardPage() {
             </Card>
           </TabsContent>
           
+          {/* Analytics tab content */}
           <TabsContent value="analytics" className="m-0">
             <Card>
               <CardHeader>
@@ -314,6 +596,7 @@ export default function AdminDashboardPage() {
             </Card>
           </TabsContent>
           
+          {/* Settings tab content */}
           <TabsContent value="settings" className="m-0">
             <Card>
               <CardHeader>

@@ -342,13 +342,13 @@ export class DatabaseStorage implements IStorage {
   // === PRODUCT OPERATIONS ===
 
   async getProducts(eventId: number, type?: string): Promise<Product[]> {
-    let query = db.select().from(products).where(eq(products.eventId, eventId));
+    let queryBuilder = db.select().from(products).where(eq(products.eventId, eventId));
     
     if (type) {
-      query = query.where(eq(products.type, type));
+      queryBuilder = queryBuilder.where(eq(products.type, type));
     }
     
-    return await query;
+    return await queryBuilder;
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
@@ -437,7 +437,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getVendorRegistrations(filters: { eventId?: number; userId?: number; status?: string } = {}): Promise<VendorRegistration[]> {
-    let query = db.select().from(vendorRegistrations);
+    let queryBuilder = db.select().from(vendorRegistrations);
     const conditions = [];
     
     if (filters.eventId) {
@@ -462,10 +462,10 @@ export class DatabaseStorage implements IStorage {
     }
     
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      queryBuilder = queryBuilder.where(and(...conditions));
     }
     
-    return await query;
+    return await queryBuilder;
   }
 
   async getVendorRegistration(id: number): Promise<VendorRegistration | undefined> {
@@ -552,7 +552,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getVolunteerAssignments(filters: { eventId?: number; userId?: number; status?: string } = {}): Promise<VolunteerAssignment[]> {
-    let query = db.select().from(volunteerAssignments);
+    let queryBuilder = db.select().from(volunteerAssignments);
     const conditions = [];
     
     if (filters.eventId) {
@@ -577,10 +577,10 @@ export class DatabaseStorage implements IStorage {
     }
     
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      queryBuilder = queryBuilder.where(and(...conditions));
     }
     
-    return await query;
+    return await queryBuilder;
   }
 
   async getVolunteerAssignment(id: number): Promise<VolunteerAssignment | undefined> {
@@ -793,13 +793,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAnalyticsByMetric(metric: string, eventId?: number, timeframe?: string): Promise<Analytics[]> {
-    let query = db
+    let queryBuilder = db
       .select()
       .from(analytics)
       .where(eq(analytics.metric, metric));
     
+    const conditions = [];
+    
     if (eventId) {
-      query = query.where(eq(analytics.eventId, eventId));
+      conditions.push(eq(analytics.eventId, eventId));
     }
     
     if (timeframe) {
@@ -826,10 +828,14 @@ export class DatabaseStorage implements IStorage {
           startDate = new Date(0); // beginning of time
       }
       
-      query = query.where(gte(analytics.dateTime, startDate));
+      conditions.push(gte(analytics.dateTime, startDate));
     }
     
-    return await query;
+    if (conditions.length > 0) {
+      queryBuilder = queryBuilder.where(and(...conditions));
+    }
+    
+    return await queryBuilder;
   }
 
   // === ADMIN STATS ===
