@@ -314,6 +314,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Update product via PATCH (protected, event owner/admin only)
+  app.patch("/api/products/:id", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      const event = await storage.getEvent(product.eventId);
+      
+      // Check permissions
+      if (req.user.role !== "admin" && event.ownerId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to update this product" });
+      }
+      
+      const validatedData = insertProductSchema.partial().parse(req.body);
+      const updatedProduct = await storage.updateProduct(productId, validatedData);
+      res.json(updatedProduct);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid product data", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message || "Failed to update product" });
+    }
+  });
+  
   // Direct product creation endpoint (for product manager component)
   app.post("/api/products", requireAuth, async (req, res) => {
     try {

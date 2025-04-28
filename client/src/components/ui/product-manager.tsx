@@ -92,11 +92,11 @@ export default function ProductManager({ eventId }: ProductManagerProps) {
   });
 
   // Filtered products by type
-  const tickets = products.filter(p => p.type === "ticket");
-  const merchandise = products.filter(p => p.type === "merchandise");
-  const addons = products.filter(p => p.type === "addon");
-  const vendorSpots = products.filter(p => p.type === "vendor_spot");
-  const volunteerShifts = products.filter(p => p.type === "volunteer_shift");
+  const tickets = products.filter((p: Product) => p.type === "ticket");
+  const merchandise = products.filter((p: Product) => p.type === "merchandise");
+  const addons = products.filter((p: Product) => p.type === "addon");
+  const vendorSpots = products.filter((p: Product) => p.type === "vendor_spot");
+  const volunteerShifts = products.filter((p: Product) => p.type === "volunteer_shift");
 
   // Create product mutation
   const createProductMutation = useMutation({
@@ -385,7 +385,14 @@ export default function ProductManager({ eventId }: ProductManagerProps) {
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Description (optional)" {...field} />
+                    <Textarea 
+                      placeholder="Description (optional)" 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                      value={field.value ?? ''}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -432,7 +439,14 @@ export default function ProductManager({ eventId }: ProductManagerProps) {
                 <FormItem>
                   <FormLabel>Image URL (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Image URL" {...field} />
+                    <Input 
+                      placeholder="Image URL" 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                      value={field.value ?? ''} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
