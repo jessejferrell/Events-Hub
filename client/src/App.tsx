@@ -18,14 +18,21 @@ import UserProfilePage from "@/pages/UserProfilePage";
 function Router() {
   return (
     <Switch>
+      {/* Public routes */}
+      <Route path="/" component={HomePage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/events" component={EventsPage} />
       <Route path="/events/:id" component={EventDetailsPage} />
-      <ProtectedRoute path="/" component={HomePage} />
+      
+      {/* Protected routes - require login */}
       <ProtectedRoute path="/my-events" component={MyEventsPage} />
-      <ProtectedRoute path="/admin" component={AdminDashboardPage} roles={["admin"]} />
-      <ProtectedRoute path="/payment-connections" component={PaymentConnectionsPage} roles={["event_owner"]} />
       <ProtectedRoute path="/profile" component={UserProfilePage} />
+      
+      {/* Role-specific routes */}
+      <ProtectedRoute path="/admin" component={AdminDashboardPage} roles={["admin"]} />
+      <ProtectedRoute path="/payment-connections" component={PaymentConnectionsPage} roles={["event_owner", "admin"]} />
+      
+      {/* 404 page */}
       <Route component={NotFound} />
     </Switch>
   );
