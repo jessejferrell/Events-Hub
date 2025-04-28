@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface StatCardProps {
+export interface StatCardProps {
   title: string;
   value: string;
   icon: ReactNode;
@@ -11,6 +11,7 @@ interface StatCardProps {
   linkHref: string;
   iconBgClass: string;
   isLoading?: boolean;
+  onClick?: () => void;
 }
 
 export default function StatCard({
@@ -20,7 +21,8 @@ export default function StatCard({
   linkText,
   linkHref,
   iconBgClass,
-  isLoading = false
+  isLoading = false,
+  onClick
 }: StatCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -38,9 +40,18 @@ export default function StatCard({
           <p className="text-3xl font-bold mb-3">{value}</p>
         )}
         
-        <Link href={linkHref} className="mt-auto">
-          <span className="text-secondary text-sm hover:underline">{linkText}</span>
-        </Link>
+        {onClick ? (
+          <button 
+            onClick={onClick} 
+            className="mt-auto text-left cursor-pointer"
+          >
+            <span className="text-secondary text-sm hover:underline">{linkText}</span>
+          </button>
+        ) : (
+          <Link href={linkHref} className="mt-auto">
+            <span className="text-secondary text-sm hover:underline">{linkText}</span>
+          </Link>
+        )}
       </CardContent>
     </Card>
   );

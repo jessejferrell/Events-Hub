@@ -33,7 +33,7 @@ export function DatePicker({ date, setDate, placeholder = "Pick a date", classNa
         <Calendar
           mode="single"
           selected={date ?? undefined}
-          onSelect={setDate}
+          onSelect={(selectedDate) => setDate(selectedDate || null)}
           initialFocus
         />
       </PopoverContent>
