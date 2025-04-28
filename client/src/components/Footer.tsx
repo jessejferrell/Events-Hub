@@ -111,14 +111,14 @@ export default function Footer() {
         <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
           <div>&copy; {new Date().getFullYear()} City Event Hub. All rights reserved.</div>
           <div className="flex mt-2 md:mt-0 space-x-6">
-            <Link href="/privacy">
-              <a className="hover:text-primary transition-colors">Privacy</a>
+            <Link href="/privacy" className="hover:text-primary transition-colors">
+              Privacy
             </Link>
-            <Link href="/terms">
-              <a className="hover:text-primary transition-colors">Terms</a>
+            <Link href="/terms" className="hover:text-primary transition-colors">
+              Terms
             </Link>
-            <Link href="/cookies">
-              <a className="hover:text-primary transition-colors">Cookies</a>
+            <Link href="/cookies" className="hover:text-primary transition-colors">
+              Cookies
             </Link>
           </div>
         </div>
