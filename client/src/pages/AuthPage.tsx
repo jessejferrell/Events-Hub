@@ -106,21 +106,36 @@ export default function AuthPage() {
   }
   
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="flex min-h-screen w-full bg-gradient-to-br from-background to-muted">
       {/* Left Side: Auth Form */}
       <div className="w-full md:w-1/2 p-6 flex flex-col justify-center items-center">
         <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <div className="bg-white rounded-full p-3 shadow-md">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-10 w-10 text-primary">
+                <path d="M11 17a1 1 0 1 0 2 0c0-.5-.34-1-1-1-.5 0-1 .63-1 1Z"></path>
+                <path d="M12 10v4"></path>
+                <path d="M2 8c0-2.2.9-4.1 2.3-5.5C5.7 1.1 7.8 0 10 0h4c2.2 0 4.3 1.1 5.7 2.5C21.1 3.9 22 5.8 22 8v6c0 5-4 8-10 8h0c-6 0-10-3-10-8V8Z"></path>
+              </svg>
+            </div>
+          </div>
+          
           <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Sign Up</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/50">
+              <TabsTrigger value="login" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+                Login
+              </TabsTrigger>
+              <TabsTrigger value="register" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+                Sign Up
+              </TabsTrigger>
             </TabsList>
             
             {/* Login Form */}
             <TabsContent value="login">
-              <div className="border border-neutral-200 rounded-lg p-8 bg-white shadow-sm">
-                <h1 className="text-2xl font-bold mb-1 text-neutral-900">Login to City Event Hub</h1>
-                <p className="text-neutral-500 mb-6 text-sm">Enter your credentials to access your account</p>
+              <div className="border border-border rounded-xl p-8 bg-white shadow-md">
+                <h1 className="text-2xl font-bold mb-1 text-foreground">Login to City Event Hub</h1>
+                <p className="text-muted-foreground mb-6 text-sm">Enter your credentials to access your account</p>
                 
                 <Form {...loginForm}>
                   <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
