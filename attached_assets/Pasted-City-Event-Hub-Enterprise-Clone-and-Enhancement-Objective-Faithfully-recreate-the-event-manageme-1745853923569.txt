@@ -1,0 +1,133 @@
+City Event Hub - Enterprise Clone and Enhancement
+
+Objective:
+Faithfully recreate the event management platform shown in the provided screenshots and the website https://events.mosspointmainstreet.org. Prioritize reliability, fluidity, intuitive UX/UI, and full data control.
+All data (users, events, payments, notes, analytics) must be managed through Replit’s Object Storage.
+
+📚 Software Stack:
+Frontend: React.js (with TailwindCSS for responsive design)
+
+Backend: FastAPI (Python)
+
+Authentication: JWT-based login with secure refresh token handling
+
+Payments: Stripe Connect OAuth integration
+
+Database: Replit Object Storage (required, not optional)
+
+Hosting: Deploy directly through Replit cloud
+
+🎯 Functional Requirements:
+Authentication and User Management:
+
+Sign up, login, password reset functionality
+
+Secure user sessions using JWT
+
+Passwords hashed with bcrypt
+
+Role-based permissions: User, Event Owner, Admin
+
+Email verification on signup if possible
+
+Public Event System:
+
+Browse upcoming events without logging in
+
+Grid view and Calendar view available
+
+Filters by event type and location
+
+Each event shows event image, date range, description, location
+
+Clicking on an event shows full details
+
+User Dashboard:
+
+View and edit own profile (name, email, password)
+
+View full purchase and payment history:
+
+Event name, ticket count, amount paid, status, transaction date
+
+View owned events (if Event Owner role is granted)
+
+Stripe Connect onboarding if eligible for Event Owner role
+
+Admin Dashboard:
+
+Total Users, Active Events, Monthly Revenue, Tickets Sold (MTD)
+
+Recent Events and Recent Payments panels
+
+View, edit, and delete any user, event, or payment
+
+Manually update any status: registration, ticket, payment, refund
+
+Add private admin notes to users and transactions
+
+Changes update immediately across dashboards and reports
+
+Event Management:
+
+Create, edit, delete events
+
+Manage event title, description, location, date range, images
+
+Events expire automatically after end date
+
+Event Owners manage only their own events
+
+Admins manage all events
+
+Payments System:
+
+Stripe Connect OAuth for Event Owners
+
+Event Owners receive direct ticket payments
+
+Admins can view and manually adjust payment entries
+
+Standard Stripe fee (2.9% + $0.30 per successful transaction) applied
+
+Payment statuses editable by admin if needed (Completed, Refunded, Cancelled)
+
+Analytics and Reporting:
+
+Real-time updates to user count, revenue totals, ticket sales
+
+Admin dashboard metrics must always reflect latest data
+
+Downloadable financial reports (CSV export capability for phase 2)
+
+⚡ Critical Engineering Practices:
+All create, update, delete, and fetch operations must use Replit Object Storage efficiently
+
+API endpoints must handle errors gracefully and return clear JSON error messages
+
+Modular backend code: separate routes, services, models, and schemas
+
+Responsive frontend design across all devices (mobile, tablet, desktop)
+
+Secure CORS rules enforced on backend routes
+
+Rate limiting on login attempts to protect against brute force attacks
+
+Sanitize all user inputs to prevent injection attacks
+
+Stripe webhooks secured with signature verification
+
+📋 Deliverables:
+Full operational deployment on Replit
+
+Screens fully functional: login, event listing, event details, user dashboard, admin dashboard, Stripe Connect
+
+Fully responsive UI/UX
+
+Proper separation of roles: Admin, Event Owner, Regular User
+
+All major CRUD operations tested and working
+
+Basic SEO optimization for public event listings
+
+END OF PROMPT
