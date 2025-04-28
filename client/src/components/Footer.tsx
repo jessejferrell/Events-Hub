@@ -31,23 +31,23 @@ export default function Footer() {
             <h3 className="text-lg font-bold text-primary mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/events">
-                  <a className="text-gray-600 hover:text-primary transition-colors">Browse Events</a>
+                <Link href="/events" className="text-gray-600 hover:text-primary transition-colors">
+                  Browse Events
                 </Link>
               </li>
               <li>
-                <Link href="/my-events">
-                  <a className="text-gray-600 hover:text-primary transition-colors">Create Event</a>
+                <Link href="/my-events" className="text-gray-600 hover:text-primary transition-colors">
+                  Create Event
                 </Link>
               </li>
               <li>
-                <Link href="/payment-connections">
-                  <a className="text-gray-600 hover:text-primary transition-colors">Payment Setup</a>
+                <Link href="/payment-connections" className="text-gray-600 hover:text-primary transition-colors">
+                  Payment Setup
                 </Link>
               </li>
               <li>
-                <Link href="/profile">
-                  <a className="text-gray-600 hover:text-primary transition-colors">My Account</a>
+                <Link href="/profile" className="text-gray-600 hover:text-primary transition-colors">
+                  My Account
                 </Link>
               </li>
             </ul>
@@ -58,28 +58,28 @@ export default function Footer() {
             <h3 className="text-lg font-bold text-primary mb-4">Support</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/help">
-                  <a className="text-gray-600 hover:text-primary transition-colors">Help Center</a>
+                <Link href="/help" className="text-gray-600 hover:text-primary transition-colors">
+                  Help Center
                 </Link>
               </li>
               <li>
-                <Link href="/faq">
-                  <a className="text-gray-600 hover:text-primary transition-colors">FAQ</a>
+                <Link href="/faq" className="text-gray-600 hover:text-primary transition-colors">
+                  FAQ
                 </Link>
               </li>
               <li>
-                <Link href="/contact">
-                  <a className="text-gray-600 hover:text-primary transition-colors">Contact Us</a>
+                <Link href="/contact" className="text-gray-600 hover:text-primary transition-colors">
+                  Contact Us
                 </Link>
               </li>
               <li>
-                <Link href="/privacy">
-                  <a className="text-gray-600 hover:text-primary transition-colors">Privacy Policy</a>
+                <Link href="/privacy" className="text-gray-600 hover:text-primary transition-colors">
+                  Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/terms">
-                  <a className="text-gray-600 hover:text-primary transition-colors">Terms of Service</a>
+                <Link href="/terms" className="text-gray-600 hover:text-primary transition-colors">
+                  Terms of Service
                 </Link>
               </li>
             </ul>

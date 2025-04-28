@@ -198,7 +198,7 @@ export default function MyEventsPage() {
 
         {/* Create Event Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create a New Event</DialogTitle>
               <DialogDescription>
@@ -211,7 +211,7 @@ export default function MyEventsPage() {
 
         {/* Edit Event Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Event</DialogTitle>
               <DialogDescription>
