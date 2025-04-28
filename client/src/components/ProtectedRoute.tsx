@@ -29,6 +29,11 @@ export function ProtectedRoute({ path, component: Component, roles }: ProtectedR
     );
   }
 
+  // Admins have access to everything
+  if (user.role === "admin") {
+    return <Route path={path} component={Component} />;
+  }
+  
   // If roles are specified, check if user has required role
   if (roles && roles.length > 0 && !roles.includes(user.role)) {
     return (

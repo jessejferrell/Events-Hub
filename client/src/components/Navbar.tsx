@@ -20,10 +20,9 @@ export default function Navbar() {
     logoutMutation.mutate();
   }, [logoutMutation]);
 
-  if (!user) return null;
-
   // Generate avatar initials from username or name
   const getInitials = () => {
+    if (!user) return "?";
     if (user.name) {
       return user.name.split(' ').map(n => n[0]).join('').toUpperCase();
     }
@@ -53,49 +52,59 @@ export default function Navbar() {
             </div>
           </Link>
           
-          {/* User Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center space-x-2 hover:bg-white/10 px-3 py-2 rounded-full h-auto transition-colors">
-                <span className="hidden sm:inline text-sm font-medium">{user.name || user.username}</span>
-                <Avatar className="h-8 w-8 bg-secondary/80 text-white ring-2 ring-white/30">
-                  <AvatarFallback>{getInitials()}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 mt-1 border-none shadow-lg rounded-xl">
-              <div className="px-4 py-3 border-b">
-                <p className="text-sm font-medium">{user.name || user.username}</p>
-                <p className="text-xs text-muted-foreground mt-1">{user.email}</p>
-              </div>
-              <Link href="/profile">
-                <DropdownMenuItem className="cursor-pointer">
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
+          {/* Guest buttons or User Menu */}
+          {!user ? (
+            <div className="flex items-center space-x-2">
+              <Link href="/auth">
+                <Button variant="outline" className="text-white border-white hover:bg-white/20 hover:text-white">
+                  Log In
+                </Button>
               </Link>
-              
-              {user.role === "admin" && (
-                <Link href="/admin">
+            </div>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center space-x-2 hover:bg-white/10 px-3 py-2 rounded-full h-auto transition-colors">
+                  <span className="hidden sm:inline text-sm font-medium">{user.name || user.username}</span>
+                  <Avatar className="h-8 w-8 bg-secondary/80 text-white ring-2 ring-white/30">
+                    <AvatarFallback>{getInitials()}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 mt-1 border-none shadow-lg rounded-xl">
+                <div className="px-4 py-3 border-b">
+                  <p className="text-sm font-medium">{user.name || user.username}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{user.email}</p>
+                </div>
+                <Link href="/profile">
                   <DropdownMenuItem className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Admin Dashboard</span>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
                   </DropdownMenuItem>
                 </Link>
-              )}
-              
-              <DropdownMenuSeparator />
-              
-              <DropdownMenuItem 
-                onClick={handleLogout} 
-                disabled={logoutMutation.isPending}
-                className="cursor-pointer text-destructive focus:text-destructive"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>{logoutMutation.isPending ? "Logging out..." : "Log out"}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                
+                {user.role === "admin" && (
+                  <Link href="/admin">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Admin Dashboard</span>
+                    </DropdownMenuItem>
+                  </Link>
+                )}
+                
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem 
+                  onClick={handleLogout} 
+                  disabled={logoutMutation.isPending}
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>{logoutMutation.isPending ? "Logging out..." : "Log out"}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
       
@@ -125,7 +134,7 @@ export default function Navbar() {
                 </div>
               </Link>
             </li>
-            {(user.role === "event_owner" || user.role === "admin") && (
+            {user && (user.role === "event_owner" || user.role === "admin") && (
               <li className="mr-2">
                 <Link href="/my-events">
                   <div className={`inline-block py-3 px-4 font-medium transition-all ${
@@ -138,7 +147,7 @@ export default function Navbar() {
                 </Link>
               </li>
             )}
-            {user.role === "admin" && (
+            {user && user.role === "admin" && (
               <li className="mr-2">
                 <Link href="/admin">
                   <div className={`inline-block py-3 px-4 font-medium transition-all ${
@@ -151,7 +160,7 @@ export default function Navbar() {
                 </Link>
               </li>
             )}
-            {(user.role === "event_owner" || user.role === "admin") && (
+            {user && (user.role === "event_owner" || user.role === "admin") && (
               <li className="mr-2">
                 <Link href="/payment-connections">
                   <div className={`inline-block py-3 px-4 font-medium transition-all ${
