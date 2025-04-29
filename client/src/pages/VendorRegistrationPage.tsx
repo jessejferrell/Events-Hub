@@ -189,7 +189,7 @@ export default function VendorRegistrationPage() {
           <CardHeader>
             <CardTitle>Vendor Registration</CardTitle>
             <CardDescription>
-              Please provide information about your business for the event: {cartItem.product.eventName}
+              Please provide information about your business for the event: {cartItem.product.name}
             </CardDescription>
           </CardHeader>
           <CardContent>

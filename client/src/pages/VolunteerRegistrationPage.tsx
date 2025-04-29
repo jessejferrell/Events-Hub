@@ -203,7 +203,7 @@ export default function VolunteerRegistrationPage() {
           <CardHeader>
             <CardTitle>Volunteer Registration</CardTitle>
             <CardDescription>
-              Please provide your information to volunteer for: {cartItem.product.eventName}
+              Please provide your information to volunteer for: {cartItem.product.name}
             </CardDescription>
           </CardHeader>
           <CardContent>
