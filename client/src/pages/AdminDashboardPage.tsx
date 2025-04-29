@@ -85,9 +85,9 @@ export default function AdminDashboardPage() {
       let queryParams = new URLSearchParams();
       
       if (searchQuery) queryParams.append("q", searchQuery);
-      if (selectedEventId) queryParams.append("eventId", selectedEventId);
-      if (selectedTransactionType) queryParams.append("type", selectedTransactionType);
-      if (selectedStatus) queryParams.append("status", selectedStatus);
+      if (selectedEventId && selectedEventId !== "all_events") queryParams.append("eventId", selectedEventId);
+      if (selectedTransactionType && selectedTransactionType !== "all_types") queryParams.append("type", selectedTransactionType);
+      if (selectedStatus && selectedStatus !== "all_statuses") queryParams.append("status", selectedStatus);
       
       const res = await fetch(`/api/admin/search?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch transactions");
@@ -104,9 +104,9 @@ export default function AdminDashboardPage() {
     let queryParams = new URLSearchParams();
     
     if (searchQuery) queryParams.append("q", searchQuery);
-    if (selectedEventId) queryParams.append("eventId", selectedEventId);
-    if (selectedTransactionType) queryParams.append("type", selectedTransactionType);
-    if (selectedStatus) queryParams.append("status", selectedStatus);
+    if (selectedEventId && selectedEventId !== "all_events") queryParams.append("eventId", selectedEventId);
+    if (selectedTransactionType && selectedTransactionType !== "all_types") queryParams.append("type", selectedTransactionType);
+    if (selectedStatus && selectedStatus !== "all_statuses") queryParams.append("status", selectedStatus);
     
     if (startDate) queryParams.append("startDate", startDate.toISOString());
     if (endDate) queryParams.append("endDate", endDate.toISOString());
@@ -397,7 +397,7 @@ export default function AdminDashboardPage() {
                         <SelectValue placeholder="All Events" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Events</SelectItem>
+                        <SelectItem value="all_events">All Events</SelectItem>
                         {stats?.recentEvents?.map(event => (
                           <SelectItem key={event.id} value={event.id.toString()}>
                             {event.title}
@@ -414,7 +414,7 @@ export default function AdminDashboardPage() {
                         <SelectValue placeholder="All Types" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Types</SelectItem>
+                        <SelectItem value="all_types">All Types</SelectItem>
                         <SelectItem value="order">Orders</SelectItem>
                         <SelectItem value="ticket">Tickets</SelectItem>
                         <SelectItem value="vendor">Vendor Registrations</SelectItem>
@@ -430,7 +430,7 @@ export default function AdminDashboardPage() {
                         <SelectValue placeholder="All Statuses" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Statuses</SelectItem>
+                        <SelectItem value="all_statuses">All Statuses</SelectItem>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="completed">Completed/Active</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
