@@ -917,6 +917,61 @@ export default function AdminDashboardPage() {
       </main>
       
       <Footer />
+      
+      {/* Delete Event Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete Event</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this event? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedEvent && (
+            <div className="border rounded-md p-4 my-4">
+              <h3 className="font-medium text-lg">{selectedEvent.title}</h3>
+              <p className="text-sm text-muted-foreground mt-1">{selectedEvent.description}</p>
+              <div className="flex items-center gap-2 mt-2 text-sm">
+                <Calendar className="h-4 w-4" />
+                <span>{format(new Date(selectedEvent.startDate), "MMM d, yyyy")}</span>
+                <span>-</span>
+                <span>{format(new Date(selectedEvent.endDate), "MMM d, yyyy")}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1 text-sm">
+                <Store className="h-4 w-4" />
+                <span>{selectedEvent.location}</span>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteEvent}
+              disabled={deleteEventMutation.isPending}
+            >
+              {deleteEventMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete Event
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
