@@ -110,6 +110,40 @@ export function CartWidget() {
                 className="w-full"
                 onClick={() => {
                   setIsOpen(false);
+                  
+                  // Check if we have any vendor or volunteer products that need registration
+                  const vendorItems = items.filter(item => item.product.type === 'vendor_spot');
+                  const volunteerItems = items.filter(item => item.product.type === 'volunteer_shift');
+                  
+                  // Check if any items need registration and don't have it completed
+                  const hasIncompleteVendorRegistration = vendorItems.some(item => 
+                    getRegistrationStatus(item.id) !== 'complete'
+                  );
+                  
+                  const hasIncompleteVolunteerRegistration = volunteerItems.some(item => 
+                    getRegistrationStatus(item.id) !== 'complete'
+                  );
+                  
+                  // Route based on what's needed
+                  if (hasIncompleteVendorRegistration) {
+                    // Get the first vendor item that needs registration
+                    const vendorItem = vendorItems.find(item => getRegistrationStatus(item.id) !== 'complete');
+                    if (vendorItem) {
+                      navigate(`/registration/vendor/${vendorItem.id}`);
+                      return;
+                    }
+                  }
+                  
+                  if (hasIncompleteVolunteerRegistration) {
+                    // Get the first volunteer item that needs registration
+                    const volunteerItem = volunteerItems.find(item => getRegistrationStatus(item.id) !== 'complete');
+                    if (volunteerItem) {
+                      navigate(`/registration/volunteer/${volunteerItem.id}`);
+                      return;
+                    }
+                  }
+                  
+                  // If all registrations are complete or there are none, go to checkout
                   navigate("/checkout");
                 }}
               >
