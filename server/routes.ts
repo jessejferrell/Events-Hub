@@ -807,42 +807,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No items provided for checkout" });
       }
       
-      // Step 1: Create an order
-      const order = await storage.createOrder({
-        userId: req.user.id,
-        status: "pending",
-        paymentStatus: "pending",
-        totalAmount: 0, // Will be calculated based on items
-      });
-      
+      // Extract product data first to get eventId
       let totalAmount = 0;
       let products = [];
       let eventIds = new Set();
       
-      // Step 2: Create order items and calculate total
       for (const item of items) {
         const product = await storage.getProduct(item.productId);
         if (!product) {
-          // If product doesn't exist, rollback
-          await storage.updateOrderStatus(order.id, "cancelled");
           return res.status(404).json({ message: `Product ${item.productId} not found` });
         }
         
         products.push(product);
         eventIds.add(product.eventId);
         
+        // Add to total
+        totalAmount += product.price * item.quantity;
+      }
+      
+      if (eventIds.size === 0) {
+        return res.status(400).json({ message: "No valid products found" });
+      }
+      
+      // Get the primary event for this order
+      const eventId = Array.from(eventIds)[0];
+      
+      // Step 1: Create an order
+      const order = await storage.createOrder({
+        userId: req.user.id,
+        eventId: eventId,
+        status: "pending",
+        paymentStatus: "pending",
+        totalAmount: totalAmount,
+        paymentMethod: "stripe"
+      });
+      
+      // Step 2: Create order items
+      for (const item of items) {
+        const product = products.find(p => p.id === item.productId);
+        
         // Create order item
         await storage.createOrderItem({
           orderId: order.id,
-          productId: product.id,
+          itemId: product.id,
+          itemType: product.type,
+          name: product.name,
+          description: product.description,
           quantity: item.quantity,
-          price: product.price,
-          productType: product.type,
-          registrationData: item.registrationData || null
+          unitPrice: product.price,
+          totalPrice: product.price * item.quantity,
+          metadata: item.registrationData || null
         });
-        
-        // Add to total
-        totalAmount += product.price * item.quantity;
       }
       
       // Update order total
@@ -850,7 +865,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedOrder = await storage.updateOrderPaymentStatus(order.id, "pending");
       
       // Step 3: Get event owner's Stripe account
-      const eventId = Array.from(eventIds)[0]; // For simplicity, assuming all products are from the same event
       const event = await storage.getEvent(eventId);
       
       if (!event) {
@@ -901,7 +915,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Send payment to the connected account
         payment_intent_data: {
-          application_fee_amount: Math.round(totalAmount * 100 * 0.05), // 5% platform fee
           transfer_data: {
             destination: owner.stripeAccountId,
           },
