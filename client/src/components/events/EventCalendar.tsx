@@ -15,12 +15,12 @@ interface EventCalendarProps {
 
 export default function EventCalendar({ events, isLoading, isError }: EventCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [eventType, setEventType] = useState("");
-  const [location, setLocation] = useState("");
+  const [eventType, setEventType] = useState("all");
+  const [location, setLocation] = useState("all");
 
   // Event type options
   const eventTypes = [
-    { value: "", label: "All Event Types" },
+    { value: "all", label: "All Event Types" },
     { value: "concert", label: "Concerts" },
     { value: "festival", label: "Festivals" },
     { value: "workshop", label: "Workshops" },
@@ -30,7 +30,7 @@ export default function EventCalendar({ events, isLoading, isError }: EventCalen
 
   // Location options
   const locationOptions = [
-    { value: "", label: "All Locations" },
+    { value: "all", label: "All Locations" },
     { value: "downtown", label: "Downtown" },
     { value: "park", label: "City Park" },
     { value: "convention", label: "Convention Center" },
@@ -74,8 +74,8 @@ export default function EventCalendar({ events, isLoading, isError }: EventCalen
 
   // Filter events by selected filters
   const filteredEvents = events.filter(event => {
-    if (eventType && event.eventType !== eventType) return false;
-    if (location && !event.location.toLowerCase().includes(location.toLowerCase())) return false;
+    if (eventType !== "all" && event.eventType !== eventType) return false;
+    if (location !== "all" && !event.location.toLowerCase().includes(location.toLowerCase())) return false;
     return true;
   });
 
