@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StatCard from "@/components/admin/StatCard";
@@ -19,8 +20,14 @@ import {
   Search,
   Filter,
   RefreshCw,
-  FileText
+  FileText,
+  Trash,
+  Edit,
+  Eye,
+  AlertTriangle,
+  Plus
 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { Event, Order } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +68,8 @@ interface Transaction {
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
+  const [eventSearchQuery, setEventSearchQuery] = useState("");
+  const [eventStatusFilter, setEventStatusFilter] = useState("all");
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [selectedTransactionType, setSelectedTransactionType] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
@@ -94,6 +103,98 @@ export default function AdminDashboardPage() {
     },
     enabled: activeTab === "transactions"
   });
+  
+  // Navigation
+  const [, navigate] = useLocation();
+  
+  // Event management
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // Fetch all events for the Events tab
+  const { data: allEvents, isLoading: isLoadingEvents, refetch: refetchEvents } = useQuery<Event[]>({
+    queryKey: ["/api/events", eventSearchQuery, eventStatusFilter],
+    queryFn: async () => {
+      let queryParams = new URLSearchParams();
+      
+      if (eventSearchQuery) queryParams.append("search", eventSearchQuery);
+      if (eventStatusFilter === "upcoming") queryParams.append("isUpcoming", "true");
+      
+      const res = await fetch(`/api/events?${queryParams.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch events");
+      return await res.json();
+    },
+    enabled: activeTab === "events"
+  });
+  
+  // Delete event mutation
+  const deleteEventMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      const res = await fetch(`/api/events/${eventId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error('Failed to delete event');
+      }
+      return true;
+    },
+    onSuccess: () => {
+      refetchEvents();
+      setShowDeleteConfirm(false);
+      setSelectedEvent(null);
+    },
+  });
+  
+  // Toggle event status mutation
+  const toggleEventStatusMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      const res = await fetch(`/api/events/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isActive }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update event status');
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      refetchEvents();
+    },
+  });
+  
+  // Handle event actions
+  const handleViewEvent = (eventId: number) => {
+    window.open(`/events/${eventId}`, '_blank');
+  };
+  
+  const handleEditEvent = (eventId: number) => {
+    navigate(`/events/${eventId}/edit`);
+  };
+  
+  const handleManageTickets = (eventId: number) => {
+    navigate(`/events/${eventId}/tickets`);
+  };
+  
+  const handleToggleEventStatus = (event: Event) => {
+    toggleEventStatusMutation.mutate({ 
+      id: event.id, 
+      isActive: !event.isActive 
+    });
+  };
+  
+  const handleDeleteEvent = (event: Event) => {
+    setSelectedEvent(event);
+    setShowDeleteConfirm(true);
+  };
+  
+  const confirmDeleteEvent = () => {
+    if (selectedEvent) {
+      deleteEventMutation.mutate(selectedEvent.id);
+    }
+  };
 
   const handleSearch = () => {
     refetchTransactions();
@@ -562,12 +663,231 @@ export default function AdminDashboardPage() {
                 <CardDescription>View and manage all events in the system</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex justify-center items-center py-12">
-                  <div className="text-center">
-                    <Calendar className="h-12 w-12 mx-auto mb-4 text-neutral-300" />
-                    <p className="text-neutral-600 mb-2">Event management interface will be implemented here</p>
-                    <p className="text-neutral-500 text-sm">This section will include event listing, approval, editing, and deletion</p>
+                <div className="space-y-6">
+                  {/* Event management controls */}
+                  <div className="flex flex-col sm:flex-row gap-4 justify-between">
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        placeholder="Search events..." 
+                        className="w-full sm:w-[250px]"
+                        value={eventSearchQuery}
+                        onChange={(e) => setEventSearchQuery(e.target.value)}
+                      />
+                      <Button variant="outline" size="icon" onClick={() => refetchEvents()}>
+                        <Search className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Select 
+                        defaultValue="all" 
+                        value={eventStatusFilter}
+                        onValueChange={setEventStatusFilter}
+                      >
+                        <SelectTrigger className="w-[150px]">
+                          <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Events</SelectItem>
+                          <SelectItem value="upcoming">Upcoming</SelectItem>
+                          <SelectItem value="past">Past Events</SelectItem>
+                          <SelectItem value="unpublished">Unpublished</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Button variant="outline" size="icon" title="Refresh" onClick={() => refetchEvents()}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      
+                      <Button variant="default">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        New Event
+                      </Button>
+                    </div>
                   </div>
+                  
+                  {/* Events table */}
+                  <div className="rounded-md border">
+                    <div className="relative w-full overflow-auto">
+                      {isLoadingEvents ? (
+                        <div className="flex justify-center py-12">
+                          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                        </div>
+                      ) : (
+                        <table className="w-full caption-bottom text-sm">
+                          <thead className="[&_tr]:border-b">
+                            <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                              <th className="h-12 px-4 text-left align-middle font-medium">Event</th>
+                              <th className="h-12 px-4 text-left align-middle font-medium">Date</th>
+                              <th className="h-12 px-4 text-left align-middle font-medium">Location</th>
+                              <th className="h-12 px-4 text-left align-middle font-medium">Status</th>
+                              <th className="h-12 px-4 text-left align-middle font-medium">Organizer</th>
+                              <th className="h-12 px-4 text-left align-middle font-medium">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="[&_tr:last-child]:border-0">
+                            {allEvents && allEvents.length > 0 ? (
+                              allEvents.map((event) => {
+                                const eventStartDate = new Date(event.startDate);
+                                const eventEndDate = new Date(event.endDate);
+                                const isUpcoming = eventStartDate > new Date();
+                                const isPast = eventEndDate < new Date();
+                                
+                                // Calculate duration in days
+                                const durationDays = Math.ceil((eventEndDate.getTime() - eventStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                
+                                return (
+                                  <tr key={event.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                    <td className="p-4 align-middle">
+                                      <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded bg-primary/10 flex items-center justify-center">
+                                          {event.imageUrl ? (
+                                            <img 
+                                              src={event.imageUrl} 
+                                              alt={event.title}
+                                              className="h-10 w-10 object-cover rounded"
+                                            />
+                                          ) : (
+                                            <Calendar className="h-5 w-5 text-primary" />
+                                          )}
+                                        </div>
+                                        <div>
+                                          <div className="font-medium">{event.title}</div>
+                                          <div className="text-xs text-muted-foreground">{event.eventType}</div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="p-4 align-middle">
+                                      <div>{format(eventStartDate, "MMM d, yyyy")}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {durationDays > 1 
+                                          ? `${durationDays}-day event` 
+                                          : "1-day event"
+                                        }
+                                      </div>
+                                    </td>
+                                    <td className="p-4 align-middle">
+                                      <div>{event.location.split(',')[0]}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {event.location.includes(',') 
+                                          ? event.location.split(',').slice(1).join(',').trim() 
+                                          : ''
+                                        }
+                                      </div>
+                                    </td>
+                                    <td className="p-4 align-middle">
+                                      <Badge 
+                                        variant={
+                                          !event.isActive 
+                                            ? "secondary" 
+                                            : isUpcoming 
+                                              ? "success" 
+                                              : isPast 
+                                                ? "warning"
+                                                : "success"
+                                        }
+                                      >
+                                        {!event.isActive 
+                                          ? "Draft" 
+                                          : isUpcoming 
+                                            ? "Upcoming" 
+                                            : isPast 
+                                              ? "Past"
+                                              : "Active"
+                                        }
+                                      </Badge>
+                                    </td>
+                                    <td className="p-4 align-middle">
+                                      <div>Organizer ID: {event.ownerId}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {/* We don't have owner name in the event data */}
+                                        {event.ownerId === 2 ? "Jesse Ferrell" : "Event Owner"}
+                                      </div>
+                                    </td>
+                                    <td className="p-4 align-middle">
+                                      <div className="flex items-center gap-1">
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          title="View event"
+                                          onClick={() => handleViewEvent(event.id)}
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          title="Edit"
+                                          onClick={() => handleEditEvent(event.id)}
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          title="Manage tickets"
+                                          onClick={() => handleManageTickets(event.id)}
+                                        >
+                                          <Ticket className="h-4 w-4" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          title="Toggle status"
+                                          onClick={() => handleToggleEventStatus(event)}
+                                        >
+                                          {event.isActive ? (
+                                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                          ) : (
+                                            <Calendar className="h-4 w-4 text-emerald-500" />
+                                          )}
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          title="Delete"
+                                          onClick={() => handleDeleteEvent(event)}
+                                        >
+                                          <Trash className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            ) : (
+                              <tr>
+                                <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                                  <div className="flex flex-col items-center justify-center">
+                                    <AlertTriangle className="h-8 w-8 mb-2 text-muted-foreground" />
+                                    <p>No events found</p>
+                                    <p className="text-sm mt-1">Try a different search or create a new event</p>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Pagination */}
+                  {allEvents && allEvents.length > 0 && (
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        Showing <strong>1-{allEvents.length}</strong> of <strong>{allEvents.length}</strong> events
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" disabled>
+                          Previous
+                        </Button>
+                        <Button variant="outline" size="sm" disabled>
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
