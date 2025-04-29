@@ -87,6 +87,15 @@ export default function EventDetailsPage() {
   const merchandiseProducts = products?.filter(p => p.type === "merchandise") || [];
   const vendorProducts = products?.filter(p => p.type === "vendor_spot") || [];
   const volunteerProducts = products?.filter(p => p.type === "volunteer_shift") || [];
+  
+  // Debug log
+  console.log("Products:", { 
+    all: products,
+    tickets: ticketProducts,
+    merchandise: merchandiseProducts, 
+    vendors: vendorProducts, 
+    volunteers: volunteerProducts 
+  });
 
   // Create checkout session mutation
   const createCheckoutSession = useMutation({
