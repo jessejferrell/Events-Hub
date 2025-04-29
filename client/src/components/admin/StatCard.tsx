@@ -48,7 +48,7 @@ export default function StatCard({
             <span className="text-secondary text-sm hover:underline">{linkText}</span>
           </button>
         ) : (
-          <Link href={linkHref} className="mt-auto">
+          <Link to={linkHref} className="mt-auto">
             <span className="text-secondary text-sm hover:underline">{linkText}</span>
           </Link>
         )}

@@ -152,6 +152,7 @@ export default function AdminDashboardPage() {
             linkHref="#users" 
             iconBgClass="bg-neutral-100"
             isLoading={isLoading}
+            onClick={() => setActiveTab("users")}
           />
           
           <StatCard 
@@ -162,6 +163,7 @@ export default function AdminDashboardPage() {
             linkHref="#events" 
             iconBgClass="bg-green-100"
             isLoading={isLoading}
+            onClick={() => setActiveTab("events")}
           />
           
           <StatCard 
