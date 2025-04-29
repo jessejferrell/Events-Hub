@@ -25,7 +25,7 @@ import {
 import { Loader2 } from "lucide-react";
 
 export default function CheckoutPage() {
-  const { items, total, itemCount, checkoutMutation, hasRegistrationType } = useCart();
+  const { items, total, itemCount, checkoutMutation, hasRegistrationType, getRegistrationStatus } = useCart();
   const { user } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -40,8 +40,6 @@ export default function CheckoutPage() {
   
   useEffect(() => {
     // Check if all required registrations are complete
-    const { getRegistrationStatus } = useCart();
-    
     const vendorItems = items.filter(item => item.product.type === 'vendor_spot');
     const volunteerItems = items.filter(item => item.product.type === 'volunteer_shift');
     
@@ -56,7 +54,7 @@ export default function CheckoutPage() {
     setHasIncompleteRegistrations(
       incompleteVendorRegistrations || incompleteVolunteerRegistrations
     );
-  }, [items]);
+  }, [items, getRegistrationStatus]);
   
   // If cart is empty, redirect to home
   useEffect(() => {
