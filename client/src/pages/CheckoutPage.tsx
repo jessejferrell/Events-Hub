@@ -262,15 +262,11 @@ export default function CheckoutPage() {
                   <span>Subtotal</span>
                   <span>${total.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Platform Fee (5%)</span>
-                  <span>${(total * 0.05).toFixed(2)}</span>
-                </div>
                 {/* Add taxes, fees, etc. here if applicable */}
                 <Separator />
                 <div className="flex justify-between font-bold">
                   <span>Total</span>
-                  <span>${(total * 1.05).toFixed(2)}</span>
+                  <span>${total.toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>

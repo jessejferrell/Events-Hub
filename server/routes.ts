@@ -5,6 +5,7 @@ import { setupAuth } from "./auth";
 import { setupStripeRoutes } from "./stripe";
 import { upload } from "./uploads";
 import { z } from "zod";
+import Stripe from "stripe";
 import { 
   insertEventSchema, 
   insertTicketSchema, 
