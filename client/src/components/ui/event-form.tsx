@@ -500,8 +500,8 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>Important</AlertTitle>
         <AlertDescription>
-          All items sold at your event should be added as products to track sales and manage inventory.
-          At minimum, you should create at least one ticket product for your event.
+          All items for your event (tickets, merchandise, vendor spots, volunteer shifts, etc.) should be added as PRODUCTS. 
+          Each product is fully editable and manageable. At minimum, create at least one ticket product for your event.
         </AlertDescription>
       </Alert>
       
