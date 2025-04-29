@@ -127,17 +127,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create event (protected, event owner/admin only)
   app.post("/api/events", requireOwnerOrAdmin, async (req, res) => {
     try {
+      console.log("Creating event with data:", req.body);
+      
       const validatedData = insertEventSchema.parse({
         ...req.body,
         ownerId: req.user.id,
       });
       
+      console.log("Validated event data:", validatedData);
+      
       const event = await storage.createEvent(validatedData);
       res.status(201).json(event);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
+        console.error("Validation error:", error.errors);
         return res.status(400).json({ message: "Invalid event data", errors: error.errors });
       }
+      console.error("Error creating event:", error.message);
       res.status(500).json({ message: error.message || "Failed to create event" });
     }
   });
