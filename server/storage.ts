@@ -12,7 +12,8 @@ import {
   volunteerShifts, type VolunteerShift, type InsertVolunteerShift,
   volunteerAssignments, type VolunteerAssignment, type InsertVolunteerAssignment,
   adminNotes, type AdminNote, type InsertAdminNote,
-  analytics, type Analytics, type InsertAnalytics
+  analytics, type Analytics, type InsertAnalytics,
+  systemSettings, type SystemSetting, type InsertSystemSetting
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -128,6 +129,13 @@ export interface IStorage {
   // Search & export
   searchTransactions(query: string, filters: { userId?: number; eventId?: number; transactionType?: string; status?: string }): Promise<any[]>;
   exportTransactions(filters: { userId?: number; eventId?: number; transactionType?: string; startDate?: Date; endDate?: Date; status?: string }): Promise<any[]>;
+  
+  // System settings operations
+  getSystemSettings(category?: string): Promise<SystemSetting[]>;
+  getSystemSettingByKey(key: string): Promise<SystemSetting | undefined>;
+  createSystemSetting(setting: InsertSystemSetting): Promise<SystemSetting>;
+  updateSystemSetting(key: string, value: any, updatedBy: number): Promise<SystemSetting>;
+  deleteSystemSetting(key: string): Promise<boolean>;
 }
 
 // Database implementation of storage interface
@@ -1095,6 +1103,58 @@ export class DatabaseStorage implements IStorage {
     );
     
     return enhancedResults;
+  }
+  
+  // === SYSTEM SETTINGS OPERATIONS ===
+  
+  async getSystemSettings(category?: string): Promise<SystemSetting[]> {
+    let query = db.select().from(systemSettings);
+    
+    if (category) {
+      query = query.where(eq(systemSettings.category, category));
+    }
+    
+    return await query.orderBy(
+      systemSettings.category,
+      systemSettings.key
+    );
+  }
+  
+  async getSystemSettingByKey(key: string): Promise<SystemSetting | undefined> {
+    const results = await db.select().from(systemSettings).where(eq(systemSettings.key, key));
+    return results[0];
+  }
+  
+  async createSystemSetting(settingData: InsertSystemSetting): Promise<SystemSetting> {
+    const results = await db.insert(systemSettings).values(settingData).returning();
+    return results[0];
+  }
+  
+  async updateSystemSetting(key: string, value: any, updatedBy: number): Promise<SystemSetting> {
+    const results = await db
+      .update(systemSettings)
+      .set({ 
+        value, 
+        updatedBy, 
+        updatedAt: new Date() 
+      })
+      .where(eq(systemSettings.key, key))
+      .returning();
+      
+    if (!results[0]) {
+      throw new Error(`Setting not found: ${key}`);
+    }
+    
+    return results[0];
+  }
+  
+  async deleteSystemSetting(key: string): Promise<boolean> {
+    const result = await db
+      .delete(systemSettings)
+      .where(eq(systemSettings.key, key))
+      .returning({ id: systemSettings.id });
+      
+    return result.length > 0;
   }
 }
 

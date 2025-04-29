@@ -1108,10 +1108,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If eventId is provided, check permissions
       if (eventId) {
         const event = await storage.getEvent(eventId);
-        if (req.user.role !== "admin" && event.ownerId !== req.user.id) {
+        if (req.user!.role !== "admin" && event!.ownerId !== req.user!.id) {
           return res.status(403).json({ message: "Not authorized to view analytics for this event" });
         }
-      } else if (req.user.role !== "admin") {
+      } else if (req.user!.role !== "admin") {
         // If no eventId and not admin, return 403
         return res.status(403).json({ message: "Not authorized to view global analytics" });
       }
@@ -1120,6 +1120,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(results);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch analytics" });
+    }
+  });
+  
+  // === SYSTEM SETTINGS API ===
+  
+  // Get all system settings
+  app.get("/api/settings", requireAdmin, async (req, res) => {
+    try {
+      const category = req.query.category as string;
+      const settings = await storage.getSystemSettings(category);
+      res.json(settings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch system settings" });
+    }
+  });
+  
+  // Get a specific system setting
+  app.get("/api/settings/:key", requireAdmin, async (req, res) => {
+    try {
+      const key = req.params.key;
+      const setting = await storage.getSystemSettingByKey(key);
+      
+      if (!setting) {
+        return res.status(404).json({ message: "Setting not found" });
+      }
+      
+      res.json(setting);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch system setting" });
+    }
+  });
+  
+  // Create or update system setting
+  app.post("/api/settings", requireAdmin, async (req, res) => {
+    try {
+      const { key, value, category } = req.body;
+      
+      if (!key || !category) {
+        return res.status(400).json({ message: "Key and category are required" });
+      }
+      
+      const existingSetting = await storage.getSystemSettingByKey(key);
+      
+      if (existingSetting) {
+        // Update existing setting
+        const updated = await storage.updateSystemSetting(key, value, req.user!.id);
+        return res.json(updated);
+      } else {
+        // Create new setting
+        const created = await storage.createSystemSetting({
+          key,
+          value,
+          category,
+          updatedBy: req.user!.id
+        });
+        return res.status(201).json(created);
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to save system setting" });
+    }
+  });
+  
+  // Delete system setting
+  app.delete("/api/settings/:key", requireAdmin, async (req, res) => {
+    try {
+      const key = req.params.key;
+      const deleted = await storage.deleteSystemSetting(key);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Setting not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to delete system setting" });
     }
   });
 
