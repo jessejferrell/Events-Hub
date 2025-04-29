@@ -12,8 +12,7 @@ import {
   volunteerShifts, type VolunteerShift, type InsertVolunteerShift,
   volunteerAssignments, type VolunteerAssignment, type InsertVolunteerAssignment,
   adminNotes, type AdminNote, type InsertAdminNote,
-  analytics, type Analytics, type InsertAnalytics,
-  systemSettings, type SystemSetting, type InsertSystemSetting
+  analytics, type Analytics, type InsertAnalytics
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";

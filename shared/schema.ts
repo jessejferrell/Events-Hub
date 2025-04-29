@@ -553,28 +553,3 @@ export type InsertAdminNote = z.infer<typeof insertAdminNoteSchema>;
 
 export type Analytics = typeof analytics.$inferSelect;
 export type InsertAnalytics = z.infer<typeof insertAnalyticsSchema>;
-
-// System Settings model
-export const systemSettings = pgTable("system_settings", {
-  id: serial("id").primaryKey(),
-  key: text("key").notNull().unique(),
-  value: jsonb("value"),
-  category: text("category").notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  updatedBy: integer("updated_by").references(() => users.id),
-});
-
-export const systemSettingsRelations = relations(systemSettings, ({ one }) => ({
-  updatedByUser: one(users, {
-    fields: [systemSettings.updatedBy],
-    references: [users.id],
-  }),
-}));
-
-export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({
-  id: true,
-  updatedAt: true,
-});
-
-export type SystemSetting = typeof systemSettings.$inferSelect;
-export type InsertSystemSetting = z.infer<typeof insertSystemSettingsSchema>;
