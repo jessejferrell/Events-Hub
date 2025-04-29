@@ -1,22 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation } from "wouter";
-import { useCart } from "@/hooks/use-cart";
-import { useAuth } from "@/hooks/use-auth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useAuth } from "@/hooks/use-auth";
+import { useCart } from "@/hooks/use-cart";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -26,20 +18,25 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
-// Form schema for vendor registration
+// Define the vendor registration form schema
 const vendorFormSchema = z.object({
-  businessName: z.string().min(2, "Business name must be at least 2 characters"),
-  businessDescription: z.string().min(10, "Please provide a description of your business"),
-  productsDescription: z.string().min(10, "Please describe what products you'll be selling"),
-  specialRequests: z.string().optional(),
-  contactPhone: z.string().min(10, "Please provide a valid phone number"),
-  businessWebsite: z.string().optional(),
-  hasInsurance: z.boolean().optional(),
+  businessName: z.string().min(1, "Business name is required"),
+  description: z.string().min(1, "Description is required"),
+  websiteUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
+  preferredLocation: z.string().optional(),
+  needsElectricity: z.boolean().default(false),
+  needsWater: z.boolean().default(false),
+  specialRequirements: z.string().optional(),
   agreeToTerms: z.boolean().refine(val => val === true, {
     message: "You must agree to the terms and conditions",
   }),
@@ -49,234 +46,174 @@ type VendorFormValues = z.infer<typeof vendorFormSchema>;
 
 export default function VendorRegistrationPage() {
   const { id } = useParams<{ id: string }>();
-  const { toast } = useToast();
-  const { user } = useAuth();
-  const { items, updateRegistrationData } = useCart();
   const [, navigate] = useLocation();
-
-  // Find the cart item
-  const cartItem = items.find(item => item.id === id);
+  const { user } = useAuth();
+  const { setRegistrationStatus, getCartItem } = useCart();
+  const { toast } = useToast();
+  const [isExistingProfile, setIsExistingProfile] = useState(false);
   
-  // Get existing vendor profile if any
-  const { data: existingProfile, isLoading: isLoadingProfile } = useQuery({
-    queryKey: ["/api/vendor-profile"],
-    queryFn: async () => {
-      try {
-        const res = await apiRequest("GET", "/api/vendor-profile");
-        if (res.status === 404) {
-          return null; // No profile found, that's ok
-        }
-        return await res.json();
-      } catch (error) {
-        return null; // Handle no profile gracefully
-      }
-    },
+  // Get the cart item
+  const cartItem = getCartItem(id);
+  
+  // Redirect if cart item doesn't exist or isn't a vendor spot
+  useEffect(() => {
+    if (!cartItem) {
+      toast({
+        title: "Item not found",
+        description: "The specified cart item was not found.",
+        variant: "destructive",
+      });
+      navigate("/");
+      return;
+    }
+    
+    if (cartItem.product.type !== 'vendor_spot') {
+      toast({
+        title: "Invalid item type",
+        description: "This item does not require vendor registration.",
+        variant: "destructive",
+      });
+      navigate("/");
+    }
+  }, [cartItem, toast, navigate]);
+  
+  // Fetch existing vendor profile if any
+  const { data: vendorProfile, isLoading: isLoadingProfile } = useQuery({
+    queryKey: ['/api/vendor-profile'],
     enabled: !!user,
   });
-
-  // Create or update vendor profile mutation
-  const profileMutation = useMutation({
+  
+  useEffect(() => {
+    if (vendorProfile) {
+      setIsExistingProfile(true);
+    }
+  }, [vendorProfile]);
+  
+  // Set up the form with default values from existing profile
+  const form = useForm<VendorFormValues>({
+    resolver: zodResolver(vendorFormSchema),
+    defaultValues: {
+      businessName: vendorProfile?.businessName || "",
+      description: vendorProfile?.description || "",
+      websiteUrl: vendorProfile?.websiteUrl || "",
+      phoneNumber: vendorProfile?.phoneNumber || user?.phoneNumber || "",
+      preferredLocation: vendorProfile?.preferredLocation || "",
+      needsElectricity: vendorProfile?.needsElectricity || false,
+      needsWater: vendorProfile?.needsWater || false,
+      specialRequirements: vendorProfile?.specialRequirements || "",
+      agreeToTerms: false,
+    },
+  });
+  
+  // On submit mutation
+  const submitMutation = useMutation({
     mutationFn: async (formData: VendorFormValues) => {
-      const profileData = {
+      // First, save or update the vendor profile
+      let profileResponse;
+      
+      if (isExistingProfile && vendorProfile?.id) {
+        // Update existing profile
+        profileResponse = await apiRequest("PUT", `/api/vendor-profile/${vendorProfile.id}`, formData);
+      } else {
+        // Create new profile
+        profileResponse = await apiRequest("POST", "/api/vendor-profile", formData);
+      }
+      
+      const profile = await profileResponse.json();
+      
+      // Then, create vendor registration for this specific event/spot
+      const registrationData = {
         userId: user?.id,
-        businessName: formData.businessName,
-        businessDescription: formData.businessDescription,
-        contactPhone: formData.contactPhone,
-        website: formData.businessWebsite || null,
-        hasInsurance: formData.hasInsurance || false,
-        metadata: {
-          termsAccepted: formData.agreeToTerms,
-          termsAcceptedDate: new Date().toISOString(),
-        },
+        eventId: cartItem?.product.eventId,
+        vendorSpotId: cartItem?.product.id,
+        profileId: profile.id,
+        status: "pending",
+        specialRequirements: formData.specialRequirements,
+        needsElectricity: formData.needsElectricity,
+        needsWater: formData.needsWater,
+        preferredLocation: formData.preferredLocation,
       };
       
-      const endpoint = existingProfile 
-        ? `/api/vendor-profile/${existingProfile.id}` 
-        : "/api/vendor-profile";
+      const registrationResponse = await apiRequest(
+        "POST", 
+        "/api/vendor-registrations", 
+        registrationData
+      );
       
-      const method = existingProfile ? "PUT" : "POST";
-      
-      const res = await apiRequest(method, endpoint, profileData);
-      return await res.json();
+      return registrationResponse.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendor-profile"] });
+      toast({
+        title: "Registration saved",
+        description: "Your vendor registration information has been saved successfully.",
+      });
       
-      // Update cart item with registration data
-      if (cartItem) {
-        updateRegistrationData(id, {
-          vendorProfileId: data.id,
-          productsDescription: form.getValues().productsDescription,
-          specialRequests: form.getValues().specialRequests || "",
-          status: "pending",
-        });
-        
-        toast({
-          title: "Registration saved",
-          description: "Your vendor information has been saved. Continuing to checkout.",
-        });
-        
-        // Navigate back to cart/checkout
+      // Mark this cart item as having completed registration
+      setRegistrationStatus(id, 'complete', data);
+      
+      // Check if there are more registrations needed, or go to checkout
+      const { needsRegistration, getNextRegistrationPath } = useCart();
+      
+      if (needsRegistration()) {
+        navigate(getNextRegistrationPath());
+      } else {
         navigate("/checkout");
       }
     },
     onError: (error: Error) => {
       toast({
         title: "Registration failed",
-        description: error.message,
+        description: error.message || "Failed to save vendor registration. Please try again.",
         variant: "destructive",
       });
-    }
-  });
-
-  // Form setup with default values
-  const form = useForm<VendorFormValues>({
-    resolver: zodResolver(vendorFormSchema),
-    defaultValues: {
-      businessName: existingProfile?.businessName || "",
-      businessDescription: existingProfile?.businessDescription || "",
-      productsDescription: cartItem?.registrationData?.productsDescription || "",
-      specialRequests: cartItem?.registrationData?.specialRequests || "",
-      contactPhone: existingProfile?.contactPhone || "",
-      businessWebsite: existingProfile?.website || "",
-      hasInsurance: existingProfile?.hasInsurance || false,
-      agreeToTerms: false,
     },
   });
   
-  // Update form when profile data loads
-  useEffect(() => {
-    if (existingProfile) {
-      form.reset({
-        businessName: existingProfile.businessName || "",
-        businessDescription: existingProfile.businessDescription || "",
-        productsDescription: cartItem?.registrationData?.productsDescription || "",
-        specialRequests: cartItem?.registrationData?.specialRequests || "",
-        contactPhone: existingProfile.contactPhone || "",
-        businessWebsite: existingProfile.website || "",
-        hasInsurance: existingProfile.hasInsurance || false,
-        agreeToTerms: false,
-      });
-    }
-  }, [existingProfile, cartItem, form]);
-
-  // Redirect to home if cart item not found
-  useEffect(() => {
-    if (!cartItem) {
-      toast({
-        title: "Item not found",
-        description: "We couldn't find the vendor registration in your cart.",
-        variant: "destructive",
-      });
-      navigate("/");
-    }
-  }, [cartItem, toast, navigate]);
-
-  // Form submission handler
   const onSubmit = (values: VendorFormValues) => {
-    profileMutation.mutate(values);
+    submitMutation.mutate(values);
   };
-
-  if (isLoadingProfile) {
+  
+  // Show loading state
+  if (isLoadingProfile || !cartItem) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
-
+  
   return (
-    <div className="container max-w-3xl py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Vendor Registration</CardTitle>
-          <CardDescription>
-            Please provide your vendor information for {cartItem?.product.name}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="businessName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Business Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Your business name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="businessDescription"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Business Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Tell us about your business" 
-                        className="min-h-[100px]" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="productsDescription"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Products You'll Be Selling</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="What products will you be selling at this event?" 
-                        className="min-h-[100px]" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="specialRequests"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Special Requests (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Any special requirements for your booth?" 
-                        className="min-h-[80px]" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      E.g., electricity needs, space requirements, etc.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="container py-8">
+      <div className="max-w-3xl mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle>Vendor Registration</CardTitle>
+            <CardDescription>
+              Please provide information about your business for the event: {cartItem.product.eventName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isExistingProfile && (
+              <Alert className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Using Existing Profile</AlertTitle>
+                <AlertDescription>
+                  We've prefilled the form with your existing vendor profile information.
+                  You can make changes if needed.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
-                  name="contactPhone"
+                  name="businessName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Contact Phone</FormLabel>
+                      <FormLabel>Business Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="(555) 123-4567" {...field} />
+                        <Input {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -285,92 +222,183 @@ export default function VendorRegistrationPage() {
                 
                 <FormField
                   control={form.control}
-                  name="businessWebsite"
+                  name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Business Website (Optional)</FormLabel>
+                      <FormLabel>Business Description</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://yourbusiness.com" {...field} />
+                        <Textarea
+                          placeholder="Tell us about your business, products, or services..."
+                          className="min-h-24"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        This will be displayed in the event vendor listing.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Phone Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="websiteUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Website URL (optional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="https://yourwebsite.com" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="preferredLocation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Preferred Location (optional)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g., Near stage, corner spot, etc." />
+                      </FormControl>
+                      <FormDescription>
+                        While we can't guarantee specific spots, we'll try to accommodate preferences.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="needsElectricity"
+                    render={({ field }) => (
+                      <FormItem className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Electricity Required</FormLabel>
+                          <FormDescription>
+                            Check if you need access to electricity for your booth.
+                          </FormDescription>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="needsWater"
+                    render={({ field }) => (
+                      <FormItem className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Water Access Required</FormLabel>
+                          <FormDescription>
+                            Check if you need access to water for your booth.
+                          </FormDescription>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="specialRequirements"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Special Requirements (optional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Any additional requests or requirements for your booth..."
+                          className="min-h-16"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="hasInsurance"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 mt-1"
-                        checked={field.value}
-                        onChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>I have business liability insurance</FormLabel>
-                      <FormDescription>
-                        Some events may require proof of insurance
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="agreeToTerms"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 mt-1"
-                        checked={field.value}
-                        onChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>I agree to the terms and conditions</FormLabel>
-                      <FormDescription>
-                        By checking this box, you agree to abide by all event rules and regulations
-                      </FormDescription>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="flex justify-between">
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => navigate("/")}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit"
-                  disabled={profileMutation.isPending}
-                >
-                  {profileMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save and Continue"
+                
+                <FormField
+                  control={form.control}
+                  name="agreeToTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Terms and Conditions</FormLabel>
+                        <FormDescription>
+                          I agree to the event terms and conditions including setup/teardown times, 
+                          vendor regulations, and payment policies.
+                        </FormDescription>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                />
+                
+                <div className="pt-4">
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={submitMutation.isPending}
+                  >
+                    {submitMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving Registration...
+                      </>
+                    ) : (
+                      'Complete Registration'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+          <CardFooter className="flex justify-center text-xs text-muted-foreground">
+            Your vendor information will be reviewed by event organizers.
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   );
 }

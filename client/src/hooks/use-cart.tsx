@@ -23,6 +23,10 @@ type CartContextType = {
   total: number;
   updateRegistrationData: (itemId: string, data: any) => void;
   getRegistrationStatus: (itemId: string) => 'pending' | 'complete' | null;
+  setRegistrationStatus: (itemId: string, status: 'pending' | 'complete', data?: any) => void;
+  getCartItem: (id: string) => CartItem | undefined;
+  needsRegistration: () => boolean;
+  getNextRegistrationPath: () => string;
   checkoutMutation: any;
   hasRegistrationType: (type: string) => boolean;
   hasItemOfType: (type: string) => boolean;
@@ -143,6 +147,55 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
     return false;
   };
+  
+  // Get a cart item by ID
+  const getCartItem = (id: string): CartItem | undefined => {
+    return items.find(item => item.id === id);
+  };
+
+  // Set registration status for an item
+  const setRegistrationStatus = (itemId: string, status: 'pending' | 'complete', data?: any) => {
+    setItems(prevItems => 
+      prevItems.map(item => 
+        item.id === itemId ? { 
+          ...item, 
+          registrationData: status === 'complete' ? (data || true) : null 
+        } : item
+      )
+    );
+  };
+  
+  // Check if any items in the cart need registration
+  const needsRegistration = (): boolean => {
+    return items.some(item => {
+      const status = getRegistrationStatus(item.id);
+      return status === 'pending';
+    });
+  };
+  
+  // Get path to the next item that needs registration
+  const getNextRegistrationPath = (): string => {
+    // Find first vendor item that needs registration
+    const pendingVendorItem = items.find(item => 
+      item.product.type === 'vendor_spot' && getRegistrationStatus(item.id) === 'pending'
+    );
+    
+    if (pendingVendorItem) {
+      return `/registration/vendor/${pendingVendorItem.id}`;
+    }
+    
+    // Find first volunteer item that needs registration
+    const pendingVolunteerItem = items.find(item => 
+      item.product.type === 'volunteer_shift' && getRegistrationStatus(item.id) === 'pending'
+    );
+    
+    if (pendingVolunteerItem) {
+      return `/registration/volunteer/${pendingVolunteerItem.id}`;
+    }
+    
+    // If no registrations needed, go to checkout
+    return '/checkout';
+  };
 
   // Calculate total number of items
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -195,6 +248,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         total,
         updateRegistrationData,
         getRegistrationStatus,
+        setRegistrationStatus,
+        getCartItem,
+        needsRegistration,
+        getNextRegistrationPath,
         checkoutMutation,
         hasRegistrationType,
         hasItemOfType

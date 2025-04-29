@@ -15,6 +15,7 @@ import MyEventsPage from "@/pages/MyEventsPage";
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
 import VendorRegistrationPage from "@/pages/VendorRegistrationPage";
 import VolunteerRegistrationPage from "@/pages/VolunteerRegistrationPage";
+import CheckoutPage from "@/pages/CheckoutPage";
 
 import PaymentConnectionsPage from "@/pages/PaymentConnectionsPage";
 import UserProfilePage from "@/pages/UserProfilePage";
@@ -30,6 +31,7 @@ function Router() {
       
       {/* Basic user features - any logged in user */}
       <ProtectedRoute path="/profile" component={UserProfilePage} />
+      <ProtectedRoute path="/checkout" component={CheckoutPage} />
       <ProtectedRoute path="/registration/vendor/:id" component={VendorRegistrationPage} />
       <ProtectedRoute path="/registration/volunteer/:id" component={VolunteerRegistrationPage} />
       
