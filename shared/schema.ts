@@ -60,10 +60,6 @@ export const events = pgTable("events", {
   capacity: integer("capacity"),
   ticketsAvailable: integer("tickets_available"),
   price: doublePrecision("price").default(0).notNull(),
-  vendorOptions: boolean("vendor_options").default(false).notNull(),
-  volunteerOptions: boolean("volunteer_options").default(false).notNull(),
-  hasAddons: boolean("has_addons").default(false).notNull(),
-  hasMerchandise: boolean("has_merchandise").default(false).notNull(),
   metadata: jsonb("metadata"), // Additional configurable fields
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

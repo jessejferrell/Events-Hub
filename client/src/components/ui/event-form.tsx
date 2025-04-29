@@ -48,10 +48,6 @@ const eventFormSchema = z.object({
   eventType: z.string().min(1, "Event type is required"),
   price: z.coerce.number().min(0, "Price must be a positive number or zero"),
   isActive: z.boolean().default(true),
-  vendorOptions: z.boolean().default(false),
-  volunteerOptions: z.boolean().default(false),
-  hasMerchandise: z.boolean().default(false),
-  hasAddons: z.boolean().default(false),
 }).refine((data) => {
   return data.endDate >= data.startDate;
 }, {
@@ -101,10 +97,6 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
     eventType: event?.eventType || "",
     price: event?.price || 0,
     isActive: event?.isActive ?? true,
-    vendorOptions: event?.vendorOptions ?? false,
-    volunteerOptions: event?.volunteerOptions ?? false,
-    hasMerchandise: event?.hasMerchandise ?? false,
-    hasAddons: event?.hasAddons ?? false,
   };
 
   // Create form
@@ -452,103 +444,8 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
           />
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-4">
-            <FormField
-              control={form.control}
-              name="hasMerchandise"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <input
-                      type="checkbox"
-                      checked={field.value}
-                      onChange={field.onChange}
-                      className="h-4 w-4 mt-1"
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Merchandise</FormLabel>
-                    <FormDescription>
-                      Sell merchandise items
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="hasAddons"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <input
-                      type="checkbox"
-                      checked={field.value}
-                      onChange={field.onChange}
-                      className="h-4 w-4 mt-1"
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Add-ons</FormLabel>
-                    <FormDescription>
-                      Offer optional add-ons
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-          </div>
-          
-          <div className="space-y-4">
-            <FormField
-              control={form.control}
-              name="vendorOptions"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <input
-                      type="checkbox"
-                      checked={field.value}
-                      onChange={field.onChange}
-                      className="h-4 w-4 mt-1"
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Vendor Options</FormLabel>
-                    <FormDescription>
-                      Allow vendor registrations
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="volunteerOptions"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <input
-                      type="checkbox"
-                      checked={field.value}
-                      onChange={field.onChange}
-                      className="h-4 w-4 mt-1"
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Volunteer Options</FormLabel>
-                    <FormDescription>
-                      Allow volunteer sign-ups
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
+        {/* All checkboxes for vendor options, volunteer options, merchandise and add-ons have been removed.
+           All of these will be managed as products in step 2 */}
         
         <FormField
           control={form.control}
