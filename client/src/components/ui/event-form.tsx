@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,13 +28,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Upload, ImageIcon, Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CalendarIcon, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import ProductManager from "@/components/ui/product-manager";
 
 // Create a more detailed event schema for the form
@@ -72,6 +73,8 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
   );
   const [currentStep, setCurrentStep] = useState(1);
   const [newEventId, setNewEventId] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Event types options
   const eventTypes = [
@@ -172,6 +175,70 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
     }
   }
 
+  // Handle image upload
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) {
+      return;
+    }
+    
+    const file = e.target.files[0];
+    
+    // Validation
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: "Please select an image file",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Size validation (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "Image size should be less than 5MB",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsUploading(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to upload image');
+      }
+      
+      const data = await response.json();
+      
+      // Update the form with the new image URL
+      form.setValue('imageUrl', data.imageUrl);
+      
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to upload image",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  
   // Handle step 2 completion (products management)
   function handleCompleteStep2() {
     toast({ title: "Success", description: "Event and products saved successfully" });
@@ -396,19 +463,74 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
           />
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <FormField
             control={form.control}
             name="imageUrl"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Image URL (Optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter image URL" {...field} />
-                </FormControl>
-                <FormDescription>
-                  Direct link to event image
-                </FormDescription>
+                <FormLabel>Event Image</FormLabel>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <FormControl>
+                      <Input 
+                        type="text" 
+                        placeholder="Image URL" 
+                        {...field}
+                        className="mb-2" 
+                      />
+                    </FormControl>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      ref={fileInputRef}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload Image
+                        </>
+                      )}
+                    </Button>
+                    <FormDescription className="mt-2">
+                      Upload an image (1920 x 1080 recommended) or enter an image URL.
+                    </FormDescription>
+                  </div>
+                  <div className="flex items-center justify-center border rounded-md p-2 h-[150px] bg-muted/20">
+                    {field.value ? (
+                      <img 
+                        src={field.value} 
+                        alt="Event preview" 
+                        className="max-h-full max-w-full object-contain"
+                        onError={(e) => {
+                          // Handle image load error
+                          (e.target as HTMLImageElement).src = '';
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          e.currentTarget.parentElement?.querySelector('.fallback')?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : (
+                      <div className="text-center text-muted-foreground flex flex-col items-center fallback">
+                        <ImageIcon className="h-8 w-8 mb-2" />
+                        <span>Image preview</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
