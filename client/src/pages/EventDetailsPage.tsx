@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Event, Ticket } from "@shared/schema";
+import { Event, Ticket, Product } from "@shared/schema";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,17 @@ import {
   DialogFooter,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import { Calendar, Clock, MapPin, Tag, Users, DollarSign } from "lucide-react";
+import { Calendar, Clock, MapPin, Tag, Users, DollarSign, ShoppingBag, HelpingHand, Store } from "lucide-react";
 import { format } from "date-fns";
 
 export default function EventDetailsPage() {
