@@ -604,11 +604,68 @@ export default function AdminDashboardPage() {
                 <CardDescription>Configure platform settings and defaults</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex justify-center items-center py-12">
-                  <div className="text-center">
-                    <Settings className="h-12 w-12 mx-auto mb-4 text-neutral-300" />
-                    <p className="text-neutral-600 mb-2">Settings interface will be implemented here</p>
-                    <p className="text-neutral-500 text-sm">This section will include global configurations and platform settings</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="border rounded-lg p-6 hover:border-primary hover:bg-neutral-50 transition-all">
+                    <Settings className="h-10 w-10 mb-4 text-primary" />
+                    <h3 className="text-lg font-medium mb-2">General System Settings</h3>
+                    <p className="text-neutral-600 mb-4">
+                      Configure appearance, event defaults, email settings, payment options, 
+                      user management, analytics, and external integrations.
+                    </p>
+                    <Button 
+                      asChild
+                      className="mt-2"
+                    >
+                      <a href="/admin/settings">Manage System Settings</a>
+                    </Button>
+                  </div>
+                  
+                  <div className="border rounded-lg p-6 hover:border-primary hover:bg-neutral-50 transition-all">
+                    <FileText className="h-10 w-10 mb-4 text-primary" />
+                    <h3 className="text-lg font-medium mb-2">Content Management</h3>
+                    <p className="text-neutral-600 mb-4">
+                      Manage static content, pages, announcements, terms of service,
+                      privacy policy, and other site content.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-2"
+                      disabled
+                    >
+                      Coming Soon
+                    </Button>
+                  </div>
+                  
+                  <div className="border rounded-lg p-6 hover:border-primary hover:bg-neutral-50 transition-all">
+                    <ShoppingCart className="h-10 w-10 mb-4 text-primary" />
+                    <h3 className="text-lg font-medium mb-2">Payment & Fees Configuration</h3>
+                    <p className="text-neutral-600 mb-4">
+                      Configure payment gateways, processing fees, platform fees, 
+                      and payout schedules for event organizers.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-2"
+                      disabled
+                    >
+                      Coming Soon
+                    </Button>
+                  </div>
+                  
+                  <div className="border rounded-lg p-6 hover:border-primary hover:bg-neutral-50 transition-all">
+                    <Users className="h-10 w-10 mb-4 text-primary" />
+                    <h3 className="text-lg font-medium mb-2">Permissions & Access Control</h3>
+                    <p className="text-neutral-600 mb-4">
+                      Manage user roles, permissions, access controls,
+                      and administrative privileges.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-2"
+                      disabled
+                    >
+                      Coming Soon
+                    </Button>
                   </div>
                 </div>
               </CardContent>

@@ -12,6 +12,7 @@ import EventsPage from "@/pages/EventsPage";
 import EventDetailsPage from "@/pages/EventDetailsPage";
 import MyEventsPage from "@/pages/MyEventsPage";
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
+import SystemSettingsPage from "@/pages/SystemSettingsPage";
 import PaymentConnectionsPage from "@/pages/PaymentConnectionsPage";
 import UserProfilePage from "@/pages/UserProfilePage";
 
@@ -33,6 +34,7 @@ function Router() {
       
       {/* Admin-only routes */}
       <ProtectedRoute path="/admin" component={AdminDashboardPage} roles={["admin"]} />
+      <ProtectedRoute path="/admin/settings" component={SystemSettingsPage} roles={["admin"]} />
       
       {/* 404 page */}
       <Route component={NotFound} />
