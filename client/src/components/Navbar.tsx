@@ -9,8 +9,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "wouter";
-import { ShoppingCart, LogOut, User, Settings } from "lucide-react";
+import { LogOut, User, Settings } from "lucide-react";
 import { useCallback } from "react";
+import { CartWidget } from "@/components/cart/CartWidget";
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
@@ -45,12 +46,7 @@ export default function Navbar() {
         </Link>
         
         <div className="flex items-center space-x-4">
-          <Link href="/cart">
-            <div className="relative p-2 rounded-full hover:bg-white/10 transition-colors">
-              <ShoppingCart className="h-5 w-5" />
-              {/* We would display badge with count if cart functionality is implemented */}
-            </div>
-          </Link>
+          <CartWidget />
           
           {/* Guest buttons or User Menu */}
           {!user ? (
