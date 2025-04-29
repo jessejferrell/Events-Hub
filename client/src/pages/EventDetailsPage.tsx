@@ -23,6 +23,7 @@ import {
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useCart } from "@/hooks/use-cart";
 import { apiRequest } from "@/lib/queryClient";
 import { Calendar, Clock, MapPin, Tag, Users, DollarSign, ShoppingBag, HelpingHand, Store } from "lucide-react";
 import { format } from "date-fns";
@@ -32,6 +33,7 @@ export default function EventDetailsPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { addItem } = useCart();
   const queryClient = useQueryClient();
   
   const [ticketQuantity, setTicketQuantity] = useState(1);
