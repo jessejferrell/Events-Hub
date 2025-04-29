@@ -225,12 +225,7 @@ export default function AdminDashboardPage() {
             >
               Analytics & Reports
             </TabsTrigger>
-            <TabsTrigger 
-              value="settings" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2 data-[state=active]:text-primary"
-            >
-              Settings
-            </TabsTrigger>
+
           </TabsList>
           
           {/* Overview Tab Content */}
