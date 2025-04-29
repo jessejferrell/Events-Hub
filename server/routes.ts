@@ -129,23 +129,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Creating event with data:", req.body);
       
-      // Convert string dates to Date objects before validation
-      const eventData = {
+      // Create a modified schema for initial validation that accepts string dates
+      const temporarySchema = insertEventSchema.extend({
+        startDate: z.string().or(z.date()),
+        endDate: z.string().or(z.date()),
+      });
+      
+      // First validate with the temporary schema
+      const initialData = temporarySchema.parse({
         ...req.body,
         ownerId: req.user!.id,
+      });
+      
+      // Then convert dates and validate with the original schema
+      const processedData = {
+        ...initialData,
+        startDate: typeof initialData.startDate === 'string' 
+          ? new Date(initialData.startDate) 
+          : initialData.startDate,
+        endDate: typeof initialData.endDate === 'string' 
+          ? new Date(initialData.endDate) 
+          : initialData.endDate,
       };
       
-      if (typeof eventData.startDate === 'string') {
-        eventData.startDate = new Date(eventData.startDate);
-      }
+      console.log("Processed event data:", processedData);
       
-      if (typeof eventData.endDate === 'string') {
-        eventData.endDate = new Date(eventData.endDate);
-      }
-      
-      console.log("Processed event data:", eventData);
-      
-      const validatedData = insertEventSchema.parse(eventData);
+      // Validate once more with the original schema to ensure the dates are properly formatted
+      const validatedData = insertEventSchema.parse(processedData);
       
       console.log("Validated event data:", validatedData);
       
@@ -176,18 +186,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to update this event" });
       }
       
-      // Convert string dates to Date objects before validation
-      const eventData = { ...req.body };
+      // Create a modified schema for initial validation that accepts string dates
+      const temporarySchema = insertEventSchema.partial().extend({
+        startDate: z.string().or(z.date()).optional(),
+        endDate: z.string().or(z.date()).optional(),
+      });
       
-      if (typeof eventData.startDate === 'string') {
-        eventData.startDate = new Date(eventData.startDate);
+      // First validate with the temporary schema
+      const initialData = temporarySchema.parse(req.body);
+      
+      // Then convert dates if they exist
+      const processedData = { ...initialData };
+      
+      if (typeof initialData.startDate === 'string') {
+        processedData.startDate = new Date(initialData.startDate);
       }
       
-      if (typeof eventData.endDate === 'string') {
-        eventData.endDate = new Date(eventData.endDate);
+      if (typeof initialData.endDate === 'string') {
+        processedData.endDate = new Date(initialData.endDate);
       }
       
-      const validatedData = insertEventSchema.partial().parse(eventData);
+      // Validate with the original schema to ensure the dates are properly formatted
+      const validatedData = insertEventSchema.partial().parse(processedData);
       const updatedEvent = await storage.updateEvent(eventId, validatedData);
       res.json(updatedEvent);
     } catch (error: any) {
