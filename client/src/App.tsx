@@ -13,6 +13,8 @@ import EventsPage from "@/pages/EventsPage";
 import EventDetailsPage from "@/pages/EventDetailsPage";
 import MyEventsPage from "@/pages/MyEventsPage";
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
+import VendorRegistrationPage from "@/pages/VendorRegistrationPage";
+import VolunteerRegistrationPage from "@/pages/VolunteerRegistrationPage";
 
 import PaymentConnectionsPage from "@/pages/PaymentConnectionsPage";
 import UserProfilePage from "@/pages/UserProfilePage";
@@ -28,6 +30,8 @@ function Router() {
       
       {/* Basic user features - any logged in user */}
       <ProtectedRoute path="/profile" component={UserProfilePage} />
+      <ProtectedRoute path="/registration/vendor/:id" component={VendorRegistrationPage} />
+      <ProtectedRoute path="/registration/volunteer/:id" component={VolunteerRegistrationPage} />
       
       {/* Event owner features */}
       <ProtectedRoute path="/my-events" component={MyEventsPage} roles={["event_owner"]} />

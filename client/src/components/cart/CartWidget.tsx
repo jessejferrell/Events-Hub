@@ -115,6 +115,9 @@ export function CartWidget() {
                   const vendorItems = items.filter(item => item.product.type === 'vendor_spot');
                   const volunteerItems = items.filter(item => item.product.type === 'volunteer_shift');
                   
+                  // Get the getRegistrationStatus function from the cart context
+                  const { getRegistrationStatus } = useCart();
+                  
                   // Check if any items need registration and don't have it completed
                   const hasIncompleteVendorRegistration = vendorItems.some(item => 
                     getRegistrationStatus(item.id) !== 'complete'
