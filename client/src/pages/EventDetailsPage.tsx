@@ -423,7 +423,11 @@ export default function EventDetailsPage() {
                                     navigate("/auth");
                                     return;
                                   }
-                                  // Handle adding free ticket to cart
+                                  // Add free ticket to cart
+                                  const freeTicket = ticketProducts.find(p => p.price === 0);
+                                  if (freeTicket) {
+                                    addItem(freeTicket, 1);
+                                  }
                                 }}
                               >
                                 Add to Cart
@@ -466,7 +470,8 @@ export default function EventDetailsPage() {
                                       navigate("/auth");
                                       return;
                                     }
-                                    // Handle product selection
+                                    // Add merchandise to cart
+                                    addItem(product, 1);
                                   }}
                                 >
                                   {product.quantity !== null && product.quantity <= 0
