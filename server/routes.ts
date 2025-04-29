@@ -140,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(event);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        console.error("Validation error:", error.errors);
+        console.error("Validation error:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ message: "Invalid event data", errors: error.errors });
       }
       console.error("Error creating event:", error.message);
