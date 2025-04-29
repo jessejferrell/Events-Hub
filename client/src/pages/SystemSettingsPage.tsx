@@ -60,18 +60,18 @@ const isComplexObject = (value: any): boolean => {
 
 export default function SystemSettingsPage() {
   const { toast } = useToast();
-  const [activeCategory, setActiveCategory] = useState<string>(SETTING_CATEGORIES[0]);
+  const [activeCategory, setActiveCategory] = useState<string>("");
   const [newSettingKey, setNewSettingKey] = useState<string>("");
   const [newSettingValue, setNewSettingValue] = useState<string>("");
   
   const { 
-    settings, 
+    settings = [], 
     isLoading, 
     updateSetting, 
     deleteSetting, 
     isUpdating,
     isDeleting
-  } = useSettings(activeCategory);
+  } = useSettings(activeCategory === "" ? undefined : activeCategory);
   
   const handleUpdateSetting = (key: string, value: any) => {
     updateSetting({ key, value, category: activeCategory });
@@ -401,117 +401,332 @@ export default function SystemSettingsPage() {
     );
   };
 
-  return (
-    <div className="container mx-auto py-6">
-      <div className="flex flex-col gap-4">
-        <h1 className="text-3xl font-bold">System Settings</h1>
-        <p className="text-gray-500">
-          Configure system-wide settings and defaults for your event platform.
-        </p>
-        <Separator className="my-2" />
-        
-        <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
-          <TabsList className="mb-8 flex flex-wrap h-auto p-1">
-            {SETTING_CATEGORIES.map((category) => (
-              <TabsTrigger 
-                key={category} 
-                value={category}
-                className="flex-grow"
-              >
-                {CATEGORY_NAMES[category]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+  // Main settings dashboard similar to the screenshot
+  const renderSettingsDashboard = () => {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex flex-col gap-4">
+          <h1 className="text-3xl font-bold">System Settings</h1>
+          <p className="text-gray-500">
+            Configure system-wide settings and defaults for your event platform.
+          </p>
+          <Separator className="my-6" />
           
-          {SETTING_CATEGORIES.map((category) => (
-            <TabsContent key={category} value={category} className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{CATEGORY_NAMES[category]} Settings</CardTitle>
-                  <CardDescription>
-                    Configure {CATEGORY_NAMES[category].toLowerCase()} settings for your event platform
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-10">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* General System Settings Card */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-6 flex flex-col h-full">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-green-100 p-3 rounded-full mr-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 8v8"></path>
+                        <path d="M8 12h8"></path>
+                      </svg>
                     </div>
-                  ) : settings.length === 0 ? (
-                    <div className="text-center py-10">
-                      <p className="text-gray-500">No settings found for this category</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {settings.map((setting) => (
-                        <div key={setting.key} className="grid gap-2">
-                          <div className="flex justify-between items-start">
-                            <Label htmlFor={setting.key} className="text-base font-medium">
-                              {getSettingDisplayName(setting.key)}
-                            </Label>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => deleteSetting(setting.key)}
-                              disabled={isDeleting}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </div>
-                          {renderSettingInput(setting)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  <Separator className="my-6" />
-                  
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Add New Setting</h3>
-                    <div className="grid gap-4">
-                      <div className="grid grid-cols-1 gap-2">
-                        <Label htmlFor="newSettingKey">Setting Key</Label>
-                        <Input
-                          id="newSettingKey"
-                          placeholder="E.g. siteName"
-                          value={newSettingKey}
-                          onChange={(e) => setNewSettingKey(e.target.value)}
-                        />
-                      </div>
-                      <div className="grid grid-cols-1 gap-2">
-                        <Label htmlFor="newSettingValue">Value</Label>
-                        <Input
-                          id="newSettingValue"
-                          placeholder="E.g. My Event Platform"
-                          value={newSettingValue}
-                          onChange={(e) => setNewSettingValue(e.target.value)}
-                        />
-                      </div>
-                      <Button 
-                        onClick={handleAddNewSetting}
-                        disabled={isUpdating || !newSettingKey.trim()}
-                      >
-                        {isUpdating ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Plus className="h-4 w-4 mr-2" />
-                        )}
-                        Add Setting
-                      </Button>
+                    <div>
+                      <h3 className="text-xl font-semibold">General System Settings</h3>
+                      <p className="text-gray-500 text-sm mt-1">
+                        Configure appearance, event defaults, email settings, payment options, user management, analytics, and more
+                      </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-              
-              {/* Render special settings interfaces for specific categories */}
-              {renderEventDefaultSettings()}
-              {renderPaymentSettings()}
-              
-            </TabsContent>
-          ))}
-        </Tabs>
+                  <p className="text-gray-600 mb-6">
+                    Configure system defaults, email settings, appearance, and other core settings.
+                  </p>
+                  <Button 
+                    className="mt-auto"
+                    onClick={() => setActiveCategory("appearance")}
+                  >
+                    Manage System Settings
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Content Management Card */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-6 flex flex-col h-full">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-blue-100 p-3 rounded-full mr-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">Content Management</h3>
+                      <p className="text-gray-500 text-sm mt-1">
+                        Manage static content, pages, announcements, terms of service, privacy policy, and other site content
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mb-6">
+                    Update website content, legal information, and manage custom pages.
+                  </p>
+                  <div className="mt-auto text-center bg-gray-100 py-2 rounded-md">
+                    <span className="text-gray-500 text-sm">Coming Soon</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Payment & Fees Configuration Card */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-6 flex flex-col h-full">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-purple-100 p-3 rounded-full mr-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-600">
+                        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                        <line x1="2" y1="10" x2="22" y2="10"></line>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">Payment & Fees Configuration</h3>
+                      <p className="text-gray-500 text-sm mt-1">
+                        Configure payment gateways, processing fees, platform fees, and payout schedules for event organizers
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mb-6">
+                    Set up payment processors, fee structures, and manage financial settings.
+                  </p>
+                  <Button 
+                    className="mt-auto"
+                    onClick={() => setActiveCategory("payment")}
+                  >
+                    Manage Payment Settings
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Permissions & Access Control Card */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-6 flex flex-col h-full">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-amber-100 p-3 rounded-full mr-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">Permissions & Access Control</h3>
+                      <p className="text-gray-500 text-sm mt-1">
+                        Manage user roles, permissions, access controls, and administrative privileges
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mb-6">
+                    Control who can access what features and data within the platform.
+                  </p>
+                  <Button 
+                    className="mt-auto"
+                    onClick={() => setActiveCategory("userManagement")}
+                  >
+                    Manage Permissions
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* System Integration Card */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-6 flex flex-col h-full">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-cyan-100 p-3 rounded-full mr-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-600">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">System Integrations</h3>
+                      <p className="text-gray-500 text-sm mt-1">
+                        Connect with external services like email platforms, marketing tools, and analytics
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mb-6">
+                    Integrate with third-party services and extend platform functionality.
+                  </p>
+                  <Button 
+                    className="mt-auto"
+                    onClick={() => setActiveCategory("integration")}
+                  >
+                    Manage Integrations
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Analytics & Reporting Card */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-6 flex flex-col h-full">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-rose-100 p-3 rounded-full mr-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-rose-600">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">Analytics & Reporting</h3>
+                      <p className="text-gray-500 text-sm mt-1">
+                        Configure analytics tracking, custom reports, and data exports
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mb-6">
+                    Set up how data is tracked, analyzed, and reported across the platform.
+                  </p>
+                  <Button 
+                    className="mt-auto"
+                    onClick={() => setActiveCategory("analytics")}
+                  >
+                    Manage Analytics
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Settings detail view with tabs
+  const renderSettingsDetailView = () => {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold">System Settings</h1>
+            <Button 
+              variant="outline" 
+              onClick={() => setActiveCategory("")}
+            >
+              Back to Dashboard
+            </Button>
+          </div>
+          <p className="text-gray-500">
+            Configure system-wide settings and defaults for your event platform.
+          </p>
+          <Separator className="my-2" />
+          
+          <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
+            <TabsList className="mb-8 flex flex-wrap h-auto p-1">
+              {SETTING_CATEGORIES.map((category) => (
+                <TabsTrigger 
+                  key={category} 
+                  value={category}
+                  className="flex-grow"
+                >
+                  {CATEGORY_NAMES[category]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            
+            {SETTING_CATEGORIES.map((category) => (
+              <TabsContent key={category} value={category} className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{CATEGORY_NAMES[category]} Settings</CardTitle>
+                    <CardDescription>
+                      Configure {CATEGORY_NAMES[category].toLowerCase()} settings for your event platform
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-10">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : settings.length === 0 ? (
+                      <div className="text-center py-10">
+                        <p className="text-gray-500">No settings found for this category</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {settings.map((setting) => (
+                          <div key={setting.key} className="grid gap-2">
+                            <div className="flex justify-between items-start">
+                              <Label htmlFor={setting.key} className="text-base font-medium">
+                                {getSettingDisplayName(setting.key)}
+                              </Label>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteSetting(setting.key)}
+                                disabled={isDeleting}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                                <span className="sr-only">Delete</span>
+                              </Button>
+                            </div>
+                            {renderSettingInput(setting)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <Separator className="my-6" />
+                    
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Add New Setting</h3>
+                      <div className="grid gap-4">
+                        <div className="grid grid-cols-1 gap-2">
+                          <Label htmlFor="newSettingKey">Setting Key</Label>
+                          <Input
+                            id="newSettingKey"
+                            placeholder="E.g. siteName"
+                            value={newSettingKey}
+                            onChange={(e) => setNewSettingKey(e.target.value)}
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                          <Label htmlFor="newSettingValue">Value</Label>
+                          <Input
+                            id="newSettingValue"
+                            placeholder="E.g. My Event Platform"
+                            value={newSettingValue}
+                            onChange={(e) => setNewSettingValue(e.target.value)}
+                          />
+                        </div>
+                        <Button 
+                          onClick={handleAddNewSetting}
+                          disabled={isUpdating || !newSettingKey.trim()}
+                        >
+                          {isUpdating ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4 mr-2" />
+                          )}
+                          Add Setting
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Render special settings interfaces for specific categories */}
+                {renderEventDefaultSettings()}
+                {renderPaymentSettings()}
+                
+              </TabsContent>
+            ))}
+          </Tabs>
+        </div>
+      </div>
+    );
+  };
+
+  return activeCategory === "" ? renderSettingsDashboard() : renderSettingsDetailView();
 }
