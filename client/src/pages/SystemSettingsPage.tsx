@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSettings } from "@/hooks/use-settings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -326,6 +326,198 @@ export default function SystemSettingsPage() {
     );
   };
   
+  // Content management settings
+  const renderContentSettings = () => {
+    if (activeCategory !== "content") return null;
+    
+    return (
+      <div className="mt-8">
+        <h3 className="text-lg font-semibold mb-4">Content Management</h3>
+        <p className="text-sm text-gray-500 mb-6">
+          Manage website content, legal documents, and static pages for your event platform.
+        </p>
+        
+        <Tabs defaultValue="pages" className="w-full mb-8">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="pages">Pages</TabsTrigger>
+            <TabsTrigger value="legal">Legal Documents</TabsTrigger>
+            <TabsTrigger value="announcements">Announcements</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="pages">
+            <Card>
+              <CardHeader>
+                <CardTitle>Static Pages</CardTitle>
+                <CardDescription>Manage custom pages for your website</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <h4 className="font-medium">About Us</h4>
+                      <p className="text-sm text-muted-foreground">
+                        /about
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline">Edit</Button>
+                      <Button size="sm" variant="outline">View</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <h4 className="font-medium">Contact</h4>
+                      <p className="text-sm text-muted-foreground">
+                        /contact
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline">Edit</Button>
+                      <Button size="sm" variant="outline">View</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <h4 className="font-medium">FAQ</h4>
+                      <p className="text-sm text-muted-foreground">
+                        /faq
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline">Edit</Button>
+                      <Button size="sm" variant="outline">View</Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Page
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="legal">
+            <Card>
+              <CardHeader>
+                <CardTitle>Legal Documents</CardTitle>
+                <CardDescription>Manage terms of service, privacy policy, and other legal content</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <h4 className="font-medium">Terms of Service</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Last updated: April 20, 2025
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline">Edit</Button>
+                      <Button size="sm" variant="outline">View</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <h4 className="font-medium">Privacy Policy</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Last updated: April 22, 2025
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline">Edit</Button>
+                      <Button size="sm" variant="outline">View</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <h4 className="font-medium">Cookie Policy</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Last updated: April 15, 2025
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline">Edit</Button>
+                      <Button size="sm" variant="outline">View</Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Legal Document
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="announcements">
+            <Card>
+              <CardHeader>
+                <CardTitle>Announcements</CardTitle>
+                <CardDescription>Manage site-wide announcements and notifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 border rounded">
+                    <div className="flex justify-between">
+                      <h4 className="font-medium">Summer Festival Season Begins!</h4>
+                      <div className="flex items-center">
+                        <Switch id="publish-announcement-1" defaultChecked />
+                        <Label htmlFor="publish-announcement-1" className="ml-2">Active</Label>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Published: April 15, 2025 · Expires: May 15, 2025
+                    </p>
+                    <p className="mt-3">
+                      Get ready for an amazing season of events this summer! Check out our featured events and secure your tickets early.
+                    </p>
+                    <div className="flex justify-end mt-4">
+                      <Button size="sm" variant="outline">Edit</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 border rounded">
+                    <div className="flex justify-between">
+                      <h4 className="font-medium">Platform Maintenance</h4>
+                      <div className="flex items-center">
+                        <Switch id="publish-announcement-2" />
+                        <Label htmlFor="publish-announcement-2" className="ml-2">Active</Label>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Scheduled: May 5, 2025 · Expires: May 6, 2025
+                    </p>
+                    <p className="mt-3">
+                      The platform will be down for maintenance from 2 AM to 4 AM EST on May 5th. We apologize for any inconvenience.
+                    </p>
+                    <div className="flex justify-end mt-4">
+                      <Button size="sm" variant="outline">Edit</Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Announcement
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  };
+  
   // Special payment settings form
   const renderPaymentSettings = () => {
     if (activeCategory !== "payment") return null;
@@ -566,9 +758,12 @@ export default function SystemSettingsPage() {
                   <p className="text-gray-600 mb-6">
                     Update website content, legal information, and manage custom pages.
                   </p>
-                  <div className="mt-auto text-center bg-gray-100 py-2 rounded-md">
-                    <span className="text-gray-500 text-sm">Coming Soon</span>
-                  </div>
+                  <Button 
+                    className="mt-auto"
+                    onClick={() => setActiveCategory("content")}
+                  >
+                    Manage Content
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -737,70 +932,87 @@ export default function SystemSettingsPage() {
             
             {SETTING_CATEGORIES.map((category) => (
               <TabsContent key={category} value={category} className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{CATEGORY_NAMES[category]} Settings</CardTitle>
-                    <CardDescription>
-                      Configure {CATEGORY_NAMES[category].toLowerCase()} settings for your event platform
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoading ? (
-                      <div className="flex items-center justify-center py-10">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      </div>
-                    ) : settings.length === 0 ? (
-                      <div className="text-center py-10">
-                        <p className="text-gray-500">No settings found for this category</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {settings.map((setting) => (
-                          <div key={setting.key} className="grid gap-2">
-                            <div className="flex justify-between items-start">
-                              <Label htmlFor={setting.key} className="text-base font-medium">
-                                {getSettingDisplayName(setting.key)}
-                              </Label>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => deleteSetting(setting.key)}
-                                disabled={isDeleting}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                                <span className="sr-only">Delete</span>
-                              </Button>
-                            </div>
-                            {renderSettingInput(setting)}
+                {category === "eventDefaults" ? (
+                  <>{renderEventDefaultSettings()}</>
+                ) : category === "content" ? (
+                  <>{renderContentSettings()}</>
+                ) : category === "payment" ? (
+                  <>{renderPaymentSettings()}</>
+                ) : (
+                  <>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>{CATEGORY_NAMES[category]} Settings</CardTitle>
+                        <CardDescription>
+                          Configure {CATEGORY_NAMES[category].toLowerCase()} settings for your event platform
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {isLoading ? (
+                          <div className="flex items-center justify-center py-10">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        ) : settings.length === 0 ? (
+                          <div className="text-center py-10">
+                            <p className="text-gray-500">No settings found for this category</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-6">
+                            {settings.map((setting) => (
+                              <div key={setting.key} className="grid gap-2">
+                                <div className="flex justify-between items-start">
+                                  <Label htmlFor={setting.key} className="text-base font-medium">
+                                    {getSettingDisplayName(setting.key)}
+                                  </Label>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => deleteSetting(setting.key)}
+                                    disabled={isDeleting}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                    <span className="sr-only">Delete</span>
+                                  </Button>
+                                </div>
+                                {renderSettingInput(setting)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                     
-                    <Separator className="my-6" />
-                    
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Add New Setting</h3>
-                      <div className="grid gap-4">
-                        <div className="grid grid-cols-1 gap-2">
-                          <Label htmlFor="newSettingKey">Setting Key</Label>
-                          <Input
-                            id="newSettingKey"
-                            placeholder="E.g. siteName"
-                            value={newSettingKey}
-                            onChange={(e) => setNewSettingKey(e.target.value)}
-                          />
+                    <Card className="mt-6">
+                      <CardHeader>
+                        <CardTitle>Add New Setting</CardTitle>
+                        <CardDescription>
+                          Create a new configuration setting for this category
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 gap-2">
+                            <Label htmlFor="newSettingKey">Setting Key</Label>
+                            <Input
+                              id="newSettingKey"
+                              placeholder="E.g. siteName"
+                              value={newSettingKey}
+                              onChange={(e) => setNewSettingKey(e.target.value)}
+                            />
+                          </div>
+                          <div className="grid grid-cols-1 gap-2">
+                            <Label htmlFor="newSettingValue">Value</Label>
+                            <Input
+                              id="newSettingValue"
+                              placeholder="E.g. My Event Platform"
+                              value={newSettingValue}
+                              onChange={(e) => setNewSettingValue(e.target.value)}
+                            />
+                          </div>
                         </div>
-                        <div className="grid grid-cols-1 gap-2">
-                          <Label htmlFor="newSettingValue">Value</Label>
-                          <Input
-                            id="newSettingValue"
-                            placeholder="E.g. My Event Platform"
-                            value={newSettingValue}
-                            onChange={(e) => setNewSettingValue(e.target.value)}
-                          />
-                        </div>
-                        <Button 
+                      </CardContent>
+                      <CardFooter className="flex justify-end">
+                        <Button
                           onClick={handleAddNewSetting}
                           disabled={isUpdating || !newSettingKey.trim()}
                         >
@@ -811,14 +1023,10 @@ export default function SystemSettingsPage() {
                           )}
                           Add Setting
                         </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                {/* Render special settings interfaces for specific categories */}
-                {renderEventDefaultSettings()}
-                {renderPaymentSettings()}
+                      </CardFooter>
+                    </Card>
+                  </>
+                )}
                 
               </TabsContent>
             ))}
