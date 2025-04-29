@@ -46,6 +46,7 @@ const eventFormSchema = z.object({
   endDate: z.date(),
   imageUrl: z.string().optional(),
   eventType: z.string().min(1, "Event type is required"),
+  isActive: z.boolean().default(true), // Keep this field as it's in the database
 }).refine((data) => {
   return data.endDate >= data.startDate;
 }, {
@@ -93,6 +94,7 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
     endDate: event ? new Date(event.endDate) : new Date(),
     imageUrl: event?.imageUrl || "",
     eventType: event?.eventType || "",
+    isActive: event?.isActive ?? true,
   };
 
   // Create form
