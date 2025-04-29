@@ -265,49 +265,51 @@ export default function EventDetailsPage() {
               
               {/* Event Options Card */}
               <div>
-                <div className="bg-white p-6 rounded-lg border border-gray-200 sticky top-6">
-                  <h2 className="text-xl font-semibold mb-4">Participate in This Event</h2>
+                <div className="bg-white p-4 sm:p-6 rounded-lg border border-gray-200 sticky top-6">
+                  <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">Participate in This Event</h2>
                   
                   <Tabs defaultValue="tickets" className="w-full">
-                    <TabsList className="mb-4 w-full justify-start">
-                      <TabsTrigger value="tickets" className="flex items-center gap-1">
-                        <ShoppingBag className="h-4 w-4" />
-                        Tickets
-                      </TabsTrigger>
-                      
-                      {merchandiseProducts.length > 0 && (
-                        <TabsTrigger value="merchandise" className="flex items-center gap-1">
-                          <ShoppingBag className="h-4 w-4" />
-                          Merchandise
+                    <div className="overflow-x-auto pb-1">
+                      <TabsList className="mb-4 w-max justify-start">
+                        <TabsTrigger value="tickets" className="flex items-center gap-1">
+                          <ShoppingBag className="h-4 w-4 md:inline hidden" />
+                          Tickets
                         </TabsTrigger>
-                      )}
-                      
-                      {vendorProducts.length > 0 && (
-                        <TabsTrigger value="vendors" className="flex items-center gap-1">
-                          <Store className="h-4 w-4" />
-                          Vendor Options
-                        </TabsTrigger>
-                      )}
-                      
-                      {volunteerProducts.length > 0 && (
-                        <TabsTrigger value="volunteers" className="flex items-center gap-1">
-                          <HelpingHand className="h-4 w-4" />
-                          Volunteer
-                        </TabsTrigger>
-                      )}
-                    </TabsList>
+                        
+                        {merchandiseProducts.length > 0 && (
+                          <TabsTrigger value="merchandise" className="flex items-center gap-1">
+                            <ShoppingBag className="h-4 w-4 md:inline hidden" />
+                            Merch
+                          </TabsTrigger>
+                        )}
+                        
+                        {vendorProducts.length > 0 && (
+                          <TabsTrigger value="vendors" className="flex items-center gap-1">
+                            <Store className="h-4 w-4 md:inline hidden" />
+                            Vendors
+                          </TabsTrigger>
+                        )}
+                        
+                        {volunteerProducts.length > 0 && (
+                          <TabsTrigger value="volunteers" className="flex items-center gap-1">
+                            <HelpingHand className="h-4 w-4 md:inline hidden" />
+                            Volunteer
+                          </TabsTrigger>
+                        )}
+                      </TabsList>
+                    </div>
                     
                     <TabsContent value="tickets">
                       {ticketProducts.length > 0 ? (
                         <div className="space-y-4">
                           {ticketProducts.map((product) => (
                             <Card key={product.id} className="overflow-hidden">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-lg">{product.name}</CardTitle>
-                                <CardDescription className="text-xs">{product.description}</CardDescription>
+                              <CardHeader className="p-3 sm:pb-2">
+                                <CardTitle className="text-base sm:text-lg">{product.name}</CardTitle>
+                                <CardDescription className="text-xs line-clamp-2">{product.description}</CardDescription>
                               </CardHeader>
-                              <CardContent className="pb-2">
-                                <p className="text-xl font-bold mb-1">${product.price.toFixed(2)}</p>
+                              <CardContent className="p-3 pt-0 sm:pb-2">
+                                <p className="text-lg sm:text-xl font-bold mb-1">${product.price.toFixed(2)}</p>
                                 {product.quantity !== null && (
                                   <p className="text-xs text-gray-500">
                                     {product.quantity > 0 
@@ -316,9 +318,9 @@ export default function EventDetailsPage() {
                                   </p>
                                 )}
                               </CardContent>
-                              <CardFooter>
+                              <CardFooter className="p-3 pt-0">
                                 <Button 
-                                  className="w-full" 
+                                  className="w-full text-sm" 
                                   disabled={!product.isActive || (product.quantity !== null && product.quantity <= 0)}
                                   onClick={() => {
                                     if (!user) {
@@ -412,8 +414,17 @@ export default function EventDetailsPage() {
                                 <p className="text-blue-600 text-sm mt-1">No ticket purchase required</p>
                               </div>
                               
-                              <Button className="w-full bg-secondary hover:bg-secondary/90">
-                                Register for Event
+                              <Button 
+                                className="w-full text-sm bg-secondary hover:bg-secondary/90"
+                                onClick={() => {
+                                  if (!user) {
+                                    navigate("/auth");
+                                    return;
+                                  }
+                                  // Handle adding free ticket to cart
+                                }}
+                              >
+                                Add to Cart
                               </Button>
                             </>
                           )}
@@ -430,12 +441,12 @@ export default function EventDetailsPage() {
                         <div className="space-y-4">
                           {merchandiseProducts.map((product) => (
                             <Card key={product.id} className="overflow-hidden">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-lg">{product.name}</CardTitle>
-                                <CardDescription className="text-xs">{product.description}</CardDescription>
+                              <CardHeader className="p-3 sm:pb-2">
+                                <CardTitle className="text-base sm:text-lg">{product.name}</CardTitle>
+                                <CardDescription className="text-xs line-clamp-2">{product.description}</CardDescription>
                               </CardHeader>
-                              <CardContent className="pb-2">
-                                <p className="text-xl font-bold mb-1">${product.price.toFixed(2)}</p>
+                              <CardContent className="p-3 pt-0 sm:pb-2">
+                                <p className="text-lg sm:text-xl font-bold mb-1">${product.price.toFixed(2)}</p>
                                 {product.quantity !== null && (
                                   <p className="text-xs text-gray-500">
                                     {product.quantity > 0 
@@ -444,9 +455,9 @@ export default function EventDetailsPage() {
                                   </p>
                                 )}
                               </CardContent>
-                              <CardFooter>
+                              <CardFooter className="p-3 pt-0">
                                 <Button 
-                                  className="w-full" 
+                                  className="w-full text-sm" 
                                   disabled={!product.isActive || (product.quantity !== null && product.quantity <= 0)}
                                   onClick={() => {
                                     if (!user) {
@@ -476,12 +487,12 @@ export default function EventDetailsPage() {
                         <div className="space-y-4">
                           {vendorProducts.map((product) => (
                             <Card key={product.id} className="overflow-hidden">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-lg">{product.name}</CardTitle>
-                                <CardDescription className="text-xs">{product.description}</CardDescription>
+                              <CardHeader className="p-3 sm:pb-2">
+                                <CardTitle className="text-base sm:text-lg">{product.name}</CardTitle>
+                                <CardDescription className="text-xs line-clamp-2">{product.description}</CardDescription>
                               </CardHeader>
-                              <CardContent className="pb-2">
-                                <p className="text-xl font-bold mb-1">${product.price.toFixed(2)}</p>
+                              <CardContent className="p-3 pt-0 sm:pb-2">
+                                <p className="text-lg sm:text-xl font-bold mb-1">${product.price.toFixed(2)}</p>
                                 {product.quantity !== null && (
                                   <p className="text-xs text-gray-500">
                                     {product.quantity > 0 
@@ -490,9 +501,9 @@ export default function EventDetailsPage() {
                                   </p>
                                 )}
                               </CardContent>
-                              <CardFooter>
+                              <CardFooter className="p-3 pt-0">
                                 <Button 
-                                  className="w-full" 
+                                  className="w-full text-sm" 
                                   disabled={!product.isActive || (product.quantity !== null && product.quantity <= 0)}
                                   onClick={() => {
                                     if (!user) {
@@ -504,7 +515,7 @@ export default function EventDetailsPage() {
                                 >
                                   {product.quantity !== null && product.quantity <= 0
                                     ? "Spots Full"
-                                    : "Apply as Vendor"}
+                                    : "Add to Cart"}
                                 </Button>
                               </CardFooter>
                             </Card>
@@ -522,11 +533,11 @@ export default function EventDetailsPage() {
                         <div className="space-y-4">
                           {volunteerProducts.map((product) => (
                             <Card key={product.id} className="overflow-hidden">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-lg">{product.name}</CardTitle>
-                                <CardDescription className="text-xs">{product.description}</CardDescription>
+                              <CardHeader className="p-3 sm:pb-2">
+                                <CardTitle className="text-base sm:text-lg">{product.name}</CardTitle>
+                                <CardDescription className="text-xs line-clamp-2">{product.description}</CardDescription>
                               </CardHeader>
-                              <CardContent className="pb-2">
+                              <CardContent className="p-3 pt-0 sm:pb-2">
                                 {product.quantity !== null && (
                                   <p className="text-xs text-gray-500">
                                     {product.quantity > 0 
@@ -535,9 +546,9 @@ export default function EventDetailsPage() {
                                   </p>
                                 )}
                               </CardContent>
-                              <CardFooter>
+                              <CardFooter className="p-3 pt-0">
                                 <Button 
-                                  className="w-full" 
+                                  className="w-full text-sm" 
                                   disabled={!product.isActive || (product.quantity !== null && product.quantity <= 0)}
                                   onClick={() => {
                                     if (!user) {
@@ -549,7 +560,7 @@ export default function EventDetailsPage() {
                                 >
                                   {product.quantity !== null && product.quantity <= 0
                                     ? "Positions Filled"
-                                    : "Volunteer"}
+                                    : "Add to Cart"}
                                 </Button>
                               </CardFooter>
                             </Card>
