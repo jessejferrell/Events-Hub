@@ -329,7 +329,8 @@ export default function EventDetailsPage() {
                                       navigate("/auth");
                                       return;
                                     }
-                                    // Handle product selection
+                                    // Add ticket to cart
+                                    addItem(product, ticketQuantity);
                                   }}
                                 >
                                   {product.quantity !== null && product.quantity <= 0
@@ -517,7 +518,8 @@ export default function EventDetailsPage() {
                                       navigate("/auth");
                                       return;
                                     }
-                                    // Handle vendor registration
+                                    // Add vendor spot to cart
+                                    addItem(product, 1);
                                   }}
                                 >
                                   {product.quantity !== null && product.quantity <= 0
@@ -562,7 +564,8 @@ export default function EventDetailsPage() {
                                       navigate("/auth");
                                       return;
                                     }
-                                    // Handle volunteer sign up
+                                    // Add volunteer position to cart
+                                    addItem(product, 1);
                                   }}
                                 >
                                   {product.quantity !== null && product.quantity <= 0
