@@ -182,7 +182,7 @@ export default function EventCalendar({ events, isLoading, isError }: EventCalen
                   {/* Events for this day */}
                   <div className="overflow-y-auto max-h-[80px]">
                     {dayEvents.map(event => (
-                      <Link key={event.id} href={`/events/${event.id}`}>
+                      <Link key={event.id} to={`/events/${event.id}`}>
                         <div className="text-xs p-1 mt-1 rounded bg-secondary/10 text-secondary truncate cursor-pointer hover:bg-secondary/20">
                           {event.title}
                         </div>
