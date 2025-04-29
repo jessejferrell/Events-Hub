@@ -97,7 +97,7 @@ export function CartWidget() {
               {(hasRegistrationType('vendor') || hasRegistrationType('volunteer')) && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
                   <p className="text-sm text-amber-800">
-                    {getSmartCartNextAction().message}
+                    {nextActionInfo.message}
                   </p>
                 </div>
               )}
@@ -113,13 +113,10 @@ export function CartWidget() {
                 className="w-full"
                 onClick={() => {
                   setIsOpen(false);
-                  
-                  // Use the smart cart navigation to determine next step
-                  const nextAction = getSmartCartNextAction();
-                  navigate(nextAction.path);
+                  navigate(nextActionInfo.path);
                 }}
               >
-                {getSmartCartNextAction().action === 'register' ? "Complete Registration" : "Checkout"}
+                {nextActionInfo.action === 'register' ? "Complete Registration" : "Checkout"}
               </Button>
             </SheetFooter>
           </>
