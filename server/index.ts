@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import cors from "cors";
+import path from "path";
+import { setupUploads } from "./uploads";
 
 const app = express();
 
@@ -52,6 +54,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Set up uploads directory
+  await setupUploads();
+  
+  // Serve static uploads
+  app.use('/uploads', express.static(path.join('.', 'public', 'uploads')));
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

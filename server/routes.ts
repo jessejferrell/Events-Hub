@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { setupStripeRoutes } from "./stripe";
+import { upload } from "./uploads";
 import { z } from "zod";
 import { 
   insertEventSchema, 
@@ -55,6 +56,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Set up Stripe routes
   setupStripeRoutes(app);
+  
+  // === FILE UPLOAD API ===
+  
+  // Handle image uploads
+  app.post("/api/upload", requireAuth, upload.single('image'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+      
+      // Return the path to the uploaded file
+      const imageUrl = `/uploads/${req.file.filename}`;
+      res.status(201).json({ imageUrl });
+    } catch (error: any) {
+      console.error("Error uploading image:", error);
+      res.status(500).json({ message: error.message || "Failed to upload image" });
+    }
+  });
 
   // === USER PROFILE API ===
   
