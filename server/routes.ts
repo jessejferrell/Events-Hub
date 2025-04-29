@@ -129,10 +129,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Creating event with data:", req.body);
       
-      const validatedData = insertEventSchema.parse({
+      // Convert string dates to Date objects before validation
+      const eventData = {
         ...req.body,
-        ownerId: req.user.id,
-      });
+        ownerId: req.user!.id,
+      };
+      
+      if (typeof eventData.startDate === 'string') {
+        eventData.startDate = new Date(eventData.startDate);
+      }
+      
+      if (typeof eventData.endDate === 'string') {
+        eventData.endDate = new Date(eventData.endDate);
+      }
+      
+      console.log("Processed event data:", eventData);
+      
+      const validatedData = insertEventSchema.parse(eventData);
       
       console.log("Validated event data:", validatedData);
       
@@ -159,17 +172,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check permissions
-      if (req.user.role !== "admin" && event.ownerId !== req.user.id) {
+      if (req.user!.role !== "admin" && event.ownerId !== req.user!.id) {
         return res.status(403).json({ message: "Not authorized to update this event" });
       }
       
-      const validatedData = insertEventSchema.partial().parse(req.body);
+      // Convert string dates to Date objects before validation
+      const eventData = { ...req.body };
+      
+      if (typeof eventData.startDate === 'string') {
+        eventData.startDate = new Date(eventData.startDate);
+      }
+      
+      if (typeof eventData.endDate === 'string') {
+        eventData.endDate = new Date(eventData.endDate);
+      }
+      
+      const validatedData = insertEventSchema.partial().parse(eventData);
       const updatedEvent = await storage.updateEvent(eventId, validatedData);
       res.json(updatedEvent);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
+        console.error("Validation error:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ message: "Invalid event data", errors: error.errors });
       }
+      console.error("Error updating event:", error.message);
       res.status(500).json({ message: error.message || "Failed to update event" });
     }
   });
