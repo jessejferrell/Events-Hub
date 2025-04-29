@@ -23,7 +23,6 @@ const SETTING_CATEGORIES = [
   "appearance",
   "eventDefaults",
   "email",
-  "payment",
   "content",
   "userManagement",
   "analytics",
@@ -35,7 +34,7 @@ const CATEGORY_NAMES: Record<string, string> = {
   appearance: "Appearance",
   eventDefaults: "Event Defaults",
   email: "Email & Notifications",
-  payment: "Payment Options",
+
   content: "Content Management",
   userManagement: "User Management",
   analytics: "Analytics & Reporting",
@@ -936,8 +935,6 @@ export default function SystemSettingsPage() {
                   <>{renderEventDefaultSettings()}</>
                 ) : category === "content" ? (
                   <>{renderContentSettings()}</>
-                ) : category === "payment" ? (
-                  <>{renderPaymentSettings()}</>
                 ) : (
                   <>
                     <Card>
