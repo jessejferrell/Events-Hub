@@ -1126,7 +1126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // === SYSTEM SETTINGS API ===
   
   // Get all system settings
-  app.get("/api/settings", requireAdmin, async (req, res) => {
+  app.get("/api/admin/settings", requireAdmin, async (req, res) => {
     try {
       const category = req.query.category as string;
       const settings = await storage.getSystemSettings(category);
@@ -1137,7 +1137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get a specific system setting
-  app.get("/api/settings/:key", requireAdmin, async (req, res) => {
+  app.get("/api/admin/settings/:key", requireAdmin, async (req, res) => {
     try {
       const key = req.params.key;
       const setting = await storage.getSystemSettingByKey(key);
@@ -1153,7 +1153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create or update system setting
-  app.post("/api/settings", requireAdmin, async (req, res) => {
+  app.post("/api/admin/settings", requireAdmin, async (req, res) => {
     try {
       const { key, value, category } = req.body;
       
@@ -1182,8 +1182,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Update system setting
+  app.put("/api/admin/settings/:key", requireAdmin, async (req, res) => {
+    try {
+      const key = req.params.key;
+      const { value, category } = req.body;
+      
+      if (value === undefined) {
+        return res.status(400).json({ message: "Value is required" });
+      }
+      
+      const setting = await storage.updateSystemSetting(key, value, req.user!.id);
+      res.json(setting);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to update system setting" });
+    }
+  });
+  
   // Delete system setting
-  app.delete("/api/settings/:key", requireAdmin, async (req, res) => {
+  app.delete("/api/admin/settings/:key", requireAdmin, async (req, res) => {
     try {
       const key = req.params.key;
       const deleted = await storage.deleteSystemSetting(key);
