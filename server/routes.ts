@@ -792,7 +792,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // === ORDERS API ===
+  // === CHECKOUT & ORDERS API ===
+
+  // Checkout endpoint (protected)
+  app.post("/api/checkout", requireAuth, async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const { items } = req.body;
+      
+      if (!items || !items.length) {
+        return res.status(400).json({ message: "No items provided for checkout" });
+      }
+      
+      // Step 1: Create an order
+      const order = await storage.createOrder({
+        userId: req.user.id,
+        status: "pending",
+        paymentStatus: "pending",
+        totalAmount: 0, // Will be calculated based on items
+      });
+      
+      let totalAmount = 0;
+      let products = [];
+      let eventIds = new Set();
+      
+      // Step 2: Create order items and calculate total
+      for (const item of items) {
+        const product = await storage.getProduct(item.productId);
+        if (!product) {
+          // If product doesn't exist, rollback
+          await storage.updateOrderStatus(order.id, "cancelled");
+          return res.status(404).json({ message: `Product ${item.productId} not found` });
+        }
+        
+        products.push(product);
+        eventIds.add(product.eventId);
+        
+        // Create order item
+        await storage.createOrderItem({
+          orderId: order.id,
+          productId: product.id,
+          quantity: item.quantity,
+          price: product.price,
+          productType: product.type,
+          registrationData: item.registrationData || null
+        });
+        
+        // Add to total
+        totalAmount += product.price * item.quantity;
+      }
+      
+      // Update order total
+      await storage.updateOrderStatus(order.id, "pending");
+      const updatedOrder = await storage.updateOrderPaymentStatus(order.id, "pending");
+      
+      // Step 3: Get event owner's Stripe account
+      const eventId = Array.from(eventIds)[0]; // For simplicity, assuming all products are from the same event
+      const event = await storage.getEvent(eventId);
+      
+      if (!event) {
+        await storage.updateOrderStatus(order.id, "cancelled");
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      const owner = await storage.getUser(event.ownerId);
+      
+      if (!owner || !owner.stripeAccountId) {
+        await storage.updateOrderStatus(order.id, "cancelled");
+        return res.status(400).json({ message: "Event owner has not connected with Stripe" });
+      }
+      
+      // Step 4: Create Stripe checkout session
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: "2023-10-16",
+      });
+      
+      // Get domain from environment or request
+      const domain = process.env.REPLIT_DOMAINS 
+        ? process.env.REPLIT_DOMAINS.split(',')[0] 
+        : `${req.protocol}://${req.get('host')}`;
+      
+      // Create line items for Stripe Checkout
+      const lineItems = products.map(product => {
+        const item = items.find(i => i.productId === product.id);
+        return {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: product.name,
+              description: product.description || undefined,
+            },
+            unit_amount: Math.round(product.price * 100), // convert to cents
+          },
+          quantity: item.quantity,
+        };
+      });
+      
+      // Create a Checkout Session
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: lineItems,
+        mode: "payment",
+        success_url: `${domain}/checkout/success?order_id=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${domain}/checkout/cancel?order_id=${order.id}`,
+        
+        // Send payment to the connected account
+        payment_intent_data: {
+          application_fee_amount: Math.round(totalAmount * 100 * 0.05), // 5% platform fee
+          transfer_data: {
+            destination: owner.stripeAccountId,
+          },
+        },
+        
+        // Pass metadata to use in the webhook
+        metadata: {
+          orderId: order.id.toString(),
+          userId: req.user.id.toString(),
+          eventId: eventId.toString(),
+        },
+      });
+      
+      // Return the checkout session ID and URL to the client
+      res.status(200).json({
+        orderId: order.id,
+        checkoutUrl: session.url,
+        clientSecret: session.client_secret,
+      });
+    } catch (error: any) {
+      console.error("Checkout error:", error);
+      res.status(500).json({ message: error.message || "Failed to process checkout" });
+    }
+  });
   
   // Get user orders (protected)
   app.get("/api/my-orders", requireAuth, async (req, res) => {

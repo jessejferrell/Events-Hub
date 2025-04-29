@@ -196,6 +196,37 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // If no registrations needed, go to checkout
     return '/checkout';
   };
+  
+  // Smart cart - determines what to do next in the cart flow based on cart contents
+  const getSmartCartNextAction = (): { action: 'register' | 'checkout', path: string, message: string } => {
+    // Check if cart has any items that need registration
+    if (needsRegistration()) {
+      const path = getNextRegistrationPath();
+      const isVendorRegistration = path.includes('/registration/vendor/');
+      const isVolunteerRegistration = path.includes('/registration/volunteer/');
+      
+      let message = "Please complete registration before checkout";
+      
+      if (isVendorRegistration) {
+        message = "Please complete vendor registration before proceeding to checkout";
+      } else if (isVolunteerRegistration) {
+        message = "Please complete volunteer registration before proceeding to checkout";
+      }
+      
+      return {
+        action: 'register',
+        path,
+        message
+      };
+    }
+    
+    // If no registrations needed, proceed to checkout
+    return {
+      action: 'checkout',
+      path: '/checkout',
+      message: "Proceeding to checkout"
+    };
+  };
 
   // Calculate total number of items
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);

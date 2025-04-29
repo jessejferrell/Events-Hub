@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useCart } from "@/hooks/use-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { ShoppingBag, CreditCard, ArrowRight } from "lucide-react";
+import { ShoppingBag, CreditCard, ArrowRight, ExternalLink, Info } from "lucide-react";
 
 import {
   Card,
@@ -29,6 +29,7 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const [isRedirectingToStripe, setIsRedirectingToStripe] = useState(false);
 
   // Check if any items need registration
   const hasVendorRegistrations = hasRegistrationType('vendor');
@@ -69,6 +70,33 @@ export default function CheckoutPage() {
     }
   }, [itemCount, toast, navigate]);
 
+  // Handle checkout success or failure
+  useEffect(() => {
+    // Check URL for checkout status
+    const searchParams = new URLSearchParams(window.location.search);
+    const success = searchParams.get('success');
+    const cancelled = searchParams.get('cancelled');
+    
+    if (success) {
+      toast({
+        title: "Payment successful",
+        description: "Your order has been processed successfully.",
+      });
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Go to order confirmation page
+      navigate("/my-orders");
+    } else if (cancelled) {
+      toast({
+        title: "Payment cancelled",
+        description: "Your payment was cancelled.",
+        variant: "destructive",
+      });
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [toast, navigate]);
+
   if (itemCount === 0) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -88,7 +116,25 @@ export default function CheckoutPage() {
       return;
     }
     
-    checkoutMutation.mutate();
+    setIsRedirectingToStripe(true);
+    
+    checkoutMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+        } else {
+          setIsRedirectingToStripe(false);
+          toast({
+            title: "Checkout error",
+            description: "Could not redirect to payment page. Please try again.",
+            variant: "destructive",
+          });
+        }
+      },
+      onError: () => {
+        setIsRedirectingToStripe(false);
+      }
+    });
   };
 
   return (
@@ -179,6 +225,31 @@ export default function CheckoutPage() {
               </AlertDescription>
             </Alert>
           )}
+          
+          {/* Payment information */}
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <CreditCard className="mr-2 h-5 w-5" />
+                Payment Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start">
+                  <Info className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
+                  <p>
+                    After clicking "Proceed to Payment," you'll be redirected to Stripe's secure payment page.
+                    Your payment will go directly to the event organizer's account.
+                  </p>
+                </div>
+                <div className="flex items-center mt-2">
+                  <ExternalLink className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <p>For questions about payment security, visit <a href="https://stripe.com/docs/security" target="_blank" rel="noopener noreferrer" className="text-primary underline">Stripe's Security Page</a>.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
         
         {/* Order total and checkout button */}
@@ -193,11 +264,15 @@ export default function CheckoutPage() {
                   <span>Subtotal</span>
                   <span>${total.toFixed(2)}</span>
                 </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Platform Fee (5%)</span>
+                  <span>${(total * 0.05).toFixed(2)}</span>
+                </div>
                 {/* Add taxes, fees, etc. here if applicable */}
                 <Separator />
                 <div className="flex justify-between font-bold">
                   <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>${(total * 1.05).toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>
@@ -206,9 +281,9 @@ export default function CheckoutPage() {
                 className="w-full"
                 size="lg"
                 onClick={handleCheckout}
-                disabled={hasIncompleteRegistrations || checkoutMutation.isPending}
+                disabled={hasIncompleteRegistrations || checkoutMutation.isPending || isRedirectingToStripe}
               >
-                {checkoutMutation.isPending ? (
+                {checkoutMutation.isPending || isRedirectingToStripe ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Processing...
