@@ -27,6 +27,7 @@ type CartContextType = {
   getCartItem: (id: string) => CartItem | undefined;
   needsRegistration: () => boolean;
   getNextRegistrationPath: () => string;
+  getSmartCartNextAction: () => { action: 'register' | 'checkout', path: string, message: string };
   checkoutMutation: any;
   hasRegistrationType: (type: string) => boolean;
   hasItemOfType: (type: string) => boolean;
@@ -283,6 +284,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         getCartItem,
         needsRegistration,
         getNextRegistrationPath,
+        getSmartCartNextAction,
         checkoutMutation,
         hasRegistrationType,
         hasItemOfType

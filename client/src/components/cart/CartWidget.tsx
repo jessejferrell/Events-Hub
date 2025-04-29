@@ -18,9 +18,12 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 
 export function CartWidget() {
-  const { items, itemCount, total, removeItem, hasRegistrationType } = useCart();
+  const { items, itemCount, total, removeItem, hasRegistrationType, getSmartCartNextAction, needsRegistration } = useCart();
   const [, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Get the next action info once to avoid multiple computations
+  const nextActionInfo = getSmartCartNextAction();
 
   if (itemCount === 0) {
     return (
@@ -94,7 +97,7 @@ export function CartWidget() {
               {(hasRegistrationType('vendor') || hasRegistrationType('volunteer')) && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
                   <p className="text-sm text-amber-800">
-                    Some items in your cart require additional information before checkout.
+                    {getSmartCartNextAction().message}
                   </p>
                 </div>
               )}
@@ -111,46 +114,12 @@ export function CartWidget() {
                 onClick={() => {
                   setIsOpen(false);
                   
-                  // Check if we have any vendor or volunteer products that need registration
-                  const vendorItems = items.filter(item => item.product.type === 'vendor_spot');
-                  const volunteerItems = items.filter(item => item.product.type === 'volunteer_shift');
-                  
-                  // Get the getRegistrationStatus function from the cart context
-                  const { getRegistrationStatus } = useCart();
-                  
-                  // Check if any items need registration and don't have it completed
-                  const hasIncompleteVendorRegistration = vendorItems.some(item => 
-                    getRegistrationStatus(item.id) !== 'complete'
-                  );
-                  
-                  const hasIncompleteVolunteerRegistration = volunteerItems.some(item => 
-                    getRegistrationStatus(item.id) !== 'complete'
-                  );
-                  
-                  // Route based on what's needed
-                  if (hasIncompleteVendorRegistration) {
-                    // Get the first vendor item that needs registration
-                    const vendorItem = vendorItems.find(item => getRegistrationStatus(item.id) !== 'complete');
-                    if (vendorItem) {
-                      navigate(`/registration/vendor/${vendorItem.id}`);
-                      return;
-                    }
-                  }
-                  
-                  if (hasIncompleteVolunteerRegistration) {
-                    // Get the first volunteer item that needs registration
-                    const volunteerItem = volunteerItems.find(item => getRegistrationStatus(item.id) !== 'complete');
-                    if (volunteerItem) {
-                      navigate(`/registration/volunteer/${volunteerItem.id}`);
-                      return;
-                    }
-                  }
-                  
-                  // If all registrations are complete or there are none, go to checkout
-                  navigate("/checkout");
+                  // Use the smart cart navigation to determine next step
+                  const nextAction = getSmartCartNextAction();
+                  navigate(nextAction.path);
                 }}
               >
-                Checkout
+                {getSmartCartNextAction().action === 'register' ? "Complete Registration" : "Checkout"}
               </Button>
             </SheetFooter>
           </>
