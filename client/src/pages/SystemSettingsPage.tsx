@@ -24,6 +24,7 @@ const SETTING_CATEGORIES = [
   "eventDefaults",
   "email",
   "payment",
+  "content",
   "userManagement",
   "analytics",
   "integration"
@@ -35,6 +36,7 @@ const CATEGORY_NAMES: Record<string, string> = {
   eventDefaults: "Event Defaults",
   email: "Email & Notifications",
   payment: "Payment Options",
+  content: "Content Management",
   userManagement: "User Management",
   analytics: "Analytics & Reporting",
   integration: "External Integrations"
@@ -330,73 +332,171 @@ export default function SystemSettingsPage() {
     
     return (
       <div className="mt-8">
-        <h3 className="text-lg font-semibold mb-4">Stripe Integration</h3>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="stripeMode">Mode</Label>
-                  <Select defaultValue="test">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="test">Test</SelectItem>
-                      <SelectItem value="live">Live</SelectItem>
-                    </SelectContent>
-                  </Select>
+        <h3 className="text-lg font-semibold mb-4">Platform Payment Settings</h3>
+        <p className="text-sm text-gray-500 mb-6">
+          These settings control how your platform handles payments. Note that most Stripe-specific settings should be configured directly in your Stripe dashboard.
+        </p>
+        
+        <Tabs defaultValue="api_keys" className="w-full mb-8">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="api_keys">API Keys</TabsTrigger>
+            <TabsTrigger value="platform_fees">Platform Fees</TabsTrigger>
+            <TabsTrigger value="payment_options">Payment Options</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="api_keys">
+            <Card>
+              <CardHeader>
+                <CardTitle>API Keys</CardTitle>
+                <CardDescription>Connect your platform to Stripe for payment processing</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="stripe-public-key">Stripe Public Key</Label>
+                    <Input
+                      id="stripe-public-key"
+                      placeholder="pk_test_..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Your publishable key from the Stripe dashboard
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="stripe-secret-key">Stripe Secret Key</Label>
+                    <Input
+                      id="stripe-secret-key"
+                      type="password"
+                      placeholder="sk_test_..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Your secret key from the Stripe dashboard (never share this)
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="stripe-webhook-secret">Webhook Secret</Label>
+                    <Input
+                      id="stripe-webhook-secret"
+                      type="password"
+                      placeholder="whsec_..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Used to verify webhook events from Stripe
+                    </p>
+                  </div>
                 </div>
-                
-                <div>
-                  <Label htmlFor="stripe-account-type">Account Type</Label>
-                  <Select defaultValue="standard">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="standard">Standard</SelectItem>
-                      <SelectItem value="connect">Connect (Multi-party)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="stripe-public-key">Stripe Public Key</Label>
-                <Input
-                  id="stripe-public-key"
-                  placeholder="pk_test_..."
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="stripe-secret-key">Stripe Secret Key</Label>
-                <Input
-                  id="stripe-secret-key"
-                  type="password"
-                  placeholder="sk_test_..."
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="stripe-webhook-secret">Webhook Secret</Label>
-                <Input
-                  id="stripe-webhook-secret"
-                  type="password"
-                  placeholder="whsec_..."
-                />
-              </div>
-              
-              <div className="pt-2">
+              </CardContent>
+              <CardFooter className="flex justify-end">
                 <Button>
                   <Save className="h-4 w-4 mr-2" />
-                  Save Stripe Configuration
+                  Save API Keys
                 </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="platform_fees">
+            <Card>
+              <CardHeader>
+                <CardTitle>Platform Fee Configuration</CardTitle>
+                <CardDescription>Set up the fees your platform charges on transactions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="platform-fee-percentage">Platform Fee Percentage</Label>
+                    <div className="flex items-center">
+                      <Input
+                        id="platform-fee-percentage"
+                        defaultValue="4.5"
+                        className="w-32"
+                      />
+                      <span className="ml-2">%</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Percentage fee added to all transactions (in addition to Stripe fees)
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="platform-fixed-fee">Fixed Fee Per Transaction</Label>
+                    <div className="flex items-center">
+                      <span className="mr-2">$</span>
+                      <Input
+                        id="platform-fixed-fee"
+                        defaultValue="0.30"
+                        className="w-32"
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Fixed fee added to all transactions (in addition to Stripe fees)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Fee Configuration
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="payment_options">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Options</CardTitle>
+                <CardDescription>Configure payment methods and checkout options</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Accept Credit Cards</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Allow customers to pay with credit cards
+                      </p>
+                    </div>
+                    <Switch defaultChecked id="accept-credit-cards" />
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Accept Apple Pay / Google Pay</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Enable digital wallet payments
+                      </p>
+                    </div>
+                    <Switch defaultChecked id="accept-digital-wallets" />
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Show Price Breakdown</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Show itemized fees at checkout
+                      </p>
+                    </div>
+                    <Switch defaultChecked id="show-price-breakdown" />
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Payment Options
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   };
