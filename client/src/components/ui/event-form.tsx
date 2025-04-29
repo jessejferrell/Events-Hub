@@ -202,7 +202,7 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
           }`}>
             2
           </div>
-          <span className="ml-2 font-medium">Products & Tickets</span>
+          <span className="ml-2 font-medium">Products</span>
         </div>
       </div>
     );
