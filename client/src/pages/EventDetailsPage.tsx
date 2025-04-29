@@ -71,6 +71,23 @@ export default function EventDetailsPage() {
   // Check if user has tickets for this event
   const hasTickets = userTickets?.some(ticket => ticket.eventId === eventId);
 
+  // Fetch products for this event
+  const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
+    queryKey: [`/api/events/${eventId}/products`],
+    queryFn: async () => {
+      const res = await fetch(`/api/events/${eventId}/products`);
+      if (!res.ok) throw new Error("Failed to fetch products");
+      return await res.json();
+    },
+    enabled: eventId > 0,
+  });
+
+  // Organize products by type
+  const ticketProducts = products?.filter(p => p.type === "ticket") || [];
+  const merchandiseProducts = products?.filter(p => p.type === "merchandise") || [];
+  const vendorProducts = products?.filter(p => p.type === "vendor_spot") || [];
+  const volunteerProducts = products?.filter(p => p.type === "volunteer_shift") || [];
+
   // Create checkout session mutation
   const createCheckoutSession = useMutation({
     mutationFn: async ({ eventId, quantity }: { eventId: number, quantity: number }) => {
@@ -329,6 +346,260 @@ export default function EventDetailsPage() {
                   </div>
                 </div>
               </div>
+            </div>
+            
+            {/* Products Section with Tabs */}
+            <div className="mb-12">
+              <h2 className="text-2xl font-bold mb-6">Participate in This Event</h2>
+              
+              <Tabs defaultValue="tickets" className="w-full">
+                <TabsList className="mb-6 w-full justify-start">
+                  <TabsTrigger value="tickets" className="flex items-center gap-1">
+                    <ShoppingBag className="h-4 w-4" />
+                    Tickets
+                  </TabsTrigger>
+                  
+                  {merchandiseProducts.length > 0 && (
+                    <TabsTrigger value="merchandise" className="flex items-center gap-1">
+                      <ShoppingBag className="h-4 w-4" />
+                      Merchandise
+                    </TabsTrigger>
+                  )}
+                  
+                  {vendorProducts.length > 0 && (
+                    <TabsTrigger value="vendors" className="flex items-center gap-1">
+                      <Store className="h-4 w-4" />
+                      Vendor Options
+                    </TabsTrigger>
+                  )}
+                  
+                  {volunteerProducts.length > 0 && (
+                    <TabsTrigger value="volunteers" className="flex items-center gap-1">
+                      <HelpingHand className="h-4 w-4" />
+                      Volunteer
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+                
+                <TabsContent value="tickets">
+                  {ticketProducts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {ticketProducts.map((product) => (
+                        <Card key={product.id} className="overflow-hidden">
+                          {product.imageUrl && (
+                            <div className="aspect-video w-full">
+                              <img 
+                                src={product.imageUrl} 
+                                alt={product.name} 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <CardHeader>
+                            <CardTitle>{product.name}</CardTitle>
+                            <CardDescription>{product.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-2xl font-bold mb-2">${product.price.toFixed(2)}</p>
+                            {product.quantity !== null && (
+                              <p className="text-sm text-gray-500 mb-2">
+                                {product.quantity > 0 
+                                  ? `${product.quantity} left` 
+                                  : 'Sold out'}
+                              </p>
+                            )}
+                          </CardContent>
+                          <CardFooter>
+                            <Button 
+                              className="w-full" 
+                              disabled={!product.isActive || (product.quantity !== null && product.quantity <= 0)}
+                              onClick={() => {
+                                if (!user) {
+                                  navigate("/auth");
+                                  return;
+                                }
+                                // Handle product selection
+                              }}
+                            >
+                              {product.quantity !== null && product.quantity <= 0
+                                ? "Sold Out"
+                                : "Add to Cart"}
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">No tickets are available for this event yet.</p>
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="merchandise">
+                  {merchandiseProducts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {merchandiseProducts.map((product) => (
+                        <Card key={product.id} className="overflow-hidden">
+                          {product.imageUrl && (
+                            <div className="aspect-video w-full">
+                              <img 
+                                src={product.imageUrl} 
+                                alt={product.name} 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <CardHeader>
+                            <CardTitle>{product.name}</CardTitle>
+                            <CardDescription>{product.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-2xl font-bold mb-2">${product.price.toFixed(2)}</p>
+                            {product.quantity !== null && (
+                              <p className="text-sm text-gray-500 mb-2">
+                                {product.quantity > 0 
+                                  ? `${product.quantity} left` 
+                                  : 'Sold out'}
+                              </p>
+                            )}
+                          </CardContent>
+                          <CardFooter>
+                            <Button 
+                              className="w-full" 
+                              disabled={!product.isActive || (product.quantity !== null && product.quantity <= 0)}
+                              onClick={() => {
+                                if (!user) {
+                                  navigate("/auth");
+                                  return;
+                                }
+                                // Handle product selection
+                              }}
+                            >
+                              {product.quantity !== null && product.quantity <= 0
+                                ? "Sold Out"
+                                : "Add to Cart"}
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">No merchandise is available for this event yet.</p>
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="vendors">
+                  {vendorProducts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {vendorProducts.map((product) => (
+                        <Card key={product.id} className="overflow-hidden">
+                          {product.imageUrl && (
+                            <div className="aspect-video w-full">
+                              <img 
+                                src={product.imageUrl} 
+                                alt={product.name} 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <CardHeader>
+                            <CardTitle>{product.name}</CardTitle>
+                            <CardDescription>{product.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-2xl font-bold mb-2">${product.price.toFixed(2)}</p>
+                            {product.quantity !== null && (
+                              <p className="text-sm text-gray-500 mb-2">
+                                {product.quantity > 0 
+                                  ? `${product.quantity} spots left` 
+                                  : 'No spots available'}
+                              </p>
+                            )}
+                          </CardContent>
+                          <CardFooter>
+                            <Button 
+                              className="w-full" 
+                              disabled={!product.isActive || (product.quantity !== null && product.quantity <= 0)}
+                              onClick={() => {
+                                if (!user) {
+                                  navigate("/auth");
+                                  return;
+                                }
+                                // Handle vendor registration
+                              }}
+                            >
+                              {product.quantity !== null && product.quantity <= 0
+                                ? "Spots Full"
+                                : "Apply as Vendor"}
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">No vendor opportunities are available for this event yet.</p>
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="volunteers">
+                  {volunteerProducts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {volunteerProducts.map((product) => (
+                        <Card key={product.id} className="overflow-hidden">
+                          {product.imageUrl && (
+                            <div className="aspect-video w-full">
+                              <img 
+                                src={product.imageUrl} 
+                                alt={product.name} 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <CardHeader>
+                            <CardTitle>{product.name}</CardTitle>
+                            <CardDescription>{product.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            {product.quantity !== null && (
+                              <p className="text-sm text-gray-500 mb-2">
+                                {product.quantity > 0 
+                                  ? `${product.quantity} positions left` 
+                                  : 'No positions available'}
+                              </p>
+                            )}
+                          </CardContent>
+                          <CardFooter>
+                            <Button 
+                              className="w-full" 
+                              disabled={!product.isActive || (product.quantity !== null && product.quantity <= 0)}
+                              onClick={() => {
+                                if (!user) {
+                                  navigate("/auth");
+                                  return;
+                                }
+                                // Handle volunteer sign up
+                              }}
+                            >
+                              {product.quantity !== null && product.quantity <= 0
+                                ? "Positions Filled"
+                                : "Volunteer"}
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">No volunteer opportunities are available for this event yet.</p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           </>
         )}
