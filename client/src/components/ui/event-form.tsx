@@ -46,8 +46,6 @@ const eventFormSchema = z.object({
   endDate: z.date(),
   imageUrl: z.string().optional(),
   eventType: z.string().min(1, "Event type is required"),
-  price: z.coerce.number().min(0, "Price must be a positive number or zero"),
-  isActive: z.boolean().default(true),
 }).refine((data) => {
   return data.endDate >= data.startDate;
 }, {
@@ -95,8 +93,6 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
     endDate: event ? new Date(event.endDate) : new Date(),
     imageUrl: event?.imageUrl || "",
     eventType: event?.eventType || "",
-    price: event?.price || 0,
-    isActive: event?.isActive ?? true,
   };
 
   // Create form
@@ -398,34 +394,7 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
           />
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Base Price ($)</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="pl-7"
-                      placeholder="0.00"
-                      {...field}
-                    />
-                  </div>
-                </FormControl>
-                <FormDescription>
-                  Set to 0 for free events
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <FormField
             control={form.control}
             name="imageUrl"
@@ -447,28 +416,7 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
         {/* All checkboxes for vendor options, volunteer options, merchandise and add-ons have been removed.
            All of these will be managed as products in step 2 */}
         
-        <FormField
-          control={form.control}
-          name="isActive"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-              <FormControl>
-                <input
-                  type="checkbox"
-                  checked={field.value}
-                  onChange={field.onChange}
-                  className="h-4 w-4 mt-1"
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel>Active Event</FormLabel>
-                <FormDescription>
-                  Uncheck to hide this event from public listings
-                </FormDescription>
-              </div>
-            </FormItem>
-          )}
-        />
+        {/* Removed isActive field as requested - events will be active by default */}
 
         <div className="flex justify-between space-x-2 pt-4">
           <Button
