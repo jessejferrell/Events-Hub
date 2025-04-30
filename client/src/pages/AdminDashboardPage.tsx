@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 import StatCard from "@/components/admin/StatCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  User, 
+  User as UserIcon, 
   Calendar, 
   DollarSign, 
   Ticket, 
@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { Event, Order } from "@shared/schema";
+import { Event, Order, User as UserType } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +75,14 @@ export default function AdminDashboardPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+  
+  // User management state
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [selectedRole, setSelectedRole] = useState('all_roles');
+  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
+  const [showUserDetail, setShowUserDetail] = useState(false);
+  const [userNote, setUserNote] = useState('');
+  const [showEditUserForm, setShowEditUserForm] = useState(false);
 
   // Fetch admin stats
   const { data: stats, isLoading } = useQuery<AdminStats>({
@@ -127,6 +135,22 @@ export default function AdminDashboardPage() {
     enabled: activeTab === "events"
   });
   
+  // Fetch all users for Users tab
+  const { data: users, isLoading: isLoadingUsers, refetch: refetchUsers } = useQuery<UserType[]>({
+    queryKey: ["/api/admin/users", userSearchQuery, selectedRole],
+    queryFn: async () => {
+      let queryParams = new URLSearchParams();
+      
+      if (userSearchQuery) queryParams.append("search", userSearchQuery);
+      if (selectedRole && selectedRole !== "all_roles") queryParams.append("role", selectedRole);
+      
+      const res = await fetch(`/api/admin/users?${queryParams.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return await res.json();
+    },
+    enabled: activeTab === "users"
+  });
+  
   // Delete event mutation
   const deleteEventMutation = useMutation({
     mutationFn: async (eventId: number) => {
@@ -162,6 +186,50 @@ export default function AdminDashboardPage() {
     },
     onSuccess: () => {
       refetchEvents();
+    },
+  });
+  
+  // Update user role mutation
+  const updateUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: number; role: string }) => {
+      const res = await fetch(`/api/admin/users/${userId}/role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update user role');
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      refetchUsers();
+    },
+  });
+  
+  // Add user note mutation
+  const addUserNoteMutation = useMutation({
+    mutationFn: async ({ userId, note }: { userId: number; note: string }) => {
+      const res = await fetch(`/api/admin/users/${userId}/notes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ note }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to add user note');
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      setUserNote('');
+      // If we're viewing user details, we should refresh that data too
+      if (selectedUser && showUserDetail) {
+        fetchUserDetails(selectedUser.id);
+      }
     },
   });
   
@@ -247,7 +315,7 @@ export default function AdminDashboardPage() {
           <StatCard 
             title="Total Users" 
             value={isLoading ? "-" : stats?.totalUsers.toString() || "0"} 
-            icon={<User />} 
+            icon={<UserIcon />} 
             linkText="View all users" 
             linkHref="#users" 
             iconBgClass="bg-neutral-100"
