@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/hooks/use-auth";
 import { CartProvider } from "@/hooks/use-cart";
-import { useBrandTheme } from "@/hooks/use-brand-theme";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import HomePage from "@/pages/HomePage";
 import AuthPage from "@/pages/AuthPage";
@@ -51,24 +50,15 @@ function Router() {
   );
 }
 
-// BrandThemeWrapper applies the brand theme site-wide
-function BrandThemeWrapper({ children }: { children: React.ReactNode }) {
-  // Apply branding colors to CSS variables
-  useBrandTheme();
-  return <>{children}</>;
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CartProvider>
-          <BrandThemeWrapper>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
-          </BrandThemeWrapper>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
         </CartProvider>
       </AuthProvider>
     </QueryClientProvider>

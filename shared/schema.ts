@@ -2,7 +2,6 @@ import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, js
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
-import { type Json } from "drizzle-orm/pg-core";
 
 // User model
 export const users = pgTable("users", {
@@ -555,21 +554,3 @@ export type InsertAdminNote = z.infer<typeof insertAdminNoteSchema>;
 
 export type Analytics = typeof analytics.$inferSelect;
 export type InsertAnalytics = z.infer<typeof insertAnalyticsSchema>;
-
-// Site Settings model
-export const siteSettings = pgTable("site_settings", {
-  id: serial("id").primaryKey(),
-  key: text("key").notNull().unique(),
-  value: jsonb("value").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const insertSiteSettingsSchema = createInsertSchema(siteSettings).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type SiteSetting = typeof siteSettings.$inferSelect;
-export type InsertSiteSetting = z.infer<typeof insertSiteSettingsSchema>;

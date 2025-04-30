@@ -12,8 +12,7 @@ import {
   volunteerShifts, type VolunteerShift, type InsertVolunteerShift,
   volunteerAssignments, type VolunteerAssignment, type InsertVolunteerAssignment,
   adminNotes, type AdminNote, type InsertAdminNote,
-  analytics, type Analytics, type InsertAnalytics,
-  siteSettings, type SiteSetting, type InsertSiteSetting
+  analytics, type Analytics, type InsertAnalytics
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -130,11 +129,7 @@ export interface IStorage {
   searchTransactions(query: string, filters: { userId?: number; eventId?: number; transactionType?: string; status?: string }): Promise<any[]>;
   exportTransactions(filters: { userId?: number; eventId?: number; transactionType?: string; startDate?: Date; endDate?: Date; status?: string }): Promise<any[]>;
   
-  // Site Settings
-  getSiteSetting(key: string): Promise<SiteSetting | undefined>;
-  getAllSiteSettings(): Promise<SiteSetting[]>;
-  createOrUpdateSiteSetting(key: string, value: any): Promise<SiteSetting>;
-  deleteSiteSetting(key: string): Promise<void>;
+
 }
 
 // Database implementation of storage interface
@@ -1107,45 +1102,6 @@ export class DatabaseStorage implements IStorage {
     );
     
     return enhancedResults;
-  }
-  
-  // === SITE SETTINGS OPERATIONS ===
-  
-  async getSiteSetting(key: string): Promise<SiteSetting | undefined> {
-    const result = await db.select().from(siteSettings).where(eq(siteSettings.key, key));
-    return result[0];
-  }
-  
-  async getAllSiteSettings(): Promise<SiteSetting[]> {
-    return await db.select().from(siteSettings);
-  }
-  
-  async createOrUpdateSiteSetting(key: string, value: any): Promise<SiteSetting> {
-    // Check if the setting exists
-    const existing = await this.getSiteSetting(key);
-    
-    if (existing) {
-      // Update existing setting
-      const result = await db
-        .update(siteSettings)
-        .set({ value, updatedAt: new Date() })
-        .where(eq(siteSettings.key, key))
-        .returning();
-      
-      return result[0];
-    } else {
-      // Create new setting
-      const result = await db
-        .insert(siteSettings)
-        .values({ key, value })
-        .returning();
-      
-      return result[0];
-    }
-  }
-  
-  async deleteSiteSetting(key: string): Promise<void> {
-    await db.delete(siteSettings).where(eq(siteSettings.key, key));
   }
 }
 

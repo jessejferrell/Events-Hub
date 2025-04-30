@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StatCard from "@/components/admin/StatCard";
-// Site settings functionality removed to improve stability
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   User as UserIcon, 
@@ -800,12 +799,6 @@ export default function AdminDashboardPage() {
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2 data-[state=active]:text-primary"
             >
               Analytics & Reports
-            </TabsTrigger>
-            <TabsTrigger 
-              value="settings" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2 data-[state=active]:text-primary"
-            >
-              Site Settings
             </TabsTrigger>
 
           </TabsList>
@@ -1776,19 +1769,6 @@ export default function AdminDashboardPage() {
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          {/* Site Settings tab content */}
-          <TabsContent value="settings" className="m-0">
-            <Card>
-              <CardHeader>
-                <CardTitle>Site Settings</CardTitle>
-                <CardDescription>Customize your organization's branding and appearance</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SimpleSiteSettingsManager />
               </CardContent>
             </Card>
           </TabsContent>
