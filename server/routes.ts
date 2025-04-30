@@ -1785,9 +1785,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Helper function to check if user is super admin
   function requireSuperAdmin(req: Request, res: Response, next: Function) {
-    // Super admin check - jessejferrell@gmail.com has specific access to site settings
-    if (!req.isAuthenticated() || req.user.email !== "jessejferrell@gmail.com") {
-      return res.status(403).json({ message: "Super admin access required" });
+    // Super admin or admin check for site settings access
+    if (!req.isAuthenticated() || (req.user.role !== 'super_admin' && req.user.role !== 'admin')) {
+      return res.status(403).json({ message: "Admin access required" });
     }
     next();
   }

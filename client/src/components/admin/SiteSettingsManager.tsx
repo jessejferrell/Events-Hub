@@ -16,8 +16,8 @@ export default function SiteSettingsManager() {
   const { user } = useAuth();
   const { settings, getSetting, updateSetting, isLoading, ColorSettingsSchema, OrgSettingsSchema } = useSiteSettings();
   
-  // Only super admins can access this section
-  const isSuperAdmin = user?.role === 'super_admin';
+  // Only admins and super admins can access this section
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'admin';
   
   // Color picker state
   const [activeColorName, setActiveColorName] = useState<string | null>(null);
@@ -98,7 +98,7 @@ export default function SiteSettingsManager() {
       <Alert variant="destructive" className="mb-4">
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription>
-          You don't have permission to access site settings. This section is restricted to super administrators.
+          You don't have permission to access site settings. This section is restricted to administrators.
         </AlertDescription>
       </Alert>
     );
@@ -116,7 +116,7 @@ export default function SiteSettingsManager() {
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
         These settings control the branding and appearance of the entire site. Changes will affect all users.
-        <Badge variant="secondary" className="ml-2">Super Admin Only</Badge>
+        <Badge variant="secondary" className="ml-2">Admin Access</Badge>
       </p>
       
       <Tabs defaultValue="organization" className="w-full">
