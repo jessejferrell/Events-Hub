@@ -12,7 +12,8 @@ import {
   volunteerShifts, type VolunteerShift, type InsertVolunteerShift,
   volunteerAssignments, type VolunteerAssignment, type InsertVolunteerAssignment,
   adminNotes, type AdminNote, type InsertAdminNote,
-  analytics, type Analytics, type InsertAnalytics
+  analytics, type Analytics, type InsertAnalytics,
+  siteSettings, type SiteSetting, type InsertSiteSetting
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -129,7 +130,11 @@ export interface IStorage {
   searchTransactions(query: string, filters: { userId?: number; eventId?: number; transactionType?: string; status?: string }): Promise<any[]>;
   exportTransactions(filters: { userId?: number; eventId?: number; transactionType?: string; startDate?: Date; endDate?: Date; status?: string }): Promise<any[]>;
   
-
+  // Site Settings
+  getSiteSetting(key: string): Promise<SiteSetting | undefined>;
+  getAllSiteSettings(): Promise<SiteSetting[]>;
+  createOrUpdateSiteSetting(key: string, value: any): Promise<SiteSetting>;
+  deleteSiteSetting(key: string): Promise<void>;
 }
 
 // Database implementation of storage interface
