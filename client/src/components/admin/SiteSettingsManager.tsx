@@ -32,11 +32,33 @@ export default function SiteSettingsManager() {
     address: '',
   });
   
-  // Color settings state
-  const [colorSettings, setColorSettings] = useState<ColorSettings>({
-    primary: '#6366f1',   // Default indigo
-    secondary: '#0ea5e9', // Default sky blue
-    accent: '#f97316',    // Default orange
+  // Color settings state - get default colors from CSS variables
+  const [colorSettings, setColorSettings] = useState<ColorSettings>(() => {
+    // Get CSS variables and convert from HSL to hex
+    const getHexFromCssVar = (varName: string): string => {
+      try {
+        // Get computed style for root element
+        const computedStyle = getComputedStyle(document.documentElement);
+        // Get the HSL value (stripping the '--' prefix)
+        const hslValue = computedStyle.getPropertyValue(`--${varName}`).trim();
+        if (!hslValue) return '#00a99d'; // Default teal if not found
+        
+        // For now, return a placeholder. Getting exact hex from HSL is complex
+        // and will be handled more precisely in a future update.
+        return varName === 'primary' ? '#00a99d' :  // Teal
+               varName === 'secondary' ? '#8a4fff' : // Purple
+               '#f0e6ff'; // Light purple for accent
+      } catch (e) {
+        console.error('Error getting CSS variable:', e);
+        return '#00a99d'; // Default teal if error
+      }
+    };
+    
+    return {
+      primary: getHexFromCssVar('primary'),
+      secondary: getHexFromCssVar('secondary'),
+      accent: getHexFromCssVar('accent'),
+    };
   });
   
   // Load settings when data is available

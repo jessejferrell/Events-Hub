@@ -17,20 +17,77 @@ export function useBrandTheme() {
         // Apply colors to CSS variables
         const root = document.documentElement;
         
+        // Helper to convert hex to HSL format for CSS variables
+        const hexToHSL = (hex: string): string => {
+          // Remove the # if it exists
+          hex = hex.replace('#', '');
+          
+          // Convert hex to RGB
+          const r = parseInt(hex.slice(0, 2), 16) / 255;
+          const g = parseInt(hex.slice(2, 4), 16) / 255;
+          const b = parseInt(hex.slice(4, 6), 16) / 255;
+          
+          // Find greatest and smallest channel values
+          const cmin = Math.min(r, g, b);
+          const cmax = Math.max(r, g, b);
+          const delta = cmax - cmin;
+          
+          let h = 0;
+          let s = 0;
+          let l = 0;
+          
+          // Calculate hue
+          if (delta === 0) {
+            h = 0;
+          } else if (cmax === r) {
+            h = ((g - b) / delta) % 6;
+          } else if (cmax === g) {
+            h = (b - r) / delta + 2;
+          } else {
+            h = (r - g) / delta + 4;
+          }
+          
+          h = Math.round(h * 60);
+          if (h < 0) h += 360;
+          
+          // Calculate lightness
+          l = (cmax + cmin) / 2;
+          
+          // Calculate saturation
+          s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+          
+          // Convert to percentages
+          s = Math.round(s * 100);
+          l = Math.round(l * 100);
+          
+          return `${h} ${s}% ${l}%`;
+        };
+        
         if (colors.primary) {
-          root.style.setProperty('--primary', colors.primary);
-          // Set derived color variables (darker/lighter variants)
-          root.style.setProperty('--primary-foreground', getContrastingColor(colors.primary));
+          try {
+            root.style.setProperty('--primary', hexToHSL(colors.primary));
+            root.style.setProperty('--primary-foreground', getContrastingColor(colors.primary));
+          } catch (e) {
+            console.error('Error setting primary color:', e);
+          }
         }
         
         if (colors.secondary) {
-          root.style.setProperty('--secondary', colors.secondary);
-          root.style.setProperty('--secondary-foreground', getContrastingColor(colors.secondary));
+          try {
+            root.style.setProperty('--secondary', hexToHSL(colors.secondary));
+            root.style.setProperty('--secondary-foreground', getContrastingColor(colors.secondary));
+          } catch (e) {
+            console.error('Error setting secondary color:', e);
+          }
         }
         
         if (colors.accent) {
-          root.style.setProperty('--accent', colors.accent);
-          root.style.setProperty('--accent-foreground', getContrastingColor(colors.accent));
+          try {
+            root.style.setProperty('--accent', hexToHSL(colors.accent));
+            root.style.setProperty('--accent-foreground', getContrastingColor(colors.accent));
+          } catch (e) {
+            console.error('Error setting accent color:', e);
+          }
         }
       }
     }
