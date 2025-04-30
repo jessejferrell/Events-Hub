@@ -1185,6 +1185,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message || "Failed to update user role" });
     }
   });
+  
+  // Update user profile (admin only, with permission checks)
+  app.put("/api/admin/users/:id", requireAuth, async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const userId = parseInt(req.params.id);
+      const userData = req.body;
+      
+      // Check permissions
+      const isSuperAdmin = req.user.email === 'jessejferrell@gmail.com';
+      const isAdmin = req.user.role === 'admin';
+      
+      // Get user to edit
+      const userToEdit = await storage.getUser(userId);
+      if (!userToEdit) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Super admin can edit anyone, regular admins can only edit non-admin users
+      const canEdit = isSuperAdmin || (isAdmin && userToEdit.role !== 'admin');
+      
+      if (!canEdit) {
+        return res.status(403).json({ message: "Not authorized to edit this user" });
+      }
+      
+      // Perform the update
+      const updatedUser = await storage.updateUserProfile(userId, userData);
+      // Remove password from response
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to update user" });
+    }
+  });
 
   // Get admin dashboard stats
   app.get("/api/admin/stats", requireAdmin, async (req, res) => {

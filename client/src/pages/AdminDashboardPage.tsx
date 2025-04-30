@@ -1021,7 +1021,7 @@ export default function AdminDashboardPage() {
                                   onClick={() => handleViewUser(user)}
                                   className="text-primary hover:text-primary-dark"
                                 >
-                                  <Info className="h-4 w-4 mr-1" />
+                                  <Eye className="h-4 w-4 mr-1" />
                                   View
                                 </Button>
                                 
@@ -1054,6 +1054,85 @@ export default function AdminDashboardPage() {
                 )}
               </CardContent>
             </Card>
+            
+            {/* Edit User Dialog */}
+            <Dialog open={showEditUserForm} onOpenChange={setShowEditUserForm}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Edit User</DialogTitle>
+                  <DialogDescription>
+                    Update user information. User roles can be changed in the User Details page.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {editUserData && (
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-username">Username</Label>
+                        <Input 
+                          id="edit-username"
+                          value={editUserData.username}
+                          onChange={(e) => setEditUserData({...editUserData, username: e.target.value})}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-email">Email</Label>
+                        <Input 
+                          id="edit-email"
+                          type="email"
+                          value={editUserData.email}
+                          onChange={(e) => setEditUserData({...editUserData, email: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-name">Full Name</Label>
+                      <Input 
+                        id="edit-name"
+                        value={editUserData.name || ''}
+                        onChange={(e) => setEditUserData({...editUserData, name: e.target.value || null})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-phone">Phone Number</Label>
+                      <Input 
+                        id="edit-phone"
+                        value={editUserData.phoneNumber || ''}
+                        onChange={(e) => setEditUserData({...editUserData, phoneNumber: e.target.value || null})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-address">Address</Label>
+                      <Input 
+                        id="edit-address"
+                        value={editUserData.address || ''}
+                        onChange={(e) => setEditUserData({...editUserData, address: e.target.value || null})}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowEditUserForm(false)}>Cancel</Button>
+                  <Button 
+                    onClick={() => updateUserMutation.mutate(editUserData)}
+                    disabled={updateUserMutation.isPending}
+                  >
+                    {updateUserMutation.isPending ? (
+                      <>
+                        <span className="animate-spin mr-2">◌</span>
+                        Saving...
+                      </>
+                    ) : 'Save Changes'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             
             {/* User Detail Dialog */}
             <Dialog open={showUserDetail} onOpenChange={setShowUserDetail}>
