@@ -26,7 +26,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/hooks/use-cart";
 import { apiRequest } from "@/lib/queryClient";
 import { Calendar, Clock, MapPin, Tag, Users, DollarSign, ShoppingBag, HelpingHand, Store } from "lucide-react";
-import { format } from "date-fns";
+import { format, isSameDay } from "date-fns";
 
 export default function EventDetailsPage() {
   const [match, params] = useRoute("/events/:id");
@@ -248,10 +248,26 @@ export default function EventDetailsPage() {
                     <div>
                       <h3 className="font-medium">Date and Time</h3>
                       <p className="text-gray-600">
-                        {format(new Date(event.startDate), "EEEE, MMMM d, yyyy")}
-                        <br />
-                        {format(new Date(event.startDate), "h:mm a")} - 
-                        {format(new Date(event.endDate), "h:mm a")}
+                        {/* Check if it's a multi-day event */}
+                        {isSameDay(new Date(event.startDate), new Date(event.endDate)) ? (
+                          /* Single day event */
+                          <>
+                            {format(new Date(event.startDate), "EEEE, MMMM d, yyyy")}
+                            <br />
+                            {format(new Date(event.startDate), "h:mm a")} - 
+                            {format(new Date(event.endDate), "h:mm a")}
+                          </>
+                        ) : (
+                          /* Multi-day event */
+                          <>
+                            {format(new Date(event.startDate), "EEEE, MMMM d, yyyy")} -
+                            <br />
+                            {format(new Date(event.endDate), "EEEE, MMMM d, yyyy")}
+                            <br />
+                            {format(new Date(event.startDate), "h:mm a")} - 
+                            {format(new Date(event.endDate), "h:mm a")}
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
