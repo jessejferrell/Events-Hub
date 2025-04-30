@@ -411,29 +411,10 @@ export default function EventDetailsPage() {
 
                           {/* For free events */}
                           {event.price === 0 && (
-                            <>
-                              <div className="bg-blue-50 p-4 rounded-md mb-4 mt-2">
-                                <p className="text-blue-700 font-medium">This is a free event!</p>
-                                <p className="text-blue-600 text-sm mt-1">No ticket purchase required</p>
-                              </div>
-                              
-                              <Button 
-                                className="w-full text-sm bg-secondary hover:bg-secondary/90"
-                                onClick={() => {
-                                  if (!user) {
-                                    navigate("/auth");
-                                    return;
-                                  }
-                                  // Add free ticket to cart
-                                  const freeTicket = ticketProducts.find(p => p.price === 0);
-                                  if (freeTicket) {
-                                    addItem(freeTicket, 1);
-                                  }
-                                }}
-                              >
-                                Add to Cart
-                              </Button>
-                            </>
+                            <div className="bg-blue-50 p-4 rounded-md mb-4 mt-2">
+                              <p className="text-blue-700 font-medium">This is a free event!</p>
+                              <p className="text-blue-600 text-sm mt-1">No ticket purchase required</p>
+                            </div>
                           )}
                         </div>
                       ) : (
