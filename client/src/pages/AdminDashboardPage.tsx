@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StatCard from "@/components/admin/StatCard";
-import SiteSettingsManager from "@/components/admin/SiteSettingsManager";
+import SimpleSiteSettingsManager from "@/components/admin/SimpleSiteSettingsManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   User as UserIcon, 
@@ -1788,7 +1788,7 @@ export default function AdminDashboardPage() {
                 <CardDescription>Customize your organization's branding and appearance</CardDescription>
               </CardHeader>
               <CardContent>
-                <SiteSettingsManager />
+                <SimpleSiteSettingsManager />
               </CardContent>
             </Card>
           </TabsContent>
