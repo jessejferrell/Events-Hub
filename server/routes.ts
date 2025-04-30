@@ -379,6 +379,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message || "Failed to update event" });
     }
   });
+  
+  // Toggle event status (protected, admin/owner only)
+  app.put("/api/events/:id/toggle-status", requireAuth, async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const newStatus = req.body.status;
+      
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Check permissions
+      if (req.user!.role !== "admin" && event.ownerId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to update this event" });
+      }
+      
+      // Determine the new status if not provided
+      let statusToSet = newStatus;
+      if (!statusToSet) {
+        // Cycle through statuses: draft -> upcoming -> active -> completed -> draft
+        switch (event.status || "draft") {
+          case "draft":
+            statusToSet = "upcoming";
+            break;
+          case "upcoming":
+            statusToSet = "active";
+            break;
+          case "active":
+            statusToSet = "completed";
+            break;
+          case "completed":
+          case "cancelled":
+            statusToSet = "draft";
+            break;
+          default:
+            statusToSet = "draft";
+        }
+      }
+      
+      const updatedEvent = await storage.updateEvent(eventId, { 
+        status: statusToSet,
+        isActive: statusToSet !== "draft" // Keep isActive for backward compatibility
+      });
+      
+      res.json(updatedEvent);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to toggle event status" });
+    }
+  });
 
   // Delete event (protected, owner/admin only)
   app.delete("/api/events/:id", requireAuth, async (req, res) => {

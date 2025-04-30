@@ -57,6 +57,7 @@ export const events = pgTable("events", {
   ownerId: integer("owner_id").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   isPublic: boolean("is_public").default(true).notNull(),
+  status: text("status").default("draft").notNull(), // 'draft', 'upcoming', 'active', 'completed', 'cancelled'
   capacity: integer("capacity"),
   ticketsAvailable: integer("tickets_available"),
   price: doublePrecision("price").default(0).notNull(),
