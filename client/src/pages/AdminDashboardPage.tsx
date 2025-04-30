@@ -402,13 +402,13 @@ export default function AdminDashboardPage() {
   
   // Toggle event status mutation
   const toggleEventStatusMutation = useMutation({
-    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
-      const res = await fetch(`/api/events/${id}`, {
+    mutationFn: async ({ id, status }: { id: number; status?: string }) => {
+      const res = await fetch(`/api/events/${id}/toggle-status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ isActive }),
+        body: JSON.stringify({ status }),
       });
       if (!res.ok) {
         throw new Error('Failed to update event status');
@@ -481,8 +481,8 @@ export default function AdminDashboardPage() {
   
   const handleToggleEventStatus = (event: Event) => {
     toggleEventStatusMutation.mutate({ 
-      id: event.id, 
-      isActive: !event.isActive 
+      id: event.id
+      // No status needed - the API will handle cycling through statuses
     });
   };
   
