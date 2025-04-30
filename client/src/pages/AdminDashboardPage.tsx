@@ -1817,7 +1817,7 @@ export default function AdminDashboardPage() {
                           </div>
                           <div className="ml-4">
                             <p className="text-gray-500 text-sm">Revenue</p>
-                            <p className="text-2xl font-semibold">${analyticsData?.revenue?.toFixed(2) || '0.00'}</p>
+                            <p className="text-2xl font-semibold">${(analyticsData?.revenue !== undefined ? analyticsData.revenue.toFixed(2) : '0.00')}</p>
                             <p className={`text-xs flex items-center ${analyticsData?.revenueChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                               {analyticsData?.revenueChange >= 0 ? (
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
