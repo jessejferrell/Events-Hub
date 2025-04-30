@@ -224,6 +224,106 @@ export default function AdminDashboardPage() {
       return await res.json();
     },
   });
+  
+  // Fetch analytics data based on timeframe
+  const { data: analytics, isLoading: isLoadingAnalytics, refetch: refetchAnalytics } = useQuery({
+    queryKey: ["/api/admin/analytics", analyticsTimeframe],
+    queryFn: async () => {
+      let queryParams = new URLSearchParams();
+      if (analyticsTimeframe) queryParams.append("timeframe", analyticsTimeframe);
+      
+      const res = await fetch(`/api/admin/analytics?${queryParams.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch analytics data");
+      return await res.json();
+    },
+    enabled: activeTab === "analytics"
+  });
+  
+  // Update analytics data and chart data when analytics response changes
+  useEffect(() => {
+    if (analytics) {
+      // Update the analytics data state
+      setAnalyticsData({
+        revenue: analytics.revenue || 0,
+        revenueChange: analytics.revenueChange || 0,
+        ticketsSold: analytics.ticketsSold || 0,
+        ticketsChange: analytics.ticketsChange || 0,
+        newUsers: analytics.newUsers || 0,
+        usersChange: analytics.usersChange || 0,
+        activeEvents: analytics.activeEvents || 0,
+        eventsChange: analytics.eventsChange || 0,
+        recentActivity: analytics.recentActivity || [],
+        conversionRate: analytics.conversionRate || {
+          ticket: 0,
+          vendor: 0,
+          volunteer: 0,
+          merchandise: 0
+        },
+        userEngagement: analytics.userEngagement || {
+          eventParticipation: 0,
+          multiTicket: 0,
+          returnRate: 0,
+          volunteerRate: 0
+        }
+      });
+      
+      // Update chart data
+      if (analytics.revenueData) {
+        setRevenueData(analytics.revenueData);
+      }
+      
+      if (analytics.revenueByEventType) {
+        setRevenueByEventType(analytics.revenueByEventType);
+      }
+      
+      if (analytics.revenueByProductType) {
+        setRevenueByProductType(analytics.revenueByProductType);
+      }
+      
+      if (analytics.topEvents) {
+        setTopEvents(analytics.topEvents);
+      }
+      
+      if (analytics.revenueAnalysis) {
+        setRevenueAnalysis(analytics.revenueAnalysis);
+      }
+      
+      if (analytics.userGrowthData) {
+        setUserGrowthData(analytics.userGrowthData);
+      }
+      
+      if (analytics.userTypeData) {
+        setUserTypeData(analytics.userTypeData);
+      }
+      
+      if (analytics.topUserSegments) {
+        setTopUserSegments(analytics.topUserSegments);
+      }
+      
+      if (analytics.eventGrowthData) {
+        setEventGrowthData(analytics.eventGrowthData);
+      }
+      
+      if (analytics.eventTypeData) {
+        setEventTypeData(analytics.eventTypeData);
+      }
+      
+      if (analytics.eventPerformanceData) {
+        setEventPerformanceData(analytics.eventPerformanceData);
+      }
+      
+      if (analytics.eventLocationData) {
+        setEventLocationData(analytics.eventLocationData);
+      }
+    }
+  }, [analytics]);
+  
+  // Handle timeframe change
+  useEffect(() => {
+    if (activeTab === "analytics") {
+      refetchAnalytics();
+    }
+  }, [analyticsTimeframe, activeTab, refetchAnalytics]);
 
   // Fetch transactions
   const { data: transactions, isLoading: isLoadingTransactions, refetch: refetchTransactions } = useQuery<Transaction[]>({
@@ -804,7 +904,7 @@ export default function AdminDashboardPage() {
                 <CardContent className="px-4 pb-4">
                   <div className="h-64 flex items-center justify-center bg-neutral-50 rounded">
                     <div className="text-center text-neutral-400">
-                      <PieChart className="h-12 w-12 mx-auto mb-2" />
+                      <PieChartIcon className="h-12 w-12 mx-auto mb-2" />
                       <p>User distribution chart will appear here when data is available</p>
                     </div>
                   </div>
