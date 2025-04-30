@@ -48,6 +48,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
 
 // Types for admin stats
@@ -1446,6 +1447,194 @@ export default function AdminDashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Transaction Edit Dialog */}
+      <Dialog open={showTransactionEditor} onOpenChange={setShowTransactionEditor}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+            <DialogDescription>
+              Make changes to the transaction. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedTransaction && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transaction-id" className="text-right">
+                  ID
+                </Label>
+                <Input
+                  id="transaction-id"
+                  value={selectedTransaction.id}
+                  className="col-span-3"
+                  disabled
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transaction-type" className="text-right">
+                  Type
+                </Label>
+                <Input
+                  id="transaction-type"
+                  value={selectedTransaction.type}
+                  className="col-span-3"
+                  disabled
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transaction-reference" className="text-right">
+                  Reference
+                </Label>
+                <Input
+                  id="transaction-reference"
+                  value={selectedTransaction.reference}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedTransaction({
+                    ...selectedTransaction,
+                    reference: e.target.value
+                  })}
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transaction-user" className="text-right">
+                  User
+                </Label>
+                <Input
+                  id="transaction-user"
+                  value={selectedTransaction.userName || `User #${selectedTransaction.userId}`}
+                  className="col-span-3"
+                  disabled
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transaction-event" className="text-right">
+                  Event
+                </Label>
+                <Input
+                  id="transaction-event"
+                  value={selectedTransaction.eventTitle || `Event #${selectedTransaction.eventId}`}
+                  className="col-span-3"
+                  disabled
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transaction-status" className="text-right">
+                  Status
+                </Label>
+                <Select 
+                  value={selectedTransaction.status}
+                  onValueChange={(value) => setSelectedTransaction({
+                    ...selectedTransaction,
+                    status: value
+                  })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transactionStatusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transaction-amount" className="text-right">
+                  Amount
+                </Label>
+                <Input
+                  id="transaction-amount"
+                  type="number"
+                  step="0.01"
+                  value={selectedTransaction.amount}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedTransaction({
+                    ...selectedTransaction,
+                    amount: parseFloat(e.target.value)
+                  })}
+                />
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transaction-notes" className="text-right">
+                  Notes
+                </Label>
+                <Textarea
+                  id="transaction-notes"
+                  value={selectedTransaction.notes || ''}
+                  className="col-span-3"
+                  rows={3}
+                  onChange={(e) => setSelectedTransaction({
+                    ...selectedTransaction,
+                    notes: e.target.value
+                  })}
+                />
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTransactionEditor(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => 
+                updateTransactionMutation.mutate({
+                  status: selectedTransaction?.status,
+                  amount: selectedTransaction?.amount,
+                  notes: selectedTransaction?.notes,
+                  reference: selectedTransaction?.reference
+                })
+              }
+              disabled={updateTransactionMutation.isPending}
+            >
+              {updateTransactionMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Transaction Delete Confirmation */}
+      <AlertDialog open={confirmDeleteTransaction} onOpenChange={setConfirmDeleteTransaction}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the transaction record
+              from our database.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteTransactionMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteTransactionMutation.isPending}
+            >
+              {deleteTransactionMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
