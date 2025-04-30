@@ -360,7 +360,7 @@ export default function AdminDashboardPage() {
       let queryParams = new URLSearchParams();
       
       if (eventSearchQuery) queryParams.append("search", eventSearchQuery);
-      if (eventStatusFilter === "upcoming") queryParams.append("isUpcoming", "true");
+      if (eventStatusFilter !== "all") queryParams.append("status", eventStatusFilter);
       
       const res = await fetch(`/api/events?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch events");
@@ -1559,9 +1559,11 @@ export default function AdminDashboardPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Events</SelectItem>
+                          <SelectItem value="draft">Draft</SelectItem>
                           <SelectItem value="upcoming">Upcoming</SelectItem>
-                          <SelectItem value="past">Past Events</SelectItem>
-                          <SelectItem value="unpublished">Unpublished</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
                         </SelectContent>
                       </Select>
                       
