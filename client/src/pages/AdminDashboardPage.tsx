@@ -358,7 +358,7 @@ export default function AdminDashboardPage() {
                           </div>
                           <div className="flex items-center text-sm text-neutral-500 mb-2">
                             <Calendar className="h-4 w-4 mr-1" />
-                            <span>{format(new Date(event.startDate), "MMM d, yyyy")}</span>
+                            <span>{new Date(event.startDate).toLocaleDateString()}</span>
                             <span className="mx-2">•</span>
                             <Ticket className="h-4 w-4 mr-1" />
                             <span>0 tickets sold</span>
@@ -418,7 +418,7 @@ export default function AdminDashboardPage() {
                                 {order.status}
                               </Badge>
                             </td>
-                            <td className="py-2 px-2 text-sm">{format(new Date(order.createdAt), "MMM d, yyyy")}</td>
+                            <td className="py-2 px-2 text-sm">{new Date(order.createdAt).toLocaleDateString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -588,7 +588,7 @@ export default function AdminDashboardPage() {
                                 {transaction.status}
                               </Badge>
                             </td>
-                            <td className="py-4 px-4">{format(new Date(transaction.createdAt), "MMM d, yyyy")}</td>
+                            <td className="py-4 px-4">{new Date(transaction.createdAt).toLocaleDateString()}</td>
                             <td className="py-4 px-4">
                               <Button variant="outline" size="sm">
                                 View
@@ -758,7 +758,7 @@ export default function AdminDashboardPage() {
                                       </div>
                                     </td>
                                     <td className="p-4 align-middle">
-                                      <div>{format(eventStartDate, "MMM d, yyyy")}</div>
+                                      <div>{eventStartDate.toLocaleDateString()}</div>
                                       <div className="text-xs text-muted-foreground">
                                         {durationDays > 1 
                                           ? `${durationDays}-day event` 
@@ -934,9 +934,9 @@ export default function AdminDashboardPage() {
               <p className="text-sm text-muted-foreground mt-1">{selectedEvent.description}</p>
               <div className="flex items-center gap-2 mt-2 text-sm">
                 <Calendar className="h-4 w-4" />
-                <span>{format(new Date(selectedEvent.startDate), "MMM d, yyyy")}</span>
+                <span>{new Date(selectedEvent.startDate).toLocaleDateString()}</span>
                 <span>-</span>
-                <span>{format(new Date(selectedEvent.endDate), "MMM d, yyyy")}</span>
+                <span>{new Date(selectedEvent.endDate).toLocaleDateString()}</span>
               </div>
               <div className="flex items-center gap-2 mt-1 text-sm">
                 <Store className="h-4 w-4" />
