@@ -6,6 +6,9 @@ import { setupStripeRoutes } from "./stripe";
 import { upload } from "./uploads";
 import { z } from "zod";
 import Stripe from "stripe";
+import fs from "fs";
+import { createObjectCsvWriter } from "csv-writer";
+import { and, eq, gte, lte, like, or, sql } from "drizzle-orm";
 import { 
   insertEventSchema, 
   insertTicketSchema, 
@@ -21,6 +24,143 @@ import {
   insertVolunteerAssignmentSchema,
   insertAnalyticsSchema
 } from "@shared/schema";
+
+// Helper function to generate time series data for charts
+function generateTimeSeriesData(metrics: any[], timeframe: string, valueType: string = 'revenue') {
+  // Default data points for different timeframes
+  const defaultDataPoints: { [key: string]: { count: number; format: string } } = {
+    'today': { count: 24, format: 'hour' },
+    'week': { count: 7, format: 'day' },
+    'month': { count: 30, format: 'day' },
+    'year': { count: 12, format: 'month' },
+    'all': { count: 12, format: 'month' }
+  };
+  
+  const config = defaultDataPoints[timeframe] || defaultDataPoints.month;
+  const result = [];
+  
+  // Group metrics by time period
+  const groupedData: { [key: string]: number } = {};
+  
+  // Create empty data structure with all time periods
+  const now = new Date();
+  for (let i = 0; i < config.count; i++) {
+    let label;
+    if (config.format === 'hour') {
+      label = `${i}:00`;
+    } else if (config.format === 'day') {
+      const date = new Date(now);
+      date.setDate(now.getDate() - i);
+      label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } else if (config.format === 'month') {
+      const date = new Date(now);
+      date.setMonth(now.getMonth() - i);
+      label = date.toLocaleDateString(undefined, { month: 'short' });
+    }
+    groupedData[label!] = 0;
+  }
+  
+  // Fill in actual data
+  metrics.forEach(metric => {
+    const date = new Date(metric.dateTime);
+    let period;
+    
+    if (config.format === 'hour') {
+      period = `${date.getHours()}:00`;
+    } else if (config.format === 'day') {
+      period = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } else if (config.format === 'month') {
+      period = date.toLocaleDateString(undefined, { month: 'short' });
+    }
+    
+    if (period && period in groupedData) {
+      // For revenue, we want to sum the values
+      if (valueType === 'revenue') {
+        groupedData[period] += parseFloat(metric.value as string) || 0;
+      } else {
+        // For counts (users, events), we want to increment
+        groupedData[period] += 1;
+      }
+    }
+  });
+  
+  // Convert to array of objects for Recharts
+  Object.entries(groupedData).forEach(([date, value]) => {
+    result.push({
+      date,
+      [valueType === 'revenue' ? 'amount' : 'events']: value
+    });
+  });
+  
+  // Sort by date 
+  return result.sort((a, b) => {
+    if (a.date < b.date) return -1;
+    if (a.date > b.date) return 1;
+    return 0;
+  });
+}
+
+// Helper function to generate recent activity for the analytics dashboard
+function generateRecentActivity() {
+  const activities = [
+    {
+      id: 1,
+      type: 'ticket_purchase',
+      user: 'John Davis',
+      event: 'Summer Music Festival',
+      amount: 89.99,
+      time: '2 hours ago'
+    },
+    {
+      id: 2,
+      type: 'new_event',
+      user: 'Christina Lee',
+      event: 'Tech Conference 2023',
+      time: '3 hours ago'
+    },
+    {
+      id: 3,
+      type: 'vendor_registration',
+      user: 'Mike\'s Food Truck',
+      event: 'Food & Wine Festival',
+      amount: 250.00,
+      time: '5 hours ago'
+    },
+    {
+      id: 4,
+      type: 'ticket_purchase',
+      user: 'Sarah Wilson',
+      event: 'Jazz Night',
+      amount: 45.00,
+      time: '6 hours ago'
+    },
+    {
+      id: 5,
+      type: 'volunteer_registration',
+      user: 'David Brown',
+      event: 'Community Cleanup',
+      time: '8 hours ago'
+    },
+    {
+      id: 6,
+      type: 'merchandise_purchase',
+      user: 'Emily Clark',
+      event: 'Rock Concert',
+      amount: 35.50,
+      time: '10 hours ago'
+    },
+    {
+      id: 7,
+      type: 'ticket_purchase',
+      user: 'Robert Johnson',
+      event: 'Art Exhibition',
+      amount: 15.00,
+      time: '12 hours ago'
+    }
+  ];
+  
+  return activities;
+}
 
 // Helper function to check authentication
 function requireAuth(req: Request, res: Response, next: Function) {

@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import cors from "cors";
 import path from "path";
 import { setupUploads } from "./uploads";
+import { seedAnalyticsData } from "./seedAnalytics";
 
 const app = express();
 
@@ -59,6 +60,13 @@ app.use((req, res, next) => {
   
   // Serve static uploads
   app.use('/uploads', express.static(path.join('.', 'public', 'uploads')));
+  
+  // Initialize analytics data
+  try {
+    await seedAnalyticsData();
+  } catch (error) {
+    console.error('Error seeding analytics data:', error);
+  }
   
   const server = await registerRoutes(app);
 
