@@ -44,7 +44,7 @@ export interface IStorage {
   updateUserProfile(userId: number, userData: Partial<InsertUser>): Promise<User>;
   
   // Event operations
-  getEvents(filters: { type?: string; location?: string; search?: string; sortBy?: string; isUpcoming?: boolean }): Promise<Event[]>;
+  getEvents(filters: { type?: string; location?: string; search?: string; sortBy?: string; isUpcoming?: boolean; status?: string }): Promise<Event[]>;
   getEvent(id: number): Promise<Event | undefined>;
   createEvent(event: InsertEvent): Promise<Event>;
   updateEvent(id: number, eventData: Partial<InsertEvent>): Promise<Event>;
@@ -264,7 +264,7 @@ export class DatabaseStorage implements IStorage {
 
   // === EVENT OPERATIONS ===
 
-  async getEvents(filters: { type?: string; location?: string; search?: string; sortBy?: string; isUpcoming?: boolean } = {}): Promise<Event[]> {
+  async getEvents(filters: { type?: string; location?: string; search?: string; sortBy?: string; isUpcoming?: boolean; status?: string } = {}): Promise<Event[]> {
     let queryBuilder = db.select().from(events);
     
     // Apply filters
@@ -289,6 +289,11 @@ export class DatabaseStorage implements IStorage {
     
     if (filters.isUpcoming) {
       conditions.push(gte(events.endDate, new Date()));
+    }
+    
+    // Filter by status if provided
+    if (filters.status) {
+      conditions.push(eq(events.status, filters.status));
     }
     
     if (conditions.length > 0) {

@@ -237,13 +237,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all events (public)
   app.get("/api/events", async (req, res) => {
     try {
-      const { type, location, search, sortBy, isUpcoming } = req.query;
+      const { type, location, search, sortBy, isUpcoming, status } = req.query;
       const events = await storage.getEvents({
         type: type as string,
         location: location as string,
         search: search as string,
         sortBy: sortBy as string,
         isUpcoming: isUpcoming === "true",
+        status: status as string,
       });
       res.json(events);
     } catch (error: any) {
