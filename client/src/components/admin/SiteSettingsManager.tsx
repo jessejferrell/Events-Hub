@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSiteSettings, type ColorSettings, type OrgSettings } from '@/hooks/use-site-settings';
 import { SketchPicker } from 'react-color';
 import { useAuth } from '@/hooks/use-auth';
@@ -58,7 +58,7 @@ export default function SiteSettingsManager() {
         });
       }
     }
-  }, [isLoading, settings, getSetting]);
+  }, [isLoading, settings, getSetting, colorSettings]);
   
   const handleSaveOrgSettings = () => {
     try {
