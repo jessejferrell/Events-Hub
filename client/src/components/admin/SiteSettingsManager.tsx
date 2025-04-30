@@ -1,274 +1,295 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { useSiteSettings } from "@/hooks/use-site-settings";
-import { useToast } from "@/hooks/use-toast";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Save, Upload, Palette } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useState } from 'react';
+import { useSiteSettings, type ColorSettings, type OrgSettings } from '@/hooks/use-site-settings';
 import { SketchPicker } from 'react-color';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-const DEFAULT_COLORS = {
-  primary: "#0EA5E9", // Teal
-  secondary: "#7E22CE", // Purple
-  accent: "#F59E0B", // Orange
-};
+import { useAuth } from '@/hooks/use-auth';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 export default function SiteSettingsManager() {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const { settings, getSetting, updateSetting, isUpdating, isLoading } = useSiteSettings();
+  const { settings, getSetting, updateSetting, isLoading, ColorSettingsSchema, OrgSettingsSchema } = useSiteSettings();
   
-  const [orgName, setOrgName] = useState<string>("");
-  const [orgLogo, setOrgLogo] = useState<string>("");
-  const [colors, setColors] = useState(DEFAULT_COLORS);
-  const [activeColor, setActiveColor] = useState<string | null>(null);
+  // Only super admins can access this section
+  const isSuperAdmin = user?.role === 'super_admin';
   
-  // Check if user is authorized (super admin)
-  const isAuthorized = user?.email === "jessejferrell@gmail.com";
+  // Color picker state
+  const [activeColorName, setActiveColorName] = useState<string | null>(null);
+  const [showColorPicker, setShowColorPicker] = useState(false);
   
+  // Organization details form state
+  const [orgSettings, setOrgSettings] = useState<OrgSettings>({
+    name: '',
+    logo: '',
+    contactEmail: '',
+    contactPhone: '',
+    address: '',
+  });
+  
+  // Color settings state
+  const [colorSettings, setColorSettings] = useState<ColorSettings>({
+    primary: '#6366f1',   // Default indigo
+    secondary: '#0ea5e9', // Default sky blue
+    accent: '#f97316',    // Default orange
+  });
+  
+  // Load settings when data is available
   useEffect(() => {
     if (!isLoading && settings) {
-      // Load organization name
-      const savedOrgName = getSetting("orgName");
-      if (savedOrgName) setOrgName(savedOrgName);
+      // Load organization settings
+      const savedOrgSettings = getSetting('orgSettings');
+      if (savedOrgSettings) {
+        setOrgSettings(savedOrgSettings);
+      }
       
-      // Load organization logo
-      const savedOrgLogo = getSetting("orgLogo");
-      if (savedOrgLogo) setOrgLogo(savedOrgLogo);
-      
-      // Load colors
-      const savedColors = getSetting("colors");
-      if (savedColors) setColors({...DEFAULT_COLORS, ...savedColors});
+      // Load color settings
+      const savedColorSettings = getSetting('colors');
+      if (savedColorSettings) {
+        setColorSettings({
+          primary: savedColorSettings.primary || colorSettings.primary,
+          secondary: savedColorSettings.secondary || colorSettings.secondary,
+          accent: savedColorSettings.accent || colorSettings.accent,
+        });
+      }
     }
   }, [isLoading, settings, getSetting]);
   
-  const handleSaveSettings = () => {
-    // Save org name
-    updateSetting({ key: "orgName", value: orgName });
-    
-    // Save org logo
-    if (orgLogo) {
-      updateSetting({ key: "orgLogo", value: orgLogo });
-    }
-    
-    // Save colors
-    updateSetting({ key: "colors", value: colors });
-    
-    toast({
-      title: "Settings saved",
-      description: "Your site settings have been updated.",
-    });
-  };
-  
-  const handleColorChange = (color: any) => {
-    if (!activeColor) return;
-    
-    setColors({
-      ...colors,
-      [activeColor]: color.hex
-    });
-  };
-  
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // Create form data
-    const formData = new FormData();
-    formData.append("image", file);
-    
+  const handleSaveOrgSettings = () => {
     try {
-      // Upload the image
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to upload logo");
-      }
-      
-      const data = await response.json();
-      setOrgLogo(data.imageUrl);
-      
-      toast({
-        title: "Logo uploaded",
-        description: "Your logo has been uploaded successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Upload failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Validate and save organization settings
+      const validatedSettings = OrgSettingsSchema.parse(orgSettings);
+      updateSetting('orgSettings', validatedSettings, OrgSettingsSchema);
+    } catch (error) {
+      console.error('Validation error:', error);
     }
   };
   
-  if (!isAuthorized) {
+  const handleSaveColorSettings = () => {
+    try {
+      // Validate and save color settings
+      const validatedColors = ColorSettingsSchema.parse(colorSettings);
+      updateSetting('colors', validatedColors, ColorSettingsSchema);
+    } catch (error) {
+      console.error('Validation error:', error);
+    }
+  };
+  
+  const handleColorChange = (colorName: keyof ColorSettings, color: any) => {
+    setColorSettings({
+      ...colorSettings,
+      [colorName]: color.hex
+    });
+  };
+  
+  // Show color picker for the selected color
+  const openColorPicker = (colorName: keyof ColorSettings) => {
+    setActiveColorName(colorName);
+    setShowColorPicker(true);
+  };
+  
+  if (!isSuperAdmin) {
     return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Unauthorized Access</AlertTitle>
+      <Alert variant="destructive" className="mb-4">
+        <AlertTriangle className="h-4 w-4" />
         <AlertDescription>
-          Only super admin (jessejferrell@gmail.com) can manage site settings.
+          You don't have permission to access site settings. This section is restricted to super administrators.
         </AlertDescription>
       </Alert>
     );
   }
   
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold mb-2">Site Settings</h2>
-          <p className="text-muted-foreground">
-            Customize your organization's branding and appearance
-          </p>
-        </div>
-        <Button 
-          onClick={handleSaveSettings} 
-          disabled={isUpdating}
-          className="flex items-center"
-        >
-          <Save className="mr-2 h-4 w-4" />
-          Save Changes
-        </Button>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        These settings control the branding and appearance of the entire site. Changes will affect all users.
+        <Badge variant="secondary" className="ml-2">Super Admin Only</Badge>
+      </p>
       
-      <Tabs defaultValue="branding" className="w-full">
-        <TabsList>
-          <TabsTrigger value="branding">Branding</TabsTrigger>
-          <TabsTrigger value="colors">Colors</TabsTrigger>
-          <TabsTrigger value="display">Display Options</TabsTrigger>
+      <Tabs defaultValue="organization" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="organization">Organization Info</TabsTrigger>
+          <TabsTrigger value="appearance">Colors & Appearance</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="branding" className="space-y-4 mt-4">
+        {/* Organization Info Tab */}
+        <TabsContent value="organization">
           <Card>
             <CardHeader>
-              <CardTitle>Organization Information</CardTitle>
-              <CardDescription>
-                Set your organization name and logo that will appear throughout the site
-              </CardDescription>
+              <CardTitle>Organization Details</CardTitle>
+              <CardDescription>Update your organization's basic information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="orgName">Organization Name</Label>
-                <Input
-                  id="orgName"
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="e.g. Moss Point Main Street"
+                <Input 
+                  id="orgName" 
+                  placeholder="Enter organization name" 
+                  value={orgSettings.name} 
+                  onChange={(e) => setOrgSettings({...orgSettings, name: e.target.value})}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="orgLogo">Organization Logo</Label>
-                <div className="flex flex-col space-y-2">
-                  {orgLogo && (
-                    <div className="border rounded p-4 mb-2">
-                      <img 
-                        src={orgLogo} 
-                        alt="Organization Logo" 
-                        className="max-h-32 mx-auto"
-                      />
-                    </div>
-                  )}
-                  <div className="flex items-center">
-                    <Button 
-                      variant="outline" 
-                      className="flex items-center"
-                      onClick={() => document.getElementById("logoUpload")?.click()}
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload Logo
-                    </Button>
-                    <input
-                      id="logoUpload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
+                <Label htmlFor="orgLogo">Logo URL</Label>
+                <Input 
+                  id="orgLogo" 
+                  placeholder="https://example.com/logo.png" 
+                  value={orgSettings.logo || ''} 
+                  onChange={(e) => setOrgSettings({...orgSettings, logo: e.target.value})}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="orgEmail">Contact Email</Label>
+                <Input 
+                  id="orgEmail" 
+                  type="email"
+                  placeholder="contact@example.org" 
+                  value={orgSettings.contactEmail || ''} 
+                  onChange={(e) => setOrgSettings({...orgSettings, contactEmail: e.target.value})}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="orgPhone">Contact Phone</Label>
+                <Input 
+                  id="orgPhone" 
+                  placeholder="(555) 123-4567" 
+                  value={orgSettings.contactPhone || ''} 
+                  onChange={(e) => setOrgSettings({...orgSettings, contactPhone: e.target.value})}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="orgAddress">Address</Label>
+                <Input 
+                  id="orgAddress" 
+                  placeholder="123 Main St, City, State, Zip" 
+                  value={orgSettings.address || ''} 
+                  onChange={(e) => setOrgSettings({...orgSettings, address: e.target.value})}
+                />
+              </div>
+              
+              <Button onClick={handleSaveOrgSettings} className="mt-4">
+                Save Organization Info
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Appearance Tab */}
+        <TabsContent value="appearance">
+          <Card>
+            <CardHeader>
+              <CardTitle>Site Colors</CardTitle>
+              <CardDescription>Customize the visual appearance of your site</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Primary Color */}
+                <div className="space-y-2">
+                  <Label>Primary Color</Label>
+                  <div 
+                    className="h-12 rounded-md border cursor-pointer flex items-center justify-center text-primary-foreground"
+                    style={{ backgroundColor: colorSettings.primary }}
+                    onClick={() => openColorPicker('primary')}
+                  >
+                    {colorSettings.primary}
+                  </div>
+                </div>
+                
+                {/* Secondary Color */}
+                <div className="space-y-2">
+                  <Label>Secondary Color</Label>
+                  <div 
+                    className="h-12 rounded-md border cursor-pointer flex items-center justify-center text-secondary-foreground"
+                    style={{ backgroundColor: colorSettings.secondary }}
+                    onClick={() => openColorPicker('secondary')}
+                  >
+                    {colorSettings.secondary}
+                  </div>
+                </div>
+                
+                {/* Accent Color */}
+                <div className="space-y-2">
+                  <Label>Accent Color</Label>
+                  <div 
+                    className="h-12 rounded-md border cursor-pointer flex items-center justify-center text-accent-foreground"
+                    style={{ backgroundColor: colorSettings.accent }}
+                    onClick={() => openColorPicker('accent')}
+                  >
+                    {colorSettings.accent}
+                  </div>
+                </div>
+              </div>
+              
+              <Button onClick={handleSaveColorSettings} className="mt-6">
+                Save Color Settings
+              </Button>
+              
+              <div className="mt-8">
+                <h3 className="text-lg font-medium mb-4">Preview</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-md border" style={{ backgroundColor: colorSettings.primary }}>
+                    <p className="text-center font-medium" style={{ color: '#fff' }}>Primary</p>
+                  </div>
+                  <div className="p-4 rounded-md border" style={{ backgroundColor: colorSettings.secondary }}>
+                    <p className="text-center font-medium" style={{ color: '#fff' }}>Secondary</p>
+                  </div>
+                  <div className="p-4 rounded-md border" style={{ backgroundColor: colorSettings.accent }}>
+                    <p className="text-center font-medium" style={{ color: '#fff' }}>Accent</p>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="colors" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Color Scheme</CardTitle>
-              <CardDescription>
-                Customize your site's color palette to match your brand
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {Object.entries(colors).map(([key, value]) => (
-                  <div key={key} className="space-y-2">
-                    <Label className="capitalize">{key} Color</Label>
-                    <div className="flex items-center space-x-2">
-                      <Popover open={activeColor === key} onOpenChange={(open) => setActiveColor(open ? key : null)}>
-                        <PopoverTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            className="w-full justify-start"
-                            style={{ borderLeftWidth: '8px', borderLeftColor: value }}
-                          >
-                            <Palette className="mr-2 h-4 w-4" />
-                            <span className="capitalize">{key}</span>
-                            <div className="ml-auto">{value}</div>
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <SketchPicker
-                            color={value}
-                            onChange={handleColorChange}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Alert className="bg-secondary/10 text-secondary border-secondary/50">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Color Application</AlertTitle>
-                <AlertDescription>
-                  Changes to colors will be applied site-wide. Primary is used for buttons and highlights, 
-                  Secondary for accents, and Accent for special elements.
-                </AlertDescription>
-              </Alert>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="display" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Display Options</CardTitle>
-              <CardDescription>
-                Configure how different elements appear on your site
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center text-muted-foreground py-8">
-                Additional display options will be added in future updates.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
+      
+      {/* Color Picker Dialog */}
+      <AlertDialog open={showColorPicker} onOpenChange={setShowColorPicker}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Choose {activeColorName} color
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Select a color from the picker below.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="flex justify-center py-4">
+            {activeColorName && (
+              <SketchPicker
+                color={colorSettings[activeColorName as keyof ColorSettings]}
+                onChange={(color) => handleColorChange(activeColorName as keyof ColorSettings, color)}
+                disableAlpha={true}
+              />
+            )}
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => setShowColorPicker(false)}>
+              Apply Color
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
