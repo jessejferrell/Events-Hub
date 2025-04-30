@@ -608,6 +608,28 @@ export default function AdminDashboardPage() {
     setConfirmDeleteTransaction(true);
   };
   
+  // Refresh analytics data
+  const fetchAnalyticsData = () => {
+    refetchAnalytics();
+    toast({
+      title: "Refreshing data",
+      description: "Analytics data is being refreshed",
+    });
+  };
+  
+  // Export analytics data
+  const exportAnalyticsData = () => {
+    let queryParams = new URLSearchParams();
+    if (analyticsTimeframe) queryParams.append("timeframe", analyticsTimeframe);
+    
+    window.open(`/api/admin/analytics/export?${queryParams.toString()}`, '_blank');
+    
+    toast({
+      title: "Export initiated",
+      description: "Analytics data export has started",
+    });
+  };
+  
   // Transaction update mutation
   const updateTransactionMutation = useMutation({
     mutationFn: async (transactionData: Partial<Transaction>) => {

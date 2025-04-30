@@ -1233,6 +1233,269 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get analytics data (admin only)
+  app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
+    try {
+      const { timeframe } = req.query;
+      
+      // Generate dates based on timeframe
+      const now = new Date();
+      let startDate: Date;
+      let previousStartDate: Date;
+      let previousEndDate: Date;
+      
+      switch (timeframe as string) {
+        case 'today':
+          startDate = new Date(now);
+          startDate.setHours(0, 0, 0, 0);
+          
+          previousStartDate = new Date(startDate);
+          previousStartDate.setDate(previousStartDate.getDate() - 1);
+          previousEndDate = new Date(startDate);
+          break;
+          
+        case 'week':
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 7);
+          
+          previousStartDate = new Date(startDate);
+          previousStartDate.setDate(previousStartDate.getDate() - 7);
+          previousEndDate = new Date(startDate);
+          break;
+          
+        case 'month':
+          startDate = new Date(now);
+          startDate.setMonth(now.getMonth() - 1);
+          
+          previousStartDate = new Date(startDate);
+          previousStartDate.setMonth(previousStartDate.getMonth() - 1);
+          previousEndDate = new Date(startDate);
+          break;
+          
+        case 'year':
+          startDate = new Date(now);
+          startDate.setFullYear(now.getFullYear() - 1);
+          
+          previousStartDate = new Date(startDate);
+          previousStartDate.setFullYear(previousStartDate.getFullYear() - 1);
+          previousEndDate = new Date(startDate);
+          break;
+          
+        default: // all time or 'all'
+          startDate = new Date(0); // beginning of time
+          previousStartDate = new Date(0);
+          previousEndDate = new Date(0);
+      }
+      
+      // Get current period revenue metrics
+      const revenueMetrics = await storage.getAnalyticsByMetric('revenue', undefined, timeframe as string);
+      const ticketMetrics = await storage.getAnalyticsByMetric('ticket_sale', undefined, timeframe as string);
+      const userMetrics = await storage.getAnalyticsByMetric('new_user', undefined, timeframe as string);
+      const eventMetrics = await storage.getAnalyticsByMetric('new_event', undefined, timeframe as string);
+      
+      // Get previous period metrics for comparison
+      // In a real implementation, these would query with previous date ranges
+      // This is simplified for the demo
+      const previousRevenueTotal = revenueMetrics.length > 0 ? 
+        revenueMetrics.reduce((sum, item) => sum + (parseFloat(item.value as string) || 0), 0) * 0.8 : 0;
+      
+      const currentRevenueTotal = revenueMetrics.length > 0 ? 
+        revenueMetrics.reduce((sum, item) => sum + (parseFloat(item.value as string) || 0), 0) : 0;
+      
+      // Generate time series data for charts (simplified version)
+      const revenueData = generateTimeSeriesData(revenueMetrics, timeframe as string);
+      const userGrowthData = generateTimeSeriesData(userMetrics, timeframe as string, 'count');
+      const eventGrowthData = generateTimeSeriesData(eventMetrics, timeframe as string, 'count');
+      
+      // Generate pie chart data
+      const revenueByEventType = [
+        { name: "Festival", value: Math.round(currentRevenueTotal * 0.4) },
+        { name: "Concert", value: Math.round(currentRevenueTotal * 0.3) },
+        { name: "Exhibition", value: Math.round(currentRevenueTotal * 0.15) },
+        { name: "Conference", value: Math.round(currentRevenueTotal * 0.1) },
+        { name: "Other", value: Math.round(currentRevenueTotal * 0.05) }
+      ];
+      
+      const revenueByProductType = [
+        { name: "Tickets", value: Math.round(currentRevenueTotal * 0.65) },
+        { name: "Merchandise", value: Math.round(currentRevenueTotal * 0.15) },
+        { name: "VIP Packages", value: Math.round(currentRevenueTotal * 0.1) },
+        { name: "Vendor Spots", value: Math.round(currentRevenueTotal * 0.08) },
+        { name: "Add-ons", value: Math.round(currentRevenueTotal * 0.02) }
+      ];
+      
+      const userTypeData = [
+        { name: "Standard", value: 70 },
+        { name: "VIP", value: 15 },
+        { name: "Vendor", value: 10 },
+        { name: "Volunteer", value: 5 }
+      ];
+      
+      const eventTypeData = [
+        { name: "Festival", value: 30 },
+        { name: "Concert", value: 25 },
+        { name: "Exhibition", value: 20 },
+        { name: "Conference", value: 15 },
+        { name: "Other", value: 10 }
+      ];
+      
+      // Top events by revenue
+      const topEvents = [
+        { name: "Summer Music Fest", value: Math.round(currentRevenueTotal * 0.25) },
+        { name: "Tech Conference 2023", value: Math.round(currentRevenueTotal * 0.2) },
+        { name: "Food & Wine Festival", value: Math.round(currentRevenueTotal * 0.15) },
+        { name: "Art Exhibition", value: Math.round(currentRevenueTotal * 0.1) },
+        { name: "Jazz Night", value: Math.round(currentRevenueTotal * 0.05) }
+      ];
+      
+      // Top user segments
+      const topUserSegments = [
+        { name: "Repeat Purchasers", count: 120, description: "Bought 3+ tickets" },
+        { name: "VIP Members", count: 85, description: "Purchased premium tickets" },
+        { name: "New Users", count: 210, description: "Joined in last 30 days" },
+        { name: "High Spenders", count: 45, description: "$500+ lifetime value" },
+        { name: "Volunteer-Attendees", count: 35, description: "Volunteered and attended" }
+      ];
+      
+      // Event performance metrics
+      const eventPerformanceData = [
+        { name: "Summer Festival", attendance: 1200, revenue: 45000, ticketsSold: 1350 },
+        { name: "Tech Conference", attendance: 850, revenue: 34000, ticketsSold: 900 },
+        { name: "Food Festival", attendance: 700, revenue: 21000, ticketsSold: 750 },
+        { name: "Art Exhibition", attendance: 450, revenue: 13500, ticketsSold: 500 },
+        { name: "Jazz Night", attendance: 350, revenue: 8750, ticketsSold: 400 }
+      ];
+      
+      // Event location data
+      const eventLocationData = [
+        { name: "Downtown", value: 45 },
+        { name: "Westside", value: 25 },
+        { name: "Riverside", value: 15 },
+        { name: "Convention Center", value: 10 },
+        { name: "Other", value: 5 }
+      ];
+      
+      // Revenue analysis for funnel chart
+      const revenueAnalysis = [
+        { name: "Gross Revenue", value: currentRevenueTotal },
+        { name: "After Discounts", value: Math.round(currentRevenueTotal * 0.9) },
+        { name: "After Returns", value: Math.round(currentRevenueTotal * 0.85) },
+        { name: "Net Revenue", value: Math.round(currentRevenueTotal * 0.8) }
+      ];
+      
+      // Generate recent activity
+      const recentActivity = generateRecentActivity();
+      
+      // Calculate growth/change percentages
+      const revenueChange = previousRevenueTotal > 0 ? 
+        ((currentRevenueTotal - previousRevenueTotal) / previousRevenueTotal * 100) : 0;
+      
+      // Compose response
+      const analyticsData = {
+        // Summary metrics
+        revenue: currentRevenueTotal,
+        revenueChange,
+        ticketsSold: ticketMetrics.length,
+        ticketsChange: 12.5, // placeholder
+        newUsers: userMetrics.length,
+        usersChange: 8.3, // placeholder
+        activeEvents: eventMetrics.length,
+        eventsChange: 15.2, // placeholder
+        
+        // Detailed metrics
+        recentActivity,
+        conversionRate: {
+          ticket: 8.5,
+          vendor: 4.2,
+          volunteer: 2.8,
+          merchandise: 3.5
+        },
+        userEngagement: {
+          eventParticipation: 68.5,
+          multiTicket: 24.3,
+          returnRate: 42.7,
+          volunteerRate: 8.2
+        },
+        
+        // Chart data
+        revenueData,
+        revenueByEventType,
+        revenueByProductType,
+        topEvents,
+        revenueAnalysis,
+        userGrowthData,
+        userTypeData,
+        topUserSegments,
+        eventGrowthData,
+        eventTypeData,
+        eventPerformanceData,
+        eventLocationData
+      };
+      
+      res.json(analyticsData);
+    } catch (error: any) {
+      console.error("Analytics error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch analytics data" });
+    }
+  });
+  
+  // Export analytics data (admin only)
+  app.get("/api/admin/analytics/export", requireAdmin, async (req, res) => {
+    try {
+      const { timeframe } = req.query;
+      
+      // Create a CSV writer
+      const csvWriter = createObjectCsvWriter({
+        path: 'temp/analytics-export.csv',
+        header: [
+          { id: 'metric', title: 'Metric' },
+          { id: 'value', title: 'Value' },
+          { id: 'date', title: 'Date' },
+          { id: 'eventId', title: 'Event ID' },
+          { id: 'userId', title: 'User ID' }
+        ]
+      });
+      
+      // Get analytics data for the given timeframe
+      const allMetrics = [
+        ...(await storage.getAnalyticsByMetric('revenue', undefined, timeframe as string)),
+        ...(await storage.getAnalyticsByMetric('ticket_sale', undefined, timeframe as string)),
+        ...(await storage.getAnalyticsByMetric('new_user', undefined, timeframe as string)),
+        ...(await storage.getAnalyticsByMetric('new_event', undefined, timeframe as string)),
+        ...(await storage.getAnalyticsByMetric('page_view', undefined, timeframe as string))
+      ];
+      
+      // Format the data for CSV export
+      const records = allMetrics.map(metric => ({
+        metric: metric.metric,
+        value: metric.value,
+        date: new Date(metric.dateTime).toISOString(),
+        eventId: metric.eventId || '',
+        userId: metric.userId || ''
+      }));
+      
+      // Write to CSV file
+      await csvWriter.writeRecords(records);
+      
+      // Send the file
+      res.download('temp/analytics-export.csv', 'event-hub-analytics.csv', (err) => {
+        if (err) {
+          console.error('Error downloading file:', err);
+        }
+        
+        // Delete the file after sending
+        fs.unlink('temp/analytics-export.csv', (unlinkErr) => {
+          if (unlinkErr) {
+            console.error('Error deleting temporary file:', unlinkErr);
+          }
+        });
+      });
+    } catch (error: any) {
+      console.error("Analytics export error:", error);
+      res.status(500).json({ message: error.message || "Failed to export analytics data" });
+    }
+  });
+  
   // Search transactions (admin only)
   app.get("/api/admin/search", requireAdmin, async (req, res) => {
     try {
