@@ -28,6 +28,17 @@ import {
   Plus
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { Event, Order, User as UserType } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -262,6 +273,41 @@ export default function AdminDashboardPage() {
     if (selectedEvent) {
       deleteEventMutation.mutate(selectedEvent.id);
     }
+  };
+
+  // User management handlers
+  const fetchUserDetails = async (userId: number) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/details`);
+      if (!res.ok) throw new Error('Failed to fetch user details');
+      const userData = await res.json();
+      setSelectedUser(userData);
+      setShowUserDetail(true);
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+    }
+  };
+  
+  const handleViewUser = (user: UserType) => {
+    setSelectedUser(user);
+    fetchUserDetails(user.id);
+  };
+  
+  const handleUpdateUserRole = (userId: number, role: string) => {
+    updateUserRoleMutation.mutate({ userId, role });
+  };
+  
+  const handleAddUserNote = () => {
+    if (selectedUser && userNote.trim()) {
+      addUserNoteMutation.mutate({
+        userId: selectedUser.id,
+        note: userNote.trim()
+      });
+    }
+  };
+  
+  const handleUserSearchFilter = () => {
+    refetchUsers();
   };
 
   const handleSearch = () => {
@@ -712,15 +758,263 @@ export default function AdminDashboardPage() {
                 <CardDescription>View and manage all users in the system</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex justify-center items-center py-12">
-                  <div className="text-center">
-                    <Users className="h-12 w-12 mx-auto mb-4 text-neutral-300" />
-                    <p className="text-neutral-600 mb-2">User management interface will be implemented here</p>
-                    <p className="text-neutral-500 text-sm">This section will include user listing, role management, and user details</p>
+                {/* Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div>
+                    <Label htmlFor="user-search" className="mb-1.5 block">Search</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-neutral-500" />
+                      <Input
+                        id="user-search"
+                        placeholder="Name, email, username..."
+                        className="pl-9"
+                        value={userSearchQuery}
+                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="role" className="mb-1.5 block">Role Filter</Label>
+                    <Select value={selectedRole} onValueChange={setSelectedRole}>
+                      <SelectTrigger id="role">
+                        <SelectValue placeholder="All Roles" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all_roles">All Roles</SelectItem>
+                        <SelectItem value="admin">Administrators</SelectItem>
+                        <SelectItem value="organizer">Event Organizers</SelectItem>
+                        <SelectItem value="vendor">Vendors</SelectItem>
+                        <SelectItem value="user">Regular Users</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <Button onClick={handleUserSearchFilter} className="mb-[2px]">
+                      <Filter className="h-4 w-4 mr-2" />
+                      Filter
+                    </Button>
                   </div>
                 </div>
+
+                {/* User listing */}
+                {isLoadingUsers ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                  </div>
+                ) : users && users.length > 0 ? (
+                  <div className="rounded-md border">
+                    <table className="min-w-full divide-y divide-neutral-200">
+                      <thead className="bg-neutral-50">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                            User
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                            Role
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                            Joined
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-neutral-200">
+                        {users.map((user) => (
+                          <tr key={user.id} className="hover:bg-neutral-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10 bg-neutral-200 rounded-full flex items-center justify-center">
+                                  <UserIcon className="h-5 w-5 text-neutral-500" />
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-neutral-900">
+                                    {user.username}
+                                  </div>
+                                  <div className="text-sm text-neutral-500">
+                                    {user.email}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Badge 
+                                variant={user.role === 'admin' ? 'destructive' : 
+                                         user.role === 'organizer' ? 'default' : 
+                                         'secondary'}
+                              >
+                                {user.role}
+                              </Badge>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Badge variant={user.active ? 'success' : 'outline'}>
+                                {user.active ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                              {new Date(user.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleViewUser(user)}
+                                className="text-primary hover:text-primary-dark"
+                              >
+                                View
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 border rounded-md">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-neutral-300" />
+                    <p className="text-neutral-600 mb-2">No users found</p>
+                    <p className="text-neutral-500 text-sm">Try a different search term or filter</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
+            
+            {/* User Detail Dialog */}
+            <Dialog open={showUserDetail} onOpenChange={setShowUserDetail}>
+              <DialogContent className="max-w-4xl">
+                {selectedUser && (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>User Details</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Basic User Info */}
+                      <div className="space-y-4">
+                        <div className="bg-neutral-100 p-6 rounded-lg text-center">
+                          <div className="h-20 w-20 bg-neutral-200 rounded-full mx-auto flex items-center justify-center mb-4">
+                            <UserIcon className="h-10 w-10 text-neutral-500" />
+                          </div>
+                          <h3 className="text-lg font-medium mb-1">{selectedUser.username}</h3>
+                          <p className="text-neutral-500 mb-2">{selectedUser.email}</p>
+                          <Badge variant="outline" className="mb-4">{selectedUser.role}</Badge>
+                          
+                          <div className="text-sm text-neutral-600">
+                            <p className="flex justify-between pt-2 border-t">
+                              <span>User ID:</span>
+                              <span className="font-mono">{selectedUser.id}</span>
+                            </p>
+                            <p className="flex justify-between pt-2 border-t">
+                              <span>Joined:</span>
+                              <span>{new Date(selectedUser.createdAt).toLocaleDateString()}</span>
+                            </p>
+                            <p className="flex justify-between pt-2 border-t">
+                              <span>Last update:</span>
+                              <span>{new Date(selectedUser.updatedAt).toLocaleDateString()}</span>
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Role Management */}
+                        <div className="border rounded-lg p-4">
+                          <h4 className="font-medium mb-3">Role Management</h4>
+                          <div className="space-y-3">
+                            <Select 
+                              value={selectedUser.role} 
+                              onValueChange={(value) => handleUpdateUserRole(selectedUser.id, value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select Role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="admin">Administrator</SelectItem>
+                                <SelectItem value="organizer">Event Organizer</SelectItem>
+                                <SelectItem value="vendor">Vendor</SelectItem>
+                                <SelectItem value="user">Regular User</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button 
+                              variant={selectedUser.active ? "destructive" : "default"} 
+                              className="w-full"
+                            >
+                              {selectedUser.active ? "Deactivate Account" : "Activate Account"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* User Activity & Orders */}
+                      <div className="md:col-span-2 space-y-4">
+                        <div className="border rounded-lg p-4">
+                          <h4 className="font-medium mb-3">Recent Activity</h4>
+                          <div className="space-y-2">
+                            {selectedUser.recentActivity && selectedUser.recentActivity.length > 0 ? (
+                              selectedUser.recentActivity.map((activity, index) => (
+                                <div key={index} className="flex items-start text-sm border-b pb-2">
+                                  <div className="h-8 w-8 rounded-full bg-neutral-100 flex items-center justify-center mr-3 mt-1">
+                                    <Clock className="h-4 w-4 text-neutral-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-neutral-800">{activity.description}</p>
+                                    <p className="text-neutral-500 text-xs">
+                                      {new Date(activity.timestamp).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-center py-8 text-neutral-500">
+                                No recent activity
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="border rounded-lg p-4">
+                          <h4 className="font-medium mb-3">Notes</h4>
+                          <div className="mb-3">
+                            <Input 
+                              placeholder="Add a note about this user..."
+                              value={userNote}
+                              onChange={(e) => setUserNote(e.target.value)}
+                            />
+                          </div>
+                          <div className="flex justify-end mb-4">
+                            <Button size="sm" onClick={handleAddUserNote}>Add Note</Button>
+                          </div>
+                          <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                            {selectedUser.notes && selectedUser.notes.length > 0 ? (
+                              selectedUser.notes.map((note, index) => (
+                                <div key={index} className="text-sm border-b pb-2">
+                                  <p className="text-neutral-800">{note.content}</p>
+                                  <div className="flex justify-between items-center mt-1">
+                                    <p className="text-neutral-500 text-xs">
+                                      By {note.addedBy}
+                                    </p>
+                                    <p className="text-neutral-500 text-xs">
+                                      {new Date(note.timestamp).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-center py-4 text-neutral-500">
+                                No notes added yet
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
           
           {/* Events tab content */}
