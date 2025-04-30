@@ -94,6 +94,14 @@ export default function AdminDashboardPage() {
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [showEditUserForm, setShowEditUserForm] = useState(false);
+  
+  // Transaction editing state
+  const [showTransactionEditor, setShowTransactionEditor] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [transactionStatusOptions, setTransactionStatusOptions] = useState<string[]>([
+    'pending', 'completed', 'cancelled', 'refunded', 'failed', 'processing'
+  ]);
+  const [confirmDeleteTransaction, setConfirmDeleteTransaction] = useState(false);
 
   // Fetch admin stats
   const { data: stats, isLoading } = useQuery<AdminStats>({
@@ -313,6 +321,59 @@ export default function AdminDashboardPage() {
   const handleSearch = () => {
     refetchTransactions();
   };
+  
+  // Transaction editing handlers
+  const handleEditTransaction = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setShowTransactionEditor(true);
+  };
+  
+  const handleDeleteTransaction = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setConfirmDeleteTransaction(true);
+  };
+  
+  // Transaction update mutation
+  const updateTransactionMutation = useMutation({
+    mutationFn: async (transactionData: Partial<Transaction>) => {
+      if (!selectedTransaction) throw new Error('No transaction selected');
+      
+      const endpoint = `/api/admin/${selectedTransaction.type}s/${selectedTransaction.id}`;
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transactionData),
+      });
+      
+      if (!res.ok) throw new Error(`Failed to update ${selectedTransaction.type}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      setShowTransactionEditor(false);
+      refetchTransactions();
+    }
+  });
+  
+  // Transaction delete mutation
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedTransaction) throw new Error('No transaction selected');
+      
+      const endpoint = `/api/admin/${selectedTransaction.type}s/${selectedTransaction.id}`;
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+      });
+      
+      if (!res.ok) throw new Error(`Failed to delete ${selectedTransaction.type}`);
+      return true;
+    },
+    onSuccess: () => {
+      setConfirmDeleteTransaction(false);
+      refetchTransactions();
+    }
+  });
 
   const handleExport = async () => {
     let queryParams = new URLSearchParams();
@@ -704,9 +765,25 @@ export default function AdminDashboardPage() {
                             </td>
                             <td className="py-4 px-4">{new Date(transaction.createdAt).toLocaleDateString()}</td>
                             <td className="py-4 px-4">
-                              <Button variant="outline" size="sm">
-                                View
-                              </Button>
+                              <div className="flex items-center space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleEditTransaction(transaction)}
+                                >
+                                  <Edit className="h-3.5 w-3.5 mr-1" />
+                                  Edit
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive/80"
+                                  onClick={() => handleDeleteTransaction(transaction)}
+                                >
+                                  <Trash className="h-3.5 w-3.5 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))
