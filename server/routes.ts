@@ -1850,8 +1850,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Not authenticated" });
     }
     
-    if (req.user?.role !== 'super_admin') {
-      return res.status(403).json({ message: "Only super admins can manage site settings" });
+    if (req.user?.role !== 'super_admin' && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: "Only admins can manage site settings" });
     }
     
     next();
