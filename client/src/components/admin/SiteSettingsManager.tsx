@@ -61,7 +61,7 @@ export default function SiteSettingsManager() {
     };
   });
   
-  // Load settings when data is available
+  // Load settings when data is available - only on initial load
   useEffect(() => {
     if (!isLoading && settings) {
       // Load organization settings
@@ -80,7 +80,8 @@ export default function SiteSettingsManager() {
         });
       }
     }
-  }, [isLoading, settings, getSetting, colorSettings]);
+    // Remove colorSettings from dependencies to prevent infinite loop
+  }, [isLoading, settings, getSetting]);
   
   const handleSaveOrgSettings = () => {
     try {
@@ -103,10 +104,13 @@ export default function SiteSettingsManager() {
   };
   
   const handleColorChange = (colorName: keyof ColorSettings, color: any) => {
-    setColorSettings({
-      ...colorSettings,
-      [colorName]: color.hex
-    });
+    const newColor = color.hex;
+    
+    // Update state with new color value
+    setColorSettings(prevSettings => ({
+      ...prevSettings,
+      [colorName]: newColor
+    }));
   };
   
   // Show color picker for the selected color

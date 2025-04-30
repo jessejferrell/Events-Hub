@@ -17,6 +17,10 @@ const ColorSettingsSchema = z.object({
   primary: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color code"),
   secondary: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color code"),
   accent: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color code"),
+}).default({
+  primary: '#00a99d',   // Default teal
+  secondary: '#8a4fff', // Default purple
+  accent: '#f0e6ff',    // Default light purple
 });
 
 const OrgSettingsSchema = z.object({
