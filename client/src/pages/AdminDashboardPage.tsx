@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StatCard from "@/components/admin/StatCard";
-import SimpleSiteSettingsManager from "@/components/admin/SimpleSiteSettingsManager";
+// Site settings functionality removed to improve stability
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   User as UserIcon, 
