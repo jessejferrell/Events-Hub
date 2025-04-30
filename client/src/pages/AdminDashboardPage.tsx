@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StatCard from "@/components/admin/StatCard";
@@ -78,6 +79,7 @@ interface Transaction {
 }
 
 export default function AdminDashboardPage() {
+  const { toast } = useToast();
   // Fetch current user for role-based permissions
   const { data: currentUser } = useQuery<UserType>({
     queryKey: ["/api/user"],
@@ -254,6 +256,8 @@ export default function AdminDashboardPage() {
     },
   });
   
+
+  
   // Add user note mutation
   const addUserNoteMutation = useMutation({
     mutationFn: async ({ userId, note }: { userId: number; note: string }) => {
@@ -387,6 +391,17 @@ export default function AdminDashboardPage() {
       if (selectedUser) {
         fetchUserDetails(selectedUser.id);
       }
+      toast({
+        title: "Success",
+        description: "User information updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user",
+        variant: "destructive"
+      });
     }
   });
   
