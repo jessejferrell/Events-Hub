@@ -1780,6 +1780,19 @@ export default function AdminDashboardPage() {
             </Card>
           </TabsContent>
           
+          {/* Site Settings tab content */}
+          <TabsContent value="settings" className="m-0">
+            <Card>
+              <CardHeader>
+                <CardTitle>Site Settings</CardTitle>
+                <CardDescription>Customize your organization's branding and appearance</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SiteSettingsManager />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
           {/* Analytics tab content */}
           <TabsContent value="analytics" className="m-0">
             <Card>
