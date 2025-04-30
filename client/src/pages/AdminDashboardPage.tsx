@@ -78,6 +78,22 @@ interface Transaction {
 }
 
 export default function AdminDashboardPage() {
+  // Fetch current user for role-based permissions
+  const { data: currentUser } = useQuery<UserType>({
+    queryKey: ["/api/user"],
+    queryFn: async () => {
+      const res = await fetch("/api/user");
+      if (!res.ok) throw new Error("Failed to fetch current user");
+      const userData = await res.json();
+      
+      // Set the current user role
+      if (userData && userData.role) {
+        setCurrentUserRole(userData.role);
+      }
+      
+      return userData;
+    }
+  });
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [eventSearchQuery, setEventSearchQuery] = useState("");
@@ -95,6 +111,15 @@ export default function AdminDashboardPage() {
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [showEditUserForm, setShowEditUserForm] = useState(false);
+  const [editUserData, setEditUserData] = useState<{
+    name: string | null;
+    email: string;
+    username: string;
+    role: string;
+    phoneNumber: string | null;
+    address: string | null;
+  } | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
   
   // Transaction editing state
   const [showTransactionEditor, setShowTransactionEditor] = useState(false);
@@ -314,6 +339,56 @@ export default function AdminDashboardPage() {
       });
     }
   };
+
+  // User edit handlers
+  const handleEditUser = (user: UserType) => {
+    // Can only edit if:
+    // 1. Current user is SUPER ADMIN (jessejferrell@gmail.com), or
+    // 2. Current user is admin AND target user is not an admin
+    const canEdit = 
+      (currentUser?.email === 'jessejferrell@gmail.com') || 
+      (currentUserRole === 'admin' && user.role !== 'admin');
+    
+    if (!canEdit) {
+      return; // Don't allow editing
+    }
+    
+    setSelectedUser(user);
+    setEditUserData({
+      name: user.name,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      phoneNumber: user.phoneNumber,
+      address: user.address,
+    });
+    setShowEditUserForm(true);
+  };
+  
+  // Update user mutation
+  const updateUserMutation = useMutation({
+    mutationFn: async (userData: typeof editUserData) => {
+      if (!selectedUser || !userData) throw new Error('No user selected');
+      
+      const res = await fetch(`/api/admin/users/${selectedUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+      
+      if (!res.ok) throw new Error('Failed to update user');
+      return await res.json();
+    },
+    onSuccess: () => {
+      setShowEditUserForm(false);
+      refetchUsers();
+      if (selectedUser) {
+        fetchUserDetails(selectedUser.id);
+      }
+    }
+  });
   
   const handleUserSearchFilter = () => {
     refetchUsers();
@@ -939,14 +1014,31 @@ export default function AdminDashboardPage() {
                               {new Date(user.createdAt).toLocaleDateString()}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => handleViewUser(user)}
-                                className="text-primary hover:text-primary-dark"
-                              >
-                                View
-                              </Button>
+                              <div className="flex justify-end space-x-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleViewUser(user)}
+                                  className="text-primary hover:text-primary-dark"
+                                >
+                                  <Info className="h-4 w-4 mr-1" />
+                                  View
+                                </Button>
+                                
+                                {/* Edit button - only visible if current user has permission */}
+                                {((currentUser?.email === 'jessejferrell@gmail.com') || 
+                                  (currentUserRole === 'admin' && user.role !== 'admin')) && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => handleEditUser(user)}
+                                    className="text-amber-600 hover:text-amber-700"
+                                  >
+                                    <Edit className="h-4 w-4 mr-1" />
+                                    Edit
+                                  </Button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
