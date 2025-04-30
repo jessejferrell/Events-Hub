@@ -853,8 +853,8 @@ export default function AdminDashboardPage() {
                               </Badge>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <Badge variant={user.active ? 'success' : 'outline'}>
-                                {user.active ? 'Active' : 'Inactive'}
+                              <Badge variant={user.lastLogin ? 'success' : 'outline'}>
+                                {user.lastLogin ? 'Active' : 'Inactive'}
                               </Badge>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
@@ -939,10 +939,10 @@ export default function AdminDashboardPage() {
                               </SelectContent>
                             </Select>
                             <Button 
-                              variant={selectedUser.active ? "destructive" : "default"} 
+                              variant={selectedUser.lastLogin ? "destructive" : "default"} 
                               className="w-full"
                             >
-                              {selectedUser.active ? "Deactivate Account" : "Activate Account"}
+                              {selectedUser.lastLogin ? "Deactivate Account" : "Activate Account"}
                             </Button>
                           </div>
                         </div>
@@ -951,27 +951,62 @@ export default function AdminDashboardPage() {
                       {/* User Activity & Orders */}
                       <div className="md:col-span-2 space-y-4">
                         <div className="border rounded-lg p-4">
-                          <h4 className="font-medium mb-3">Recent Activity</h4>
-                          <div className="space-y-2">
-                            {selectedUser.recentActivity && selectedUser.recentActivity.length > 0 ? (
-                              selectedUser.recentActivity.map((activity, index) => (
-                                <div key={index} className="flex items-start text-sm border-b pb-2">
-                                  <div className="h-8 w-8 rounded-full bg-neutral-100 flex items-center justify-center mr-3 mt-1">
-                                    <Clock className="h-4 w-4 text-neutral-500" />
-                                  </div>
-                                  <div>
-                                    <p className="text-neutral-800">{activity.description}</p>
-                                    <p className="text-neutral-500 text-xs">
-                                      {new Date(activity.timestamp).toLocaleString()}
-                                    </p>
-                                  </div>
+                          <h4 className="font-medium mb-3">Account Information</h4>
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div className="text-neutral-500">Name:</div>
+                              <div>{selectedUser.name || 'Not provided'}</div>
+                              
+                              <div className="text-neutral-500">Phone:</div>
+                              <div>{selectedUser.phoneNumber || 'Not provided'}</div>
+                              
+                              <div className="text-neutral-500">Address:</div>
+                              <div>{selectedUser.address || 'Not provided'}</div>
+                              
+                              <div className="text-neutral-500">City:</div>
+                              <div>{selectedUser.city || 'Not provided'}</div>
+                              
+                              <div className="text-neutral-500">State:</div>
+                              <div>{selectedUser.state || 'Not provided'}</div>
+                              
+                              <div className="text-neutral-500">Zip Code:</div>
+                              <div>{selectedUser.zipCode || 'Not provided'}</div>
+                            </div>
+                            
+                            <div className="pt-3 border-t">
+                              <h5 className="text-sm font-medium mb-2">Payment Connections</h5>
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div className="text-neutral-500">Stripe Customer:</div>
+                                <div>
+                                  {selectedUser.stripeCustomerId ? (
+                                    <Badge variant="outline" className="font-mono text-xs">
+                                      {selectedUser.stripeCustomerId.substring(0, 14)}...
+                                    </Badge>
+                                  ) : 'Not connected'}
                                 </div>
-                              ))
-                            ) : (
-                              <div className="text-center py-8 text-neutral-500">
-                                No recent activity
+                                
+                                <div className="text-neutral-500">Stripe Connect:</div>
+                                <div>
+                                  {selectedUser.stripeAccountId ? (
+                                    <Badge variant="outline" className="font-mono text-xs">
+                                      {selectedUser.stripeAccountId.substring(0, 14)}...
+                                    </Badge>
+                                  ) : 'Not connected'}
+                                </div>
                               </div>
-                            )}
+                            </div>
+                            
+                            <div className="pt-3 border-t">
+                              <h5 className="text-sm font-medium mb-2">Last Activity</h5>
+                              <div className="flex items-center gap-2 text-sm">
+                                <Clock className="h-4 w-4 text-neutral-500" />
+                                <span>
+                                  {selectedUser.lastLogin 
+                                    ? `Last login: ${new Date(selectedUser.lastLogin).toLocaleString()}`
+                                    : 'No login recorded'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                         
@@ -988,16 +1023,16 @@ export default function AdminDashboardPage() {
                             <Button size="sm" onClick={handleAddUserNote}>Add Note</Button>
                           </div>
                           <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                            {selectedUser.notes && selectedUser.notes.length > 0 ? (
-                              selectedUser.notes.map((note, index) => (
+                            {selectedUser.adminNotes && selectedUser.adminNotes.length > 0 ? (
+                              selectedUser.adminNotes.map((note, index) => (
                                 <div key={index} className="text-sm border-b pb-2">
-                                  <p className="text-neutral-800">{note.content}</p>
+                                  <p className="text-neutral-800">{note.note}</p>
                                   <div className="flex justify-between items-center mt-1">
                                     <p className="text-neutral-500 text-xs">
-                                      By {note.addedBy}
+                                      By Admin #{note.adminId}
                                     </p>
                                     <p className="text-neutral-500 text-xs">
-                                      {new Date(note.timestamp).toLocaleString()}
+                                      {new Date(note.createdAt).toLocaleString()}
                                     </p>
                                   </div>
                                 </div>
