@@ -743,7 +743,7 @@ export default function AdminDashboardPage() {
           
           <StatCard 
             title="Monthly Revenue" 
-            value={isLoading ? "-" : `$${stats?.monthlyRevenue.toFixed(2) || "0.00"}`} 
+            value={isLoading ? "-" : `$${stats?.monthlyRevenue !== undefined ? stats.monthlyRevenue.toFixed(2) : "0.00"}`} 
             icon={<DollarSign />} 
             linkText="View financial reports" 
             linkHref="#transactions" 
@@ -887,7 +887,7 @@ export default function AdminDashboardPage() {
                         {stats.recentOrders.map((order) => (
                           <tr key={order.id}>
                             <td className="py-2 px-2 text-sm">{order.orderNumber}</td>
-                            <td className="py-2 px-2 text-sm">${order.totalAmount.toFixed(2)}</td>
+                            <td className="py-2 px-2 text-sm">${order.totalAmount !== undefined ? order.totalAmount.toFixed(2) : '0.00'}</td>
                             <td className="py-2 px-2 text-sm">
                               <Badge variant={getStatusBadgeVariant(order.status)}>
                                 {order.status}
@@ -1057,7 +1057,7 @@ export default function AdminDashboardPage() {
                             <td className="py-4 px-4 font-medium">{transaction.reference}</td>
                             <td className="py-4 px-4">{transaction.eventTitle || `Event #${transaction.eventId}`}</td>
                             <td className="py-4 px-4">{transaction.userName || transaction.userEmail || `User #${transaction.userId}`}</td>
-                            <td className="py-4 px-4 font-medium">${transaction.amount.toFixed(2)}</td>
+                            <td className="py-4 px-4 font-medium">${transaction.amount !== undefined ? transaction.amount.toFixed(2) : '0.00'}</td>
                             <td className="py-4 px-4">
                               <Badge variant={getStatusBadgeVariant(transaction.status)}>
                                 {transaction.status}
@@ -2090,7 +2090,7 @@ export default function AdminDashboardPage() {
                                     <p className="text-xs text-gray-500">{event.date}</p>
                                   </div>
                                 </div>
-                                <p className="font-medium">${event.revenue.toFixed(2)}</p>
+                                <p className="font-medium">${event.revenue !== undefined ? event.revenue.toFixed(2) : '0.00'}</p>
                               </div>
                             ))}
                           </div>
