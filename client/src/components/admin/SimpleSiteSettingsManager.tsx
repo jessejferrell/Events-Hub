@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSiteSettings, type ColorSettings, type OrgSettings } from '@/hooks/use-site-settings';
+import { useBrandTheme } from '@/hooks/use-brand-theme';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 // Default colors
 const DEFAULT_COLORS = {
@@ -19,8 +21,10 @@ const DEFAULT_COLORS = {
 
 export default function SimpleSiteSettingsManager() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'admin';
   const { settings, getSetting, updateSetting, isLoading, ColorSettingsSchema, OrgSettingsSchema } = useSiteSettings();
+  const brandTheme = useBrandTheme();
   
   // Organization details form state
   const [orgSettings, setOrgSettings] = useState<OrgSettings>({
@@ -33,6 +37,7 @@ export default function SimpleSiteSettingsManager() {
   
   // Color settings state
   const [colorSettings, setColorSettings] = useState<ColorSettings>(DEFAULT_COLORS);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   
   // Load settings only once when component mounts or settings change
   useEffect(() => {
@@ -55,12 +60,110 @@ export default function SimpleSiteSettingsManager() {
     }
   }, [isLoading, settings, getSetting]);
   
+  // Apply color changes to CSS custom properties directly
+  const applyColorsToCss = useCallback((colors: ColorSettings) => {
+    try {
+      // Convert hex to HSL format for CSS variables
+      const hexToHSL = (hex: string): string => {
+        try {
+          // Remove the # if it exists
+          hex = hex.replace('#', '');
+          
+          // Parse the hex color to RGB
+          const r = parseInt(hex.substring(0, 2), 16) / 255;
+          const g = parseInt(hex.substring(2, 4), 16) / 255;
+          const b = parseInt(hex.substring(4, 6), 16) / 255;
+          
+          // Find greatest and smallest channel values
+          const cmin = Math.min(r, g, b);
+          const cmax = Math.max(r, g, b);
+          const delta = cmax - cmin;
+          
+          // Initialize variables
+          let h = 0;
+          let s = 0;
+          let l = (cmax + cmin) / 2;
+          
+          // Calculate hue
+          if (delta !== 0) {
+            if (cmax === r) {
+              h = ((g - b) / delta) % 6;
+            } else if (cmax === g) {
+              h = (b - r) / delta + 2;
+            } else {
+              h = (r - g) / delta + 4;
+            }
+            
+            h = Math.round(h * 60);
+            if (h < 0) h += 360;
+            
+            // Calculate saturation
+            s = delta / (1 - Math.abs(2 * l - 1));
+          }
+          
+          // Convert to percentages
+          s = Math.round(s * 100);
+          l = Math.round(l * 100);
+          
+          return `${h} ${s}% ${l}%`;
+        } catch (e) {
+          console.error('Error in hexToHSL:', e);
+          return '174 75% 37%'; // Default teal as fallback
+        }
+      };
+      
+      // Apply colors to CSS variables
+      const root = document.documentElement;
+      
+      // Apply each color if available
+      if (colors.primary) {
+        root.style.setProperty('--primary', hexToHSL(colors.primary));
+        root.style.setProperty('--primary-foreground', '#ffffff');
+      }
+      
+      if (colors.secondary) {
+        root.style.setProperty('--secondary', hexToHSL(colors.secondary));
+        root.style.setProperty('--secondary-foreground', '#ffffff');
+      }
+      
+      if (colors.accent) {
+        root.style.setProperty('--accent', hexToHSL(colors.accent));
+        root.style.setProperty('--accent-foreground', '#000000');
+      }
+      
+      // Update ring color to match primary
+      if (colors.primary) {
+        root.style.setProperty('--ring', hexToHSL(colors.primary));
+      }
+      
+      console.log('Preview colors applied:', colors);
+      return true;
+    } catch (error) {
+      console.error('Error applying colors to CSS:', error);
+      return false;
+    }
+  }, []);
+  
+  // Display a live preview as colors are selected
+  useEffect(() => {
+    applyColorsToCss(colorSettings);
+  }, [colorSettings, applyColorsToCss]);
+  
   // Handle save organization settings
   const handleSaveOrgSettings = () => {
     try {
       updateSetting('orgSettings', orgSettings, OrgSettingsSchema);
+      toast({
+        title: "Organization settings saved",
+        description: "Your changes have been applied successfully",
+      });
     } catch (error) {
       console.error('Error saving organization settings:', error);
+      toast({
+        title: "Error saving settings",
+        description: "There was a problem saving your changes",
+        variant: "destructive",
+      });
     }
   };
   
@@ -68,8 +171,19 @@ export default function SimpleSiteSettingsManager() {
   const handleSaveColorSettings = () => {
     try {
       updateSetting('colors', colorSettings, ColorSettingsSchema);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      toast({
+        title: "Color settings saved",
+        description: "Your changes have been applied successfully",
+      });
     } catch (error) {
       console.error('Error saving color settings:', error);
+      toast({
+        title: "Error saving colors",
+        description: "There was a problem saving your changes",
+        variant: "destructive",
+      });
     }
   };
   
@@ -261,8 +375,13 @@ export default function SimpleSiteSettingsManager() {
                 </div>
               </div>
               
-              <Button onClick={handleSaveColorSettings} className="mt-6">
-                Save Color Settings
+              <Button 
+                onClick={handleSaveColorSettings} 
+                className="mt-6 flex items-center gap-2"
+                variant={saveSuccess ? "success" : "default"}
+              >
+                {saveSuccess ? <CheckCircle2 className="h-4 w-4" /> : null}
+                {saveSuccess ? "Colors Saved!" : "Save Color Settings"}
               </Button>
               
               <div className="mt-8">
