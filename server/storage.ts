@@ -1108,6 +1108,45 @@ export class DatabaseStorage implements IStorage {
     
     return enhancedResults;
   }
+  
+  // === SITE SETTINGS OPERATIONS ===
+  
+  async getSiteSetting(key: string): Promise<SiteSetting | undefined> {
+    const result = await db.select().from(siteSettings).where(eq(siteSettings.key, key));
+    return result[0];
+  }
+  
+  async getAllSiteSettings(): Promise<SiteSetting[]> {
+    return await db.select().from(siteSettings);
+  }
+  
+  async createOrUpdateSiteSetting(key: string, value: any): Promise<SiteSetting> {
+    // Check if the setting exists
+    const existing = await this.getSiteSetting(key);
+    
+    if (existing) {
+      // Update existing setting
+      const result = await db
+        .update(siteSettings)
+        .set({ value, updatedAt: new Date() })
+        .where(eq(siteSettings.key, key))
+        .returning();
+      
+      return result[0];
+    } else {
+      // Create new setting
+      const result = await db
+        .insert(siteSettings)
+        .values({ key, value })
+        .returning();
+      
+      return result[0];
+    }
+  }
+  
+  async deleteSiteSetting(key: string): Promise<void> {
+    await db.delete(siteSettings).where(eq(siteSettings.key, key));
+  }
 }
 
 // Export a single instance of the storage implementation

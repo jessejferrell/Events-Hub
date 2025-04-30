@@ -22,7 +22,8 @@ import {
   insertVolunteerProfileSchema,
   insertVolunteerShiftSchema,
   insertVolunteerAssignmentSchema,
-  insertAnalyticsSchema
+  insertAnalyticsSchema,
+  insertSiteSettingsSchema
 } from "@shared/schema";
 
 // Helper function to generate time series data for charts
@@ -1777,6 +1778,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(results);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch analytics" });
+    }
+  });
+
+  // === SITE SETTINGS API ===
+  
+  // Helper function to check if user is super admin
+  function requireSuperAdmin(req: Request, res: Response, next: Function) {
+    // Super admin check - jessejferrell@gmail.com has specific access to site settings
+    if (!req.isAuthenticated() || req.user.email !== "jessejferrell@gmail.com") {
+      return res.status(403).json({ message: "Super admin access required" });
+    }
+    next();
+  }
+  
+  // Get all site settings (public)
+  app.get("/api/site-settings", async (req, res) => {
+    try {
+      const settings = await storage.getAllSiteSettings();
+      res.json(settings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch site settings" });
+    }
+  });
+  
+  // Get site setting by key (public)
+  app.get("/api/site-settings/:key", async (req, res) => {
+    try {
+      const setting = await storage.getSiteSetting(req.params.key);
+      if (!setting) {
+        return res.status(404).json({ message: "Setting not found" });
+      }
+      res.json(setting);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch site setting" });
+    }
+  });
+  
+  // Create or update site setting (protected, super admin only)
+  app.post("/api/site-settings/:key", requireSuperAdmin, async (req, res) => {
+    try {
+      const { key } = req.params;
+      const { value } = req.body;
+      
+      if (value === undefined) {
+        return res.status(400).json({ message: "Value is required" });
+      }
+      
+      const setting = await storage.createOrUpdateSiteSetting(key, value);
+      res.status(201).json(setting);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to create/update site setting" });
+    }
+  });
+  
+  // Delete site setting (protected, super admin only)
+  app.delete("/api/site-settings/:key", requireSuperAdmin, async (req, res) => {
+    try {
+      await storage.deleteSiteSetting(req.params.key);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to delete site setting" });
     }
   });
   
