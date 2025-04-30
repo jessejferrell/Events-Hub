@@ -26,7 +26,10 @@ import {
   Edit,
   Eye,
   AlertTriangle,
-  Plus
+  Plus,
+  CalendarCheck,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import {
   BarChart,
@@ -1645,22 +1648,22 @@ export default function AdminDashboardPage() {
                                     <td className="p-4 align-middle">
                                       <Badge 
                                         variant={
-                                          !event.isActive 
+                                          event.status === "draft" 
                                             ? "secondary" 
-                                            : isUpcoming 
+                                            : event.status === "upcoming" 
                                               ? "success" 
-                                              : isPast 
+                                              : event.status === "completed" 
                                                 ? "warning"
-                                                : "success"
+                                                : event.status === "cancelled"
+                                                  ? "destructive"
+                                                  : "success"
                                         }
                                       >
-                                        {!event.isActive 
-                                          ? "Draft" 
-                                          : isUpcoming 
-                                            ? "Upcoming" 
-                                            : isPast 
-                                              ? "Past"
-                                              : "Active"
+                                        {event.status 
+                                          ? event.status.charAt(0).toUpperCase() + event.status.slice(1)
+                                          : !event.isActive 
+                                            ? "Draft" 
+                                            : "Active"
                                         }
                                       </Badge>
                                     </td>
@@ -1703,8 +1706,16 @@ export default function AdminDashboardPage() {
                                           title="Toggle status"
                                           onClick={() => handleToggleEventStatus(event)}
                                         >
-                                          {event.isActive ? (
-                                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                          {event.status === "draft" ? (
+                                            <Calendar className="h-4 w-4 text-emerald-500" />
+                                          ) : event.status === "upcoming" ? (
+                                            <CalendarCheck className="h-4 w-4 text-blue-500" />
+                                          ) : event.status === "active" ? (
+                                            <CheckCircle className="h-4 w-4 text-green-500" />
+                                          ) : event.status === "completed" ? (
+                                            <Clock className="h-4 w-4 text-amber-500" />
+                                          ) : event.status === "cancelled" ? (
+                                            <XCircle className="h-4 w-4 text-red-500" />
                                           ) : (
                                             <Calendar className="h-4 w-4 text-emerald-500" />
                                           )}
