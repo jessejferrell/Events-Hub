@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -11,8 +11,8 @@ import {
   Calendar, 
   DollarSign, 
   Ticket, 
-  BarChart2, 
-  PieChart, 
+  BarChart2 as BarChart2Icon, 
+  PieChart as PieChartIcon, 
   Users,
   ShoppingCart,
   Store,
@@ -28,6 +28,21 @@ import {
   AlertTriangle,
   Plus
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  LineChart, 
+  Line,
+  PieChart, 
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ComposedChart
+} from "recharts";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -130,6 +145,75 @@ export default function AdminDashboardPage() {
     'pending', 'completed', 'cancelled', 'refunded', 'failed', 'processing'
   ]);
   const [confirmDeleteTransaction, setConfirmDeleteTransaction] = useState(false);
+  
+  // Analytics state
+  const [analyticsTimeframe, setAnalyticsTimeframe] = useState<string>("month");
+  const [analyticsData, setAnalyticsData] = useState<{
+    revenue: number;
+    revenueChange: number;
+    ticketsSold: number;
+    ticketsChange: number;
+    newUsers: number;
+    usersChange: number;
+    activeEvents: number;
+    eventsChange: number;
+    recentActivity: Array<{
+      type: string;
+      description: string;
+      time: string;
+    }>;
+    conversionRate: {
+      ticket: number;
+      vendor: number;
+      volunteer: number;
+      merchandise: number;
+    };
+    userEngagement: {
+      eventParticipation: number;
+      multiTicket: number;
+      returnRate: number;
+      volunteerRate: number;
+    };
+  }>({
+    revenue: 0,
+    revenueChange: 0,
+    ticketsSold: 0,
+    ticketsChange: 0,
+    newUsers: 0,
+    usersChange: 0,
+    activeEvents: 0,
+    eventsChange: 0,
+    recentActivity: [],
+    conversionRate: {
+      ticket: 0,
+      vendor: 0,
+      volunteer: 0,
+      merchandise: 0
+    },
+    userEngagement: {
+      eventParticipation: 0,
+      multiTicket: 0,
+      returnRate: 0,
+      volunteerRate: 0
+    }
+  });
+  
+  // Chart data
+  const [revenueData, setRevenueData] = useState<Array<{date: string; revenue: number}>>([]);
+  const [revenueByEventType, setRevenueByEventType] = useState<Array<{name: string; value: number}>>([]);
+  const [revenueByProductType, setRevenueByProductType] = useState<Array<{name: string; value: number}>>([]);
+  const [topEvents, setTopEvents] = useState<Array<{name: string; date: string; revenue: number}>>([]);
+  const [revenueAnalysis, setRevenueAnalysis] = useState<Array<{name: string; tickets: number; merchandise: number; vendors: number; other: number}>>([]);
+  const [userGrowthData, setUserGrowthData] = useState<Array<{date: string; users: number}>>([]);
+  const [userTypeData, setUserTypeData] = useState<Array<{name: string; value: number}>>([]);
+  const [topUserSegments, setTopUserSegments] = useState<Array<{name: string; description: string; count: number}>>([]);
+  const [eventGrowthData, setEventGrowthData] = useState<Array<{date: string; events: number}>>([]);
+  const [eventTypeData, setEventTypeData] = useState<Array<{name: string; value: number}>>([]);
+  const [eventPerformanceData, setEventPerformanceData] = useState<Array<{name: string; attendance: number; revenue: number}>>([]);
+  const [eventLocationData, setEventLocationData] = useState<Array<{name: string; eventCount: number; growth: number}>>([]);
+  
+  // Chart colors
+  const pieColors = ['#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#22c55e'];
 
   // Fetch admin stats
   const { data: stats, isLoading } = useQuery<AdminStats>({
@@ -705,7 +789,7 @@ export default function AdminDashboardPage() {
                 <CardContent className="px-4 pb-4">
                   <div className="h-64 flex items-center justify-center bg-neutral-50 rounded">
                     <div className="text-center text-neutral-400">
-                      <BarChart2 className="h-12 w-12 mx-auto mb-2" />
+                      <BarChart2Icon className="h-12 w-12 mx-auto mb-2" />
                       <p>Revenue chart will appear here when data is available</p>
                     </div>
                   </div>
@@ -1557,19 +1641,622 @@ export default function AdminDashboardPage() {
           {/* Analytics tab content */}
           <TabsContent value="analytics" className="m-0">
             <Card>
-              <CardHeader>
-                <CardTitle>Analytics & Reports</CardTitle>
-                <CardDescription>View detailed analytics and generate reports</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle>Analytics & Reports</CardTitle>
+                  <CardDescription>View detailed analytics and generate reports</CardDescription>
+                </div>
+                <Select 
+                  value="monthly" 
+                  onValueChange={(value) => setAnalyticsTimeframe(value)}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select timeframe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="all">All Time</SelectItem>
+                  </SelectContent>
+                </Select>
               </CardHeader>
               <CardContent>
-                <div className="flex justify-center items-center py-12">
-                  <div className="text-center">
-                    <BarChart2 className="h-12 w-12 mx-auto mb-4 text-neutral-300" />
-                    <p className="text-neutral-600 mb-2">Analytics dashboard will be implemented here</p>
-                    <p className="text-neutral-500 text-sm">This section will include financial reports, ticket sales, and user growth</p>
-                  </div>
-                </div>
+                {/* Analytics Tabs */}
+                <Tabs defaultValue="overview" className="space-y-4">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="revenue">Revenue</TabsTrigger>
+                    <TabsTrigger value="users">Users</TabsTrigger>
+                    <TabsTrigger value="events">Events</TabsTrigger>
+                  </TabsList>
+                  
+                  {/* Overview Tab */}
+                  <TabsContent value="overview" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <div className="flex items-center">
+                          <div className="p-3 rounded-full bg-blue-500 bg-opacity-10">
+                            <DollarSign className="h-8 w-8 text-blue-500" />
+                          </div>
+                          <div className="ml-4">
+                            <p className="text-gray-500 text-sm">Revenue</p>
+                            <p className="text-2xl font-semibold">${analyticsData?.revenue?.toFixed(2) || '0.00'}</p>
+                            <p className={`text-xs flex items-center ${analyticsData?.revenueChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {analyticsData?.revenueChange >= 0 ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M12 7a1 1 0 01-1 1H9v3a1 1 0 01-2 0V8H4a1 1 0 010-2h3V3a1 1 0 112 0v3h3a1 1 0 011 1z" clipRule="evenodd" />
+                                </svg>
+                              ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                              {Math.abs(analyticsData?.revenueChange || 0)}% vs previous period
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <div className="flex items-center">
+                          <div className="p-3 rounded-full bg-green-500 bg-opacity-10">
+                            <Ticket className="h-8 w-8 text-green-500" />
+                          </div>
+                          <div className="ml-4">
+                            <p className="text-gray-500 text-sm">Tickets Sold</p>
+                            <p className="text-2xl font-semibold">{analyticsData?.ticketsSold || 0}</p>
+                            <p className={`text-xs flex items-center ${analyticsData?.ticketsChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {analyticsData?.ticketsChange >= 0 ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M12 7a1 1 0 01-1 1H9v3a1 1 0 01-2 0V8H4a1 1 0 010-2h3V3a1 1 0 112 0v3h3a1 1 0 011 1z" clipRule="evenodd" />
+                                </svg>
+                              ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                              {Math.abs(analyticsData?.ticketsChange || 0)}% vs previous period
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <div className="flex items-center">
+                          <div className="p-3 rounded-full bg-purple-500 bg-opacity-10">
+                            <Users className="h-8 w-8 text-purple-500" />
+                          </div>
+                          <div className="ml-4">
+                            <p className="text-gray-500 text-sm">New Users</p>
+                            <p className="text-2xl font-semibold">{analyticsData?.newUsers || 0}</p>
+                            <p className={`text-xs flex items-center ${analyticsData?.usersChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {analyticsData?.usersChange >= 0 ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M12 7a1 1 0 01-1 1H9v3a1 1 0 01-2 0V8H4a1 1 0 010-2h3V3a1 1 0 112 0v3h3a1 1 0 011 1z" clipRule="evenodd" />
+                                </svg>
+                              ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                              {Math.abs(analyticsData?.usersChange || 0)}% vs previous period
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <div className="flex items-center">
+                          <div className="p-3 rounded-full bg-amber-500 bg-opacity-10">
+                            <Calendar className="h-8 w-8 text-amber-500" />
+                          </div>
+                          <div className="ml-4">
+                            <p className="text-gray-500 text-sm">Active Events</p>
+                            <p className="text-2xl font-semibold">{analyticsData?.activeEvents || 0}</p>
+                            <p className={`text-xs flex items-center ${analyticsData?.eventsChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {analyticsData?.eventsChange >= 0 ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M12 7a1 1 0 01-1 1H9v3a1 1 0 01-2 0V8H4a1 1 0 010-2h3V3a1 1 0 112 0v3h3a1 1 0 011 1z" clipRule="evenodd" />
+                                </svg>
+                              ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                              {Math.abs(analyticsData?.eventsChange || 0)}% vs previous period
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Revenue Chart */}
+                    <div className="bg-white shadow rounded-lg p-4">
+                      <h3 className="text-lg font-medium mb-4">Revenue Trends</h3>
+                      <div className="h-80">
+                        {revenueData.length > 0 ? (
+                          <BarChart 
+                            data={revenueData}
+                            margin={{ top: 20, right: 30, left: 40, bottom: 50 }}
+                            className="w-full h-full"
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="revenue" fill="#6366f1" name="Revenue" />
+                          </BarChart>
+                        ) : (
+                          <div className="h-full flex items-center justify-center">
+                            <p className="text-neutral-500">No revenue data available for the selected period</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Activity Feed and Conversion Metrics */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Recent Activity */}
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Recent Activity</h3>
+                        <div className="space-y-4">
+                          {analyticsData?.recentActivity?.length > 0 ? (
+                            analyticsData.recentActivity.map((activity, index) => (
+                              <div key={index} className="flex items-start">
+                                <div className={`p-2 rounded-full ${
+                                  activity.type === 'purchase' ? 'bg-green-100 text-green-600' : 
+                                  activity.type === 'user' ? 'bg-blue-100 text-blue-600' : 
+                                  activity.type === 'event' ? 'bg-amber-100 text-amber-600' : 
+                                  'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {activity.type === 'purchase' ? <DollarSign className="h-4 w-4" /> : 
+                                   activity.type === 'user' ? <UserIcon className="h-4 w-4" /> : 
+                                   activity.type === 'event' ? <Calendar className="h-4 w-4" /> : 
+                                   <FileText className="h-4 w-4" />}
+                                </div>
+                                <div className="ml-3">
+                                  <p className="text-sm">{activity.description}</p>
+                                  <p className="text-xs text-gray-500">{activity.time}</p>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-neutral-500 text-center py-4">No recent activity</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Conversion Metrics */}
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Conversion Metrics</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Ticket Conversion Rate</span>
+                              <span className="text-sm font-medium">{analyticsData?.conversionRate?.ticket || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${analyticsData?.conversionRate?.ticket || 0}%` }}></div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Vendor Registration Rate</span>
+                              <span className="text-sm font-medium">{analyticsData?.conversionRate?.vendor || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${analyticsData?.conversionRate?.vendor || 0}%` }}></div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Volunteer Registration Rate</span>
+                              <span className="text-sm font-medium">{analyticsData?.conversionRate?.volunteer || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div className="bg-purple-500 h-2.5 rounded-full" style={{ width: `${analyticsData?.conversionRate?.volunteer || 0}%` }}></div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Merchandise Sales Rate</span>
+                              <span className="text-sm font-medium">{analyticsData?.conversionRate?.merchandise || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div className="bg-amber-500 h-2.5 rounded-full" style={{ width: `${analyticsData?.conversionRate?.merchandise || 0}%` }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  {/* Revenue Tab */}
+                  <TabsContent value="revenue" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Revenue by Event Type</h3>
+                        <div className="h-64">
+                          {revenueByEventType.length > 0 ? (
+                            <PieChart width={300} height={250}>
+                              <Pie
+                                data={revenueByEventType}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                dataKey="value"
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              >
+                                {revenueByEventType.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                              <Legend />
+                            </PieChart>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <p className="text-neutral-500">No data available</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Revenue by Product Category</h3>
+                        <div className="h-64">
+                          {revenueByProductType.length > 0 ? (
+                            <PieChart width={300} height={250}>
+                              <Pie
+                                data={revenueByProductType}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                dataKey="value"
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              >
+                                {revenueByProductType.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value) => [`$${value}`, 'Revenue']} />
+                              <Legend />
+                            </PieChart>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <p className="text-neutral-500">No data available</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Top Performing Events</h3>
+                        {topEvents.length > 0 ? (
+                          <div className="space-y-4">
+                            {topEvents.map((event, index) => (
+                              <div key={index} className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <div className="bg-neutral-100 rounded-md h-10 w-10 flex items-center justify-center mr-3">
+                                    <span className="text-sm font-bold">{index + 1}</span>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium">{event.name}</p>
+                                    <p className="text-xs text-gray-500">{event.date}</p>
+                                  </div>
+                                </div>
+                                <p className="font-medium">${event.revenue.toFixed(2)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-neutral-500 text-center py-4">No event data available</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white shadow rounded-lg p-4">
+                      <h3 className="text-lg font-medium mb-4">Revenue Analysis</h3>
+                      <div className="h-80">
+                        {revenueAnalysis.length > 0 ? (
+                          <BarChart 
+                            data={revenueAnalysis}
+                            margin={{ top: 20, right: 30, left: 40, bottom: 50 }}
+                            className="w-full h-full"
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="tickets" fill="#6366f1" name="Tickets" />
+                            <Bar dataKey="merchandise" fill="#ec4899" name="Merchandise" />
+                            <Bar dataKey="vendors" fill="#14b8a6" name="Vendors" />
+                            <Bar dataKey="other" fill="#f59e0b" name="Other" />
+                          </BarChart>
+                        ) : (
+                          <div className="h-full flex items-center justify-center">
+                            <p className="text-neutral-500">No revenue analysis data available</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  {/* Users Tab */}
+                  <TabsContent value="users" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">User Growth</h3>
+                        <div className="h-80">
+                          {userGrowthData.length > 0 ? (
+                            <LineChart
+                              data={userGrowthData}
+                              margin={{ top: 20, right: 30, left: 40, bottom: 50 }}
+                              className="w-full h-full"
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="date" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Line type="monotone" dataKey="users" stroke="#6366f1" activeDot={{ r: 8 }} />
+                            </LineChart>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <p className="text-neutral-500">No user growth data available</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">User Types</h3>
+                        <div className="h-80">
+                          {userTypeData.length > 0 ? (
+                            <PieChart width={400} height={300}>
+                              <Pie
+                                data={userTypeData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                dataKey="value"
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              >
+                                {userTypeData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip />
+                              <Legend />
+                            </PieChart>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <p className="text-neutral-500">No user type data available</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">User Engagement</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Event Participation Rate</span>
+                              <span className="text-sm font-medium">{analyticsData?.userEngagement?.eventParticipation || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${analyticsData?.userEngagement?.eventParticipation || 0}%` }}></div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Multi-ticket Purchase Rate</span>
+                              <span className="text-sm font-medium">{analyticsData?.userEngagement?.multiTicket || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${analyticsData?.userEngagement?.multiTicket || 0}%` }}></div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Return Customer Rate</span>
+                              <span className="text-sm font-medium">{analyticsData?.userEngagement?.returnRate || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div className="bg-purple-500 h-2.5 rounded-full" style={{ width: `${analyticsData?.userEngagement?.returnRate || 0}%` }}></div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-medium">Volunteer Rate</span>
+                              <span className="text-sm font-medium">{analyticsData?.userEngagement?.volunteerRate || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div className="bg-amber-500 h-2.5 rounded-full" style={{ width: `${analyticsData?.userEngagement?.volunteerRate || 0}%` }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Top Customer Segments</h3>
+                        {topUserSegments.length > 0 ? (
+                          <div className="space-y-4">
+                            {topUserSegments.map((segment, index) => (
+                              <div key={index} className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <div className="bg-neutral-100 rounded-md h-10 w-10 flex items-center justify-center mr-3">
+                                    <span className="text-sm font-bold">{index + 1}</span>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium">{segment.name}</p>
+                                    <p className="text-xs text-gray-500">{segment.description}</p>
+                                  </div>
+                                </div>
+                                <p className="font-medium">{segment.count} users</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-neutral-500 text-center py-4">No segment data available</p>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  {/* Events Tab */}
+                  <TabsContent value="events" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Event Growth</h3>
+                        <div className="h-80">
+                          {eventGrowthData.length > 0 ? (
+                            <LineChart
+                              data={eventGrowthData}
+                              margin={{ top: 20, right: 30, left: 40, bottom: 50 }}
+                              className="w-full h-full"
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="date" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Line type="monotone" dataKey="events" stroke="#6366f1" activeDot={{ r: 8 }} />
+                            </LineChart>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <p className="text-neutral-500">No event growth data available</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Event Types</h3>
+                        <div className="h-80">
+                          {eventTypeData.length > 0 ? (
+                            <PieChart width={400} height={300}>
+                              <Pie
+                                data={eventTypeData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                dataKey="value"
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              >
+                                {eventTypeData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip />
+                              <Legend />
+                            </PieChart>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <p className="text-neutral-500">No event type data available</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Event Performance</h3>
+                        <div className="h-80">
+                          {eventPerformanceData.length > 0 ? (
+                            <ComposedChart
+                              data={eventPerformanceData}
+                              margin={{ top: 20, right: 30, left: 40, bottom: 50 }}
+                              className="w-full h-full"
+                            >
+                              <CartesianGrid stroke="#f5f5f5" />
+                              <XAxis dataKey="name" scale="band" />
+                              <YAxis yAxisId="left" orientation="left" stroke="#6366f1" />
+                              <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" />
+                              <Tooltip />
+                              <Legend />
+                              <Bar yAxisId="left" dataKey="attendance" barSize={20} fill="#6366f1" name="Attendance" />
+                              <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#f59e0b" name="Revenue" />
+                            </ComposedChart>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <p className="text-neutral-500">No event performance data available</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white shadow rounded-lg p-4">
+                        <h3 className="text-lg font-medium mb-4">Event Locations</h3>
+                        <div className="space-y-4">
+                          {eventLocationData.length > 0 ? (
+                            eventLocationData.map((location, index) => (
+                              <div key={index} className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <div className="p-2 rounded-full bg-neutral-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                  </div>
+                                  <div className="ml-3">
+                                    <p className="text-sm font-medium">{location.name}</p>
+                                    <p className="text-xs text-gray-500">{location.eventCount} events</p>
+                                  </div>
+                                </div>
+                                <div className="text-sm">
+                                  <span className={`px-2 py-1 rounded-full text-xs ${
+                                    location.growth > 0 ? 'bg-green-100 text-green-800' : 
+                                    location.growth < 0 ? 'bg-red-100 text-red-800' : 
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {location.growth > 0 ? '+' : ''}{location.growth}%
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-neutral-500 text-center py-4">No location data available</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
+              
+              <CardFooter className="flex justify-between">
+                <Button variant="outline" onClick={() => fetchAnalyticsData()}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh Data
+                </Button>
+                <Button variant="outline" onClick={() => exportAnalyticsData()}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Report
+                </Button>
+              </CardFooter>
             </Card>
           </TabsContent>
           
