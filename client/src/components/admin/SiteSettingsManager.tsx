@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSiteSettings, type ColorSettings, type OrgSettings } from '@/hooks/use-site-settings';
 import { SketchPicker } from 'react-color';
 import { useAuth } from '@/hooks/use-auth';
@@ -12,15 +12,20 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
+// Default colors that match our design
+const DEFAULT_COLORS: ColorSettings = {
+  primary: '#00a99d',   // Teal
+  secondary: '#8a4fff', // Purple
+  accent: '#f0e6ff',    // Light purple
+};
+
 export default function SiteSettingsManager() {
   const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'admin';
   const { settings, getSetting, updateSetting, isLoading, ColorSettingsSchema, OrgSettingsSchema } = useSiteSettings();
   
-  // Only admins and super admins can access this section
-  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'admin';
-  
   // Color picker state
-  const [activeColorName, setActiveColorName] = useState<string | null>(null);
+  const [activeColorName, setActiveColorName] = useState<keyof ColorSettings | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   
   // Organization details form state
@@ -32,34 +37,8 @@ export default function SiteSettingsManager() {
     address: '',
   });
   
-  // Color settings state - get default colors from CSS variables
-  const [colorSettings, setColorSettings] = useState<ColorSettings>(() => {
-    // Get CSS variables and convert from HSL to hex
-    const getHexFromCssVar = (varName: string): string => {
-      try {
-        // Get computed style for root element
-        const computedStyle = getComputedStyle(document.documentElement);
-        // Get the HSL value (stripping the '--' prefix)
-        const hslValue = computedStyle.getPropertyValue(`--${varName}`).trim();
-        if (!hslValue) return '#00a99d'; // Default teal if not found
-        
-        // For now, return a placeholder. Getting exact hex from HSL is complex
-        // and will be handled more precisely in a future update.
-        return varName === 'primary' ? '#00a99d' :  // Teal
-               varName === 'secondary' ? '#8a4fff' : // Purple
-               '#f0e6ff'; // Light purple for accent
-      } catch (e) {
-        console.error('Error getting CSS variable:', e);
-        return '#00a99d'; // Default teal if error
-      }
-    };
-    
-    return {
-      primary: getHexFromCssVar('primary'),
-      secondary: getHexFromCssVar('secondary'),
-      accent: getHexFromCssVar('accent'),
-    };
-  });
+  // Color settings state
+  const [colorSettings, setColorSettings] = useState<ColorSettings>(DEFAULT_COLORS);
   
   // Load settings when data is available - only on initial load
   useEffect(() => {
@@ -74,16 +53,15 @@ export default function SiteSettingsManager() {
       const savedColorSettings = getSetting('colors');
       if (savedColorSettings) {
         setColorSettings({
-          primary: savedColorSettings.primary || colorSettings.primary,
-          secondary: savedColorSettings.secondary || colorSettings.secondary,
-          accent: savedColorSettings.accent || colorSettings.accent,
+          primary: savedColorSettings.primary || DEFAULT_COLORS.primary,
+          secondary: savedColorSettings.secondary || DEFAULT_COLORS.secondary,
+          accent: savedColorSettings.accent || DEFAULT_COLORS.accent,
         });
       }
     }
-    // Remove colorSettings from dependencies to prevent infinite loop
   }, [isLoading, settings, getSetting]);
   
-  const handleSaveOrgSettings = () => {
+  const handleSaveOrgSettings = useCallback(() => {
     try {
       // Validate and save organization settings
       const validatedSettings = OrgSettingsSchema.parse(orgSettings);
@@ -91,9 +69,9 @@ export default function SiteSettingsManager() {
     } catch (error) {
       console.error('Validation error:', error);
     }
-  };
+  }, [orgSettings, OrgSettingsSchema, updateSetting]);
   
-  const handleSaveColorSettings = () => {
+  const handleSaveColorSettings = useCallback(() => {
     try {
       // Validate and save color settings
       const validatedColors = ColorSettingsSchema.parse(colorSettings);
@@ -101,23 +79,19 @@ export default function SiteSettingsManager() {
     } catch (error) {
       console.error('Validation error:', error);
     }
-  };
+  }, [colorSettings, ColorSettingsSchema, updateSetting]);
   
-  const handleColorChange = (colorName: keyof ColorSettings, color: any) => {
-    const newColor = color.hex;
-    
-    // Update state with new color value
-    setColorSettings(prevSettings => ({
-      ...prevSettings,
-      [colorName]: newColor
+  const handleColorChange = useCallback((colorName: keyof ColorSettings, color: any) => {
+    setColorSettings(prev => ({
+      ...prev,
+      [colorName]: color.hex
     }));
-  };
+  }, []);
   
-  // Show color picker for the selected color
-  const openColorPicker = (colorName: keyof ColorSettings) => {
+  const openColorPicker = useCallback((colorName: keyof ColorSettings) => {
     setActiveColorName(colorName);
     setShowColorPicker(true);
-  };
+  }, []);
   
   if (!isSuperAdmin) {
     return (
@@ -165,7 +139,7 @@ export default function SiteSettingsManager() {
                   id="orgName" 
                   placeholder="Enter organization name" 
                   value={orgSettings.name} 
-                  onChange={(e) => setOrgSettings({...orgSettings, name: e.target.value})}
+                  onChange={(e) => setOrgSettings(prev => ({...prev, name: e.target.value}))}
                 />
               </div>
               
@@ -175,7 +149,7 @@ export default function SiteSettingsManager() {
                   id="orgLogo" 
                   placeholder="https://example.com/logo.png" 
                   value={orgSettings.logo || ''} 
-                  onChange={(e) => setOrgSettings({...orgSettings, logo: e.target.value})}
+                  onChange={(e) => setOrgSettings(prev => ({...prev, logo: e.target.value}))}
                 />
               </div>
               
@@ -186,7 +160,7 @@ export default function SiteSettingsManager() {
                   type="email"
                   placeholder="contact@example.org" 
                   value={orgSettings.contactEmail || ''} 
-                  onChange={(e) => setOrgSettings({...orgSettings, contactEmail: e.target.value})}
+                  onChange={(e) => setOrgSettings(prev => ({...prev, contactEmail: e.target.value}))}
                 />
               </div>
               
@@ -196,7 +170,7 @@ export default function SiteSettingsManager() {
                   id="orgPhone" 
                   placeholder="(555) 123-4567" 
                   value={orgSettings.contactPhone || ''} 
-                  onChange={(e) => setOrgSettings({...orgSettings, contactPhone: e.target.value})}
+                  onChange={(e) => setOrgSettings(prev => ({...prev, contactPhone: e.target.value}))}
                 />
               </div>
               
@@ -206,7 +180,7 @@ export default function SiteSettingsManager() {
                   id="orgAddress" 
                   placeholder="123 Main St, City, State, Zip" 
                   value={orgSettings.address || ''} 
-                  onChange={(e) => setOrgSettings({...orgSettings, address: e.target.value})}
+                  onChange={(e) => setOrgSettings(prev => ({...prev, address: e.target.value}))}
                 />
               </div>
               
@@ -230,8 +204,11 @@ export default function SiteSettingsManager() {
                 <div className="space-y-2">
                   <Label>Primary Color</Label>
                   <div 
-                    className="h-12 rounded-md border cursor-pointer flex items-center justify-center text-primary-foreground"
-                    style={{ backgroundColor: colorSettings.primary }}
+                    className="h-12 rounded-md border cursor-pointer flex items-center justify-center"
+                    style={{ 
+                      backgroundColor: colorSettings.primary,
+                      color: '#ffffff'
+                    }}
                     onClick={() => openColorPicker('primary')}
                   >
                     {colorSettings.primary}
@@ -242,8 +219,11 @@ export default function SiteSettingsManager() {
                 <div className="space-y-2">
                   <Label>Secondary Color</Label>
                   <div 
-                    className="h-12 rounded-md border cursor-pointer flex items-center justify-center text-secondary-foreground"
-                    style={{ backgroundColor: colorSettings.secondary }}
+                    className="h-12 rounded-md border cursor-pointer flex items-center justify-center"
+                    style={{ 
+                      backgroundColor: colorSettings.secondary,
+                      color: '#ffffff'
+                    }}
                     onClick={() => openColorPicker('secondary')}
                   >
                     {colorSettings.secondary}
@@ -254,8 +234,11 @@ export default function SiteSettingsManager() {
                 <div className="space-y-2">
                   <Label>Accent Color</Label>
                   <div 
-                    className="h-12 rounded-md border cursor-pointer flex items-center justify-center text-accent-foreground"
-                    style={{ backgroundColor: colorSettings.accent }}
+                    className="h-12 rounded-md border cursor-pointer flex items-center justify-center"
+                    style={{ 
+                      backgroundColor: colorSettings.accent,
+                      color: '#000000'  // Always dark text for light accent color
+                    }}
                     onClick={() => openColorPicker('accent')}
                   >
                     {colorSettings.accent}
@@ -270,14 +253,17 @@ export default function SiteSettingsManager() {
               <div className="mt-8">
                 <h3 className="text-lg font-medium mb-4">Preview</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-md border" style={{ backgroundColor: colorSettings.primary }}>
-                    <p className="text-center font-medium" style={{ color: '#fff' }}>Primary</p>
+                  <div className="p-4 rounded-md border flex items-center justify-center" 
+                      style={{ backgroundColor: colorSettings.primary, height: '60px' }}>
+                    <p className="text-center font-medium text-white">Primary</p>
                   </div>
-                  <div className="p-4 rounded-md border" style={{ backgroundColor: colorSettings.secondary }}>
-                    <p className="text-center font-medium" style={{ color: '#fff' }}>Secondary</p>
+                  <div className="p-4 rounded-md border flex items-center justify-center" 
+                      style={{ backgroundColor: colorSettings.secondary, height: '60px' }}>
+                    <p className="text-center font-medium text-white">Secondary</p>
                   </div>
-                  <div className="p-4 rounded-md border" style={{ backgroundColor: colorSettings.accent }}>
-                    <p className="text-center font-medium" style={{ color: '#fff' }}>Accent</p>
+                  <div className="p-4 rounded-md border flex items-center justify-center" 
+                      style={{ backgroundColor: colorSettings.accent, height: '60px' }}>
+                    <p className="text-center font-medium text-slate-900">Accent</p>
                   </div>
                 </div>
               </div>
@@ -287,35 +273,35 @@ export default function SiteSettingsManager() {
       </Tabs>
       
       {/* Color Picker Dialog */}
-      <AlertDialog open={showColorPicker} onOpenChange={setShowColorPicker}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Choose {activeColorName} color
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Select a color from the picker below.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          
-          <div className="flex justify-center py-4">
-            {activeColorName && (
+      {activeColorName && (
+        <AlertDialog open={showColorPicker} onOpenChange={setShowColorPicker}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Choose {activeColorName} color
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Select a color from the picker below.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            
+            <div className="flex justify-center py-4">
               <SketchPicker
-                color={colorSettings[activeColorName as keyof ColorSettings]}
-                onChange={(color) => handleColorChange(activeColorName as keyof ColorSettings, color)}
+                color={colorSettings[activeColorName]}
+                onChange={(color) => handleColorChange(activeColorName, color)}
                 disableAlpha={true}
               />
-            )}
-          </div>
-          
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => setShowColorPicker(false)}>
-              Apply Color
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </div>
+            
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => setShowColorPicker(false)}>
+                Apply Color
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
