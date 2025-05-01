@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -220,6 +220,23 @@ export default function AdminDashboardPage() {
   
   // Chart colors
   const pieColors = ['#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#22c55e'];
+
+  // Function to handle stat card navigation
+  const handleTabChange = (tabName: string, transactionType?: string) => {
+    setActiveTab(tabName);
+    
+    if (transactionType) {
+      setSelectedTransactionType(transactionType);
+    }
+    
+    // Allow the state to update before scrolling
+    setTimeout(() => {
+      // Scroll to the tabs section
+      if (tabsRef.current) {
+        tabsRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
 
   // Fetch admin stats
   const { data: stats, isLoading } = useQuery<AdminStats>({
@@ -730,7 +747,7 @@ export default function AdminDashboardPage() {
             linkHref="#users" 
             iconBgClass="bg-neutral-100"
             isLoading={isLoading}
-            onClick={() => setActiveTab("users")}
+            onClick={() => handleTabChange("users")}
           />
           
           <StatCard 
@@ -741,7 +758,7 @@ export default function AdminDashboardPage() {
             linkHref="#events" 
             iconBgClass="bg-green-100"
             isLoading={isLoading}
-            onClick={() => setActiveTab("events")}
+            onClick={() => handleTabChange("events")}
           />
           
           <StatCard 
@@ -752,7 +769,7 @@ export default function AdminDashboardPage() {
             linkHref="#transactions" 
             iconBgClass="bg-blue-100"
             isLoading={isLoading}
-            onClick={() => setActiveTab("transactions")}
+            onClick={() => handleTabChange("transactions")}
           />
           
           <StatCard 
@@ -763,15 +780,12 @@ export default function AdminDashboardPage() {
             linkHref="#transactions" 
             iconBgClass="bg-purple-100"
             isLoading={isLoading}
-            onClick={() => {
-              setActiveTab("transactions");
-              setSelectedTransactionType("ticket");
-            }}
+            onClick={() => handleTabChange("transactions", "ticket")}
           />
         </div>
         
         {/* Admin Tabs */}
-        <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-8">
+        <Tabs ref={tabsRef} defaultValue={activeTab} onValueChange={setActiveTab} className="mb-8">
           <TabsList className="border-b w-full justify-start rounded-none bg-transparent p-0 mb-6">
             <TabsTrigger 
               value="overview" 
@@ -815,7 +829,7 @@ export default function AdminDashboardPage() {
                   <div>
                     <CardTitle className="text-lg">Recent Events</CardTitle>
                   </div>
-                  <Button variant="link" size="sm" className="text-secondary p-0" onClick={() => setActiveTab("events")}>
+                  <Button variant="link" size="sm" className="text-secondary p-0" onClick={() => handleTabChange("events")}>
                     View all
                   </Button>
                 </CardHeader>
@@ -863,10 +877,7 @@ export default function AdminDashboardPage() {
                     variant="link" 
                     size="sm" 
                     className="text-secondary p-0" 
-                    onClick={() => {
-                      setActiveTab("transactions");
-                      setSelectedTransactionType("order");
-                    }}
+                    onClick={() => handleTabChange("transactions", "order")}
                   >
                     View all
                   </Button>
