@@ -115,6 +115,9 @@ export default function AdminDashboardPage() {
     }
   });
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // Ref for tabs component
+  const tabsRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [eventSearchQuery, setEventSearchQuery] = useState("");
   const [eventStatusFilter, setEventStatusFilter] = useState("all");
