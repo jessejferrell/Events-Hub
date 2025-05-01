@@ -228,14 +228,6 @@ export default function AdminDashboardPage() {
     if (transactionType) {
       setSelectedTransactionType(transactionType);
     }
-    
-    // Allow the state to update before scrolling
-    setTimeout(() => {
-      // Scroll to the tabs section
-      if (tabsRef.current) {
-        tabsRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 100);
   };
 
   // Fetch admin stats
@@ -766,10 +758,10 @@ export default function AdminDashboardPage() {
             value={isLoading ? "-" : `$${stats?.monthlyRevenue !== undefined ? stats.monthlyRevenue.toFixed(2) : "0.00"}`} 
             icon={<DollarSign />} 
             linkText="View financial reports" 
-            linkHref="#transactions" 
+            linkHref="#analytics" 
             iconBgClass="bg-blue-100"
             isLoading={isLoading}
-            onClick={() => handleTabChange("transactions")}
+            onClick={() => handleTabChange("analytics")}
           />
           
           <StatCard 
@@ -777,10 +769,10 @@ export default function AdminDashboardPage() {
             value={isLoading ? "-" : stats?.ticketsSoldMTD.toString() || "0"} 
             icon={<Ticket />} 
             linkText="View ticket reports" 
-            linkHref="#transactions" 
+            linkHref="#analytics" 
             iconBgClass="bg-purple-100"
             isLoading={isLoading}
-            onClick={() => handleTabChange("transactions", "ticket")}
+            onClick={() => handleTabChange("analytics")}
           />
         </div>
         
