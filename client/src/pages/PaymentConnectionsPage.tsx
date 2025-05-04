@@ -147,7 +147,7 @@ export default function PaymentConnectionsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading || isLoadingConnection ? (
+            {isLoading || isLoadingAccount ? (
               <div className="space-y-4">
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-4 w-5/6" />
@@ -164,7 +164,7 @@ export default function PaymentConnectionsPage() {
                   </div>
                 </div>
                 <p className="text-neutral-600 mb-6">
-                  Your Stripe account (ID: {connectionStatus?.accountId}) is successfully connected to City Event Hub. 
+                  Your Stripe account (ID: {accountStatus?.accountId}) is successfully connected to City Event Hub. 
                   Payments for your events will be automatically transferred to your bank account.
                 </p>
                 <div className="flex space-x-4">
@@ -181,33 +181,52 @@ export default function PaymentConnectionsPage() {
             ) : (
               <>
                 <p className="text-neutral-600 mb-4">
-                  By connecting with Stripe, you can accept credit and debit card payments directly to your bank account. 
+                  By connecting your existing Stripe account, you can accept credit and debit card payments directly to your bank account. 
                   Stripe charges standard processing fees of 2.9% + 30¢ per successful transaction.
                 </p>
                 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      className="bg-indigo-600 hover:bg-indigo-700"
-                      disabled={isRedirecting}
-                    >
-                      {isRedirecting ? "Redirecting..." : "Connect with Stripe"}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Connect with Stripe</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        You will be redirected to Stripe to complete the connection process. 
-                        After connecting, payments for your events will be sent directly to your bank account.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleConnectStripe}>Continue</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-md">
+                    <FormField
+                      control={form.control}
+                      name="stripeAccountId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Your Stripe Account ID</FormLabel>
+                          <FormControl>
+                            <Input placeholder="acct_..." {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            Enter your Stripe account ID, which starts with "acct_"
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="space-y-2">
+                      <Button 
+                        type="submit" 
+                        className="bg-indigo-600 hover:bg-indigo-700"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? "Connecting..." : "Connect Account"}
+                      </Button>
+                      
+                      <p className="text-sm text-muted-foreground mt-2">
+                        <a 
+                          href="https://dashboard.stripe.com/settings/account" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 hover:text-indigo-800 underline inline-flex items-center"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Find your Stripe Account ID in your Stripe Dashboard
+                        </a>
+                      </p>
+                    </div>
+                  </form>
+                </Form>
               </>
             )}
           </CardContent>
