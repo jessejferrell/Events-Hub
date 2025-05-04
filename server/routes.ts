@@ -210,21 +210,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Debug endpoint for Stripe redirect URI
   app.get("/api/stripe/debug", (req, res) => {
-    // Get domain from environment or request
-    const domain = process.env.REPLIT_DOMAINS 
+    // Use the correct domains as specified by the client
+    const productionDomain = "https://events.mosspointmainstreet.org";
+    const replitAppDomain = "https://events-manager.replit.app";
+    
+    // For development, we use the replit app domain
+    const effectiveDomain = process.env.NODE_ENV === 'production' 
+      ? productionDomain 
+      : replitAppDomain;
+      
+    // Get the actual replit domain as well for debugging
+    const currentDomain = process.env.REPLIT_DOMAINS 
       ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
       : `${req.protocol}://${req.get('host')}`;
     
     // List all possible redirect URIs
     const redirectUris = [
-      `${domain}/stripe-callback`,
-      `${domain}/api/stripe/oauth/callback`,
-      "https://events.mosspointmainstreet.org/stripe-callback",
-      "https://events.mosspointmainstreet.org/api/stripe/oauth/callback"
+      `${productionDomain}/stripe-callback`,
+      `${productionDomain}/api/stripe/oauth/callback`,
+      `${replitAppDomain}/stripe-callback`,
+      `${replitAppDomain}/api/stripe/oauth/callback`
     ];
     
     res.json({
-      domain,
+      productionDomain,
+      replitAppDomain,
+      effectiveDomain,
+      currentDomain,
       replit_domains: process.env.REPLIT_DOMAINS,
       redirectUris,
       clientId: process.env.STRIPE_CLIENT_ID ? "Available" : "Missing"
