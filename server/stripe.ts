@@ -56,7 +56,7 @@ export function setupStripeRoutes(app: Express) {
     
     // Generate OAuth URL
     const state = Math.random().toString(36).substring(2, 15);
-    const redirectUri = `${domain}/payment-connections`;
+    const redirectUri = `${domain}/api/stripe/oauth/callback`;
     
     // Build the OAuth URL
     const oauthUrl = new URL('https://connect.stripe.com/oauth/authorize');
@@ -74,6 +74,46 @@ export function setupStripeRoutes(app: Express) {
     res.json({ url: oauthUrl.toString() });
   });
   
+  // Handle Stripe OAuth callback after user authorizes
+  app.get("/api/stripe/oauth/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code) {
+        // If there's an error or denial, Stripe redirects with error information instead of a code
+        const error = req.query.error;
+        const errorDescription = req.query.error_description;
+        log(`OAuth error: ${error} - ${errorDescription}`, "stripe");
+        
+        // Redirect to payment connections page with error
+        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(errorDescription as string || 'Authorization denied'));
+      }
+      
+      // Exchange the authorization code for an access token
+      const response = await stripe.oauth.token({
+        grant_type: 'authorization_code',
+        code: code as string,
+      });
+      
+      // Extract the connected account ID
+      const connectedAccountId = response.stripe_user_id;
+      
+      if (!req.isAuthenticated()) {
+        // If user's session expired during OAuth flow, redirect them to login
+        return res.redirect('/auth?message=' + encodeURIComponent('Please login to complete Stripe connection'));
+      }
+      
+      // Save the account ID to the user record
+      await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
+      
+      // Redirect back to the payment connections page with success
+      res.redirect('/payment-connections?success=true');
+    } catch (error: any) {
+      log(`OAuth callback error: ${error.message}`, "stripe");
+      res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(error.message || 'Failed to connect Stripe account'));
+    }
+  });
+
   // Allow admins to manually register their Stripe account ID
   app.post("/api/stripe/register-account", async (req, res) => {
     if (!req.isAuthenticated()) {
