@@ -23,8 +23,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { BadgeCheck, ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function PaymentConnectionsPage() {
   const { user } = useAuth();
