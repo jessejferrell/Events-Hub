@@ -674,16 +674,37 @@ export default function AdminDashboardPage() {
       if (!selectedTransaction) throw new Error('No transaction selected');
       
       const endpoint = `/api/admin/${selectedTransaction.type}s/${selectedTransaction.id}`;
+      
+      console.log(`Deleting transaction: ${endpoint}`);
+      
       const res = await fetch(endpoint, {
         method: 'DELETE',
       });
       
-      if (!res.ok) throw new Error(`Failed to delete ${selectedTransaction.type}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`Delete error: ${errorText}`);
+        throw new Error(`Failed to delete ${selectedTransaction.type}: ${errorText}`);
+      }
+      
       return true;
     },
     onSuccess: () => {
+      toast({
+        title: "Transaction deleted",
+        description: `The ${selectedTransaction?.type} has been deleted successfully.`,
+        variant: "success",
+      });
       setConfirmDeleteTransaction(false);
+      setSelectedTransaction(null);
       refetchTransactions();
+    },
+    onError: (error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   });
 
@@ -2635,16 +2656,22 @@ export default function AdminDashboardPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => deleteTransactionMutation.mutate()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleteTransactionMutation.isPending}
+              asChild
             >
-              {deleteTransactionMutation.isPending ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : "Delete"}
+              <Button
+                variant="destructive"
+                onClick={() => deleteTransactionMutation.mutate()}
+                disabled={deleteTransactionMutation.isPending}
+              >
+                {deleteTransactionMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : "Delete"}
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
