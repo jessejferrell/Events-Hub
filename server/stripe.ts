@@ -49,19 +49,23 @@ export function setupStripeRoutes(app: Express) {
       });
     }
 
-    // Get domain from environment or request
-    const domain = process.env.REPLIT_DOMAINS 
-      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-      : `${req.protocol}://${req.get('host')}`;
+    // Use the correct domains as specified by the client
+    const domain = "https://events.mosspointmainstreet.org";
+    const replitAppDomain = "https://events-manager.replit.app";
     
-    log(`Using domain for redirect: ${domain}`, "stripe");
+    // For local development, use one of the published domains instead of localhost
+    // This ensures Stripe can properly redirect back
+    const effectiveDomain = process.env.NODE_ENV === 'production' ? domain : replitAppDomain;
+    
+    log(`Using domain for redirect: ${effectiveDomain}`, "stripe");
     
     // Generate OAuth URL
     const state = Math.random().toString(36).substring(2, 15);
     
     // Use a simpler redirect URI that will be easier to configure in Stripe
     // We'll also have route handlers for both paths
-    const redirectUri = `${domain}/stripe-callback`;
+    // Use the same domain that we're connecting from to avoid redirect URI mismatch
+    const redirectUri = `${effectiveDomain}/stripe-callback`;
     
     log(`Using redirect URI: ${redirectUri}`, "stripe");
     
@@ -282,10 +286,12 @@ export function setupStripeRoutes(app: Express) {
         return res.status(400).json({ message: "Event owner has not connected with Stripe" });
       }
 
-      // Get domain from environment or request
-      const domain = process.env.REPLIT_DOMAINS 
-        ? process.env.REPLIT_DOMAINS.split(',')[0] 
-        : `${req.protocol}://${req.get('host')}`;
+      // Use the correct domains as specified by the client
+      const domain = "https://events.mosspointmainstreet.org";
+      const replitAppDomain = "https://events-manager.replit.app";
+      
+      // For local development, use one of the published domains instead of localhost
+      const effectiveDomain = process.env.NODE_ENV === 'production' ? domain : replitAppDomain;
 
       // Create a Checkout Session
       const session = await stripe.checkout.sessions.create({
@@ -304,8 +310,8 @@ export function setupStripeRoutes(app: Express) {
           },
         ],
         mode: "payment",
-        success_url: `${domain}/events/${eventId}?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${domain}/events/${eventId}?cancelled=true`,
+        success_url: `${effectiveDomain}/events/${eventId}?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${effectiveDomain}/events/${eventId}?cancelled=true`,
         // Send payment to the connected account
         payment_intent_data: {
           application_fee_amount: Math.round(event.price * 100 * (quantity || 1) * 0.1), // 10% platform fee
