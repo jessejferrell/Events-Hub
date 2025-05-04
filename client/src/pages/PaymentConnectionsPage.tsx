@@ -144,18 +144,73 @@ export default function PaymentConnectionsPage() {
   }, [connectionStatus?.connected, isLoadingConnection, refetchStatus]);
 
   const isConnected = connectionStatus?.connected;
+  
+  // Manual refresh function
+  const handleManualRefresh = () => {
+    refetchStatus();
+    toast({
+      title: "Refreshing connection status",
+      description: "Checking your Stripe account connection status...",
+    });
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       
       <main className="flex-grow container mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold mb-6">Payment Connections</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Payment Connections</h1>
+          <div className="flex items-center space-x-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleManualRefresh}
+                    disabled={isLoadingConnection}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingConnection ? 'animate-spin' : ''}`} />
+                    Refresh Status
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Check for updated connection status</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <Badge variant={isConnected ? "success" : "outline"} className={isConnected ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-neutral-100"}>
+              {isConnected ? "Connected" : "Not Connected"}
+            </Badge>
+          </div>
+        </div>
+        
+        {/* Status bar */}
+        {isConnected && (
+          <div className="mb-6 p-3 bg-green-50 rounded-md border border-green-200 max-w-3xl">
+            <div className="flex items-center">
+              <BadgeCheck className="h-6 w-6 text-green-600 mr-2 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-green-800">Your Stripe account is successfully connected</p>
+                <p className="text-sm text-green-700">Account ID: {connectionStatus?.accountId}</p>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Stripe Connect Card */}
         <Card className="max-w-3xl">
           <CardHeader>
-            <CardTitle>Stripe Connect</CardTitle>
+            <CardTitle className="flex justify-between items-center">
+              <span>Stripe Connect</span>
+              {isConnected && (
+                <Badge variant="outline" className="bg-green-100 text-green-800 ml-2">
+                  Connected
+                </Badge>
+              )}
+            </CardTitle>
             <CardDescription>
               Connect your Stripe account to accept payments directly to your bank account.
             </CardDescription>
@@ -170,16 +225,37 @@ export default function PaymentConnectionsPage() {
               </div>
             ) : isConnected ? (
               <div>
-                <div className="flex items-center mb-4 p-3 bg-green-50 rounded-md border border-green-200">
-                  <BadgeCheck className="h-6 w-6 text-green-500 mr-2" />
-                  <div>
-                    <p className="font-medium text-green-700">Your Stripe account is connected</p>
-                    <p className="text-sm text-green-600">You can now receive payments directly to your bank account</p>
+                <div className="mb-4 p-4 bg-green-50 rounded-md border border-green-200">
+                  <h3 className="text-lg font-medium text-green-800 mb-2">Connection Details</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-green-700 w-40">Account ID:</span>
+                      <span className="text-sm text-green-800">{connectionStatus?.accountId}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-green-700 w-40">Details Submitted:</span>
+                      <span className="text-sm text-green-800">{connectionStatus?.detailsSubmitted ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-green-700 w-40">Charges Enabled:</span>
+                      <span className="text-sm text-green-800">{connectionStatus?.chargesEnabled ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-green-700 w-40">Payouts Enabled:</span>
+                      <span className="text-sm text-green-800">{connectionStatus?.payoutsEnabled ? 'Yes' : 'No'}</span>
+                    </div>
                   </div>
                 </div>
+                
                 <p className="text-neutral-600 mb-6">
-                  Your Stripe account (ID: {connectionStatus?.accountId}) is successfully connected to City Event Hub. 
+                  Your Stripe account is successfully connected to City Event Hub. 
                   Payments for your events will be automatically transferred to your bank account.
+                  {!connectionStatus?.detailsSubmitted && (
+                    <span className="text-amber-600 block mt-2">
+                      <AlertCircle className="h-4 w-4 inline mr-1" />
+                      Please complete your account setup in the Stripe Dashboard to enable payments.
+                    </span>
+                  )}
                 </p>
                 <div className="flex space-x-4">
                   <Button
@@ -227,7 +303,15 @@ export default function PaymentConnectionsPage() {
           </CardContent>
         </Card>
         
-        {/* Future payment methods could be added here */}
+        {/* Connection Status Debug Card */}
+        <div className="mt-6">
+          <details className="text-sm text-neutral-500">
+            <summary className="cursor-pointer">Connection Status Details</summary>
+            <div className="mt-2 p-4 bg-neutral-50 rounded-md border border-neutral-200 font-mono text-xs overflow-x-auto">
+              <pre>{JSON.stringify(connectionStatus, null, 2)}</pre>
+            </div>
+          </details>
+        </div>
       </main>
       
       <Footer />
