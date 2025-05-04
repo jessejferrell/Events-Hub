@@ -56,10 +56,13 @@ export function setupStripeRoutes(app: Express) {
     
     // Generate OAuth URL
     const state = Math.random().toString(36).substring(2, 15);
-    const redirectUri = `${domain}/api/stripe/oauth/callback`;
     
-    // Build the OAuth URL
-    const oauthUrl = new URL('https://connect.stripe.com/oauth/authorize');
+    // Use a simpler redirect URI that will be easier to configure in Stripe
+    // We'll also have route handlers for both paths
+    const redirectUri = `${domain}/stripe-callback`;
+    
+    // Build the OAuth URL - Use Express flow for easier onboarding
+    const oauthUrl = new URL('https://connect.stripe.com/express/oauth/authorize');
     oauthUrl.searchParams.append('response_type', 'code');
     oauthUrl.searchParams.append('client_id', stripeClientId);
     oauthUrl.searchParams.append('scope', 'read_write');
