@@ -41,46 +41,47 @@ export function setupStripeRoutes(app: Express) {
       });
     }
 
-    // Get domain from environment or request
-    const domain = process.env.REPLIT_DOMAINS 
-      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` 
-      : `${req.protocol}://${req.get('host')}`;
-
-    // We'll use Stripe Express accounts instead of OAuth as it doesn't require a client ID
-    // Create an Express account onboarding link instead
-    const accountParams: Stripe.AccountCreateParams = {
-      type: 'express',
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-      business_type: 'individual',
-      metadata: {
-        userId: req.user.id.toString()
-      }
-    };
+    // The admin needs to enter their own Stripe account ID
+    // Return a form where they can input their Stripe account ID
+    res.json({ message: "Please provide your Stripe account ID on the form" });
+  });
+  
+  // Allow admins to manually register their Stripe account ID
+  app.post("/api/stripe/register-account", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    // Only users with event_owner role can connect with Stripe
+    if (req.user.role !== "event_owner" && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only event owners can connect with Stripe" });
+    }
     
     try {
-      // Create the account
-      const account = await stripe.accounts.create(accountParams);
+      const { stripeAccountId } = req.body;
       
-      // Save the account ID to user
-      await storage.updateUserStripeAccount(req.user.id, account.id);
+      if (!stripeAccountId || typeof stripeAccountId !== 'string') {
+        return res.status(400).json({ message: "Valid Stripe account ID is required" });
+      }
       
-      // Create an account link
-      const accountLink = await stripe.accountLinks.create({
-        account: account.id,
-        refresh_url: `${domain}/payment-connections?refresh=true`,
-        return_url: `${domain}/payment-connections?success=true`,
-        type: 'account_onboarding',
+      // Validate the account ID with Stripe
+      try {
+        await stripe.accounts.retrieve(stripeAccountId);
+      } catch (error) {
+        return res.status(400).json({ message: "Invalid Stripe account ID. Please check and try again." });
+      }
+      
+      // Save the account ID to the user record
+      await storage.updateUserStripeAccount(req.user.id, stripeAccountId);
+      
+      res.json({ 
+        success: true, 
+        message: "Stripe account successfully connected",
+        accountId: stripeAccountId
       });
-      
-      // Return the link to redirect to
-      const connectLink = accountLink.url;
-      res.json({ url: connectLink });
     } catch (error: any) {
-      log(`Stripe account creation error: ${error.message}`, "stripe");
-      res.status(500).json({ message: error.message || "Failed to create Stripe account" });
+      log(`Error registering Stripe account: ${error.message}`, "stripe");
+      res.status(500).json({ message: error.message || "Failed to register Stripe account" });
     }
   });
 

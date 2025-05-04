@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import Navbar from "@/components/Navbar";
@@ -26,11 +26,28 @@ import {
 } from "@/components/ui/alert-dialog";
 import { BadgeCheck, ExternalLink } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+// Define a schema for the Stripe account ID form
+const stripeAccountFormSchema = z.object({
+  stripeAccountId: z.string()
+    .min(3, { message: "Stripe account ID is required" })
+    .refine(val => val.startsWith('acct_'), { 
+      message: "Stripe account ID should start with 'acct_'" 
+    })
+});
+
+type StripeAccountFormValues = z.infer<typeof stripeAccountFormSchema>;
 
 export default function PaymentConnectionsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch Stripe connection status
   const { data: stripeConfig, isLoading } = useQuery({
@@ -42,45 +59,60 @@ export default function PaymentConnectionsPage() {
     },
   });
 
-  // Check for Stripe connection status
-  const { data: connectionStatus, isLoading: isLoadingConnection } = useQuery({
-    queryKey: ["/api/stripe/connect"],
+  // Check for Stripe account status
+  const { data: accountStatus, isLoading: isLoadingAccount, refetch: refetchAccountStatus } = useQuery({
+    queryKey: ["/api/stripe/account-status"],
     queryFn: async () => {
-      const res = await fetch("/api/stripe/connect");
-      if (!res.ok) throw new Error("Failed to fetch Stripe connection status");
+      const res = await fetch("/api/stripe/account-status");
+      if (!res.ok) throw new Error("Failed to fetch Stripe account status");
       return await res.json();
     },
     enabled: !!user,
   });
 
-  // Handle connect with Stripe
-  const handleConnectStripe = async () => {
-    try {
-      setIsRedirecting(true);
-      const res = await apiRequest("GET", "/api/stripe/connect");
-      const data = await res.json();
-      
-      if (data.url) {
-        // Redirect to Stripe Connect OAuth flow
-        window.location.href = data.url;
-      } else if (data.connected) {
-        toast({
-          title: "Already connected",
-          description: "Your Stripe account is already connected.",
-        });
-        setIsRedirecting(false);
+  // Form for Stripe account ID
+  const form = useForm<StripeAccountFormValues>({
+    resolver: zodResolver(stripeAccountFormSchema),
+    defaultValues: {
+      stripeAccountId: "",
+    },
+  });
+
+  // Mutation to register Stripe account
+  const registerAccount = useMutation({
+    mutationFn: async (values: StripeAccountFormValues) => {
+      const res = await apiRequest("POST", "/api/stripe/register-account", values);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to register Stripe account");
       }
-    } catch (error: any) {
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Account connected",
+        description: "Your Stripe account has been successfully connected.",
+      });
+      refetchAccountStatus();
+      setIsSubmitting(false);
+    },
+    onError: (error: Error) => {
       toast({
         title: "Connection failed",
-        description: error.message || "Failed to connect with Stripe",
+        description: error.message,
         variant: "destructive",
       });
-      setIsRedirecting(false);
-    }
+      setIsSubmitting(false);
+    },
+  });
+
+  // Handle form submission
+  const onSubmit = (values: StripeAccountFormValues) => {
+    setIsSubmitting(true);
+    registerAccount.mutate(values);
   };
 
-  // Check URL for successful OAuth redirect
+  // Check URL for successful redirect
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const success = searchParams.get("success");
@@ -88,16 +120,16 @@ export default function PaymentConnectionsPage() {
     if (success === "true") {
       toast({
         title: "Connection successful",
-        description: "Your Stripe account has been successfully connected.",
+        description: "Please verify your account status below.",
       });
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
-      // Refetch connection status
-      queryClient.invalidateQueries({ queryKey: ["/api/stripe/connect"] });
+      // Refetch account status
+      refetchAccountStatus();
     }
-  }, [toast]);
+  }, [toast, refetchAccountStatus]);
 
-  const isConnected = connectionStatus?.connected;
+  const isConnected = accountStatus?.connected;
 
   return (
     <div className="min-h-screen flex flex-col">
