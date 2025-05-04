@@ -73,6 +73,9 @@ export function setupStripeRoutes(app: Express) {
     oauthUrl.searchParams.append('redirect_uri', redirectUri);
     oauthUrl.searchParams.append('state', state);
     
+    // Additional logging for debugging
+    log(`Final OAuth URL: ${oauthUrl.toString()}`, "stripe");
+    
     // Store state for verification when user returns
     // This is optional but recommended for security
     // You could store this in the session if needed

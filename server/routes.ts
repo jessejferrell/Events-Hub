@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { setupStripeRoutes } from "./stripe";
 import { upload } from "./uploads";
+import { log } from "./vite";
 import { z } from "zod";
 import Stripe from "stripe";
 import fs from "fs";
@@ -206,6 +207,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Forward to our handler
     res.redirect(`/api/stripe/oauth/callback${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`);
   });
+  
+  // Debug endpoint for Stripe redirect URI
+  app.get("/api/stripe/debug", (req, res) => {
+    // Get domain from environment or request
+    const domain = process.env.REPLIT_DOMAINS 
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : `${req.protocol}://${req.get('host')}`;
+    
+    // List all possible redirect URIs
+    const redirectUris = [
+      `${domain}/stripe-callback`,
+      `${domain}/api/stripe/oauth/callback`,
+      "https://events.mosspointmainstreet.org/stripe-callback",
+      "https://events.mosspointmainstreet.org/api/stripe/oauth/callback"
+    ];
+    
+    res.json({
+      domain,
+      replit_domains: process.env.REPLIT_DOMAINS,
+      redirectUris,
+      clientId: process.env.STRIPE_CLIENT_ID ? "Available" : "Missing"
+    });
+  });
+  
   // Set up authentication routes
   setupAuth(app);
   
