@@ -1736,16 +1736,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // PERMANENTLY DELETE all tickets associated with the order
       for (const ticket of tickets) {
-        await db.delete(tickets).where(eq(tickets.id, ticket.id));
+        await db.delete(schema.tickets).where(eq(schema.tickets.id, ticket.id));
       }
       
       // PERMANENTLY DELETE all order items associated with the order
       for (const item of orderItems) {
-        await db.delete(orderItems).where(eq(orderItems.id, item.id));
+        await db.delete(schema.orderItems).where(eq(schema.orderItems.id, item.id));
       }
       
       // PERMANENTLY DELETE the order itself
-      await db.delete(orders).where(eq(orders.id, orderId));
+      await db.delete(schema.orders).where(eq(schema.orders.id, orderId));
       
       // Return success
       res.status(200).json({ success: true, message: "Order permanently deleted" });
@@ -1768,7 +1768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Delete the ticket from the database
-      await db.delete(tickets).where(eq(tickets.id, ticketId));
+      await db.delete(schema.tickets).where(eq(schema.tickets.id, ticketId));
       
       // Return success
       res.status(200).json({ success: true, message: "Ticket permanently deleted" });
@@ -1791,7 +1791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Delete the vendor registration from the database
-      await db.delete(vendorRegistrations).where(eq(vendorRegistrations.id, registrationId));
+      await db.delete(schema.vendorRegistrations).where(eq(schema.vendorRegistrations.id, registrationId));
       
       // Return success
       res.status(200).json({ success: true, message: "Vendor registration permanently deleted" });
@@ -1814,7 +1814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Delete the volunteer assignment from the database
-      await db.delete(volunteerAssignments).where(eq(volunteerAssignments.id, assignmentId));
+      await db.delete(schema.volunteerAssignments).where(eq(schema.volunteerAssignments.id, assignmentId));
       
       // Return success
       res.status(200).json({ success: true, message: "Volunteer assignment permanently deleted" });
