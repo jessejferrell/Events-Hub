@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export interface StatCardProps {
@@ -24,6 +24,26 @@ export default function StatCard({
   isLoading = false,
   onClick
 }: StatCardProps) {
+  const [, navigate] = useLocation();
+  
+  // Handle card click function
+  const handleClick = () => {
+    // First call the provided onClick handler if it exists
+    if (onClick) {
+      onClick();
+    }
+    
+    // If we have a hash in the linkHref, handle it specially
+    if (linkHref.startsWith('#')) {
+      // In the case of a hash link, just make sure the page doesn't scroll
+      // The onClick handler should take care of navigating to the correct tab
+      return;
+    }
+    
+    // Otherwise navigate using wouter
+    navigate(linkHref);
+  };
+  
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4 flex flex-col h-full">
@@ -40,18 +60,12 @@ export default function StatCard({
           <p className="text-3xl font-bold mb-3">{value}</p>
         )}
         
-        {onClick ? (
-          <button 
-            onClick={onClick} 
-            className="mt-auto text-left cursor-pointer"
-          >
-            <span className="text-secondary text-sm hover:underline">{linkText}</span>
-          </button>
-        ) : (
-          <Link to={linkHref} className="mt-auto">
-            <span className="text-secondary text-sm hover:underline">{linkText}</span>
-          </Link>
-        )}
+        <button 
+          onClick={handleClick}
+          className="mt-auto text-left cursor-pointer border-0 bg-transparent p-0"
+        >
+          <span className="text-secondary text-sm hover:underline">{linkText}</span>
+        </button>
       </CardContent>
     </Card>
   );

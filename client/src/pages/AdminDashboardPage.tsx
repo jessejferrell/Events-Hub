@@ -133,6 +133,7 @@ export default function AdminDashboardPage() {
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [userNote, setUserNote] = useState('');
+  const [userNotes, setUserNotes] = useState<Array<{ id: number, note: string, adminId: number, createdAt: string }>>([]);
   const [showEditUserForm, setShowEditUserForm] = useState(false);
   const [editUserData, setEditUserData] = useState<{
     name: string | null;
@@ -693,7 +694,7 @@ export default function AdminDashboardPage() {
       toast({
         title: "Transaction deleted",
         description: `The ${selectedTransaction?.type} has been deleted successfully.`,
-        variant: "success",
+        variant: "default",
       });
       setConfirmDeleteTransaction(false);
       setSelectedTransaction(null);
@@ -1523,9 +1524,9 @@ export default function AdminDashboardPage() {
                             <Button size="sm" onClick={handleAddUserNote}>Add Note</Button>
                           </div>
                           <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                            {selectedUser.adminNotes && selectedUser.adminNotes.length > 0 ? (
-                              selectedUser.adminNotes.map((note, index) => (
-                                <div key={index} className="text-sm border-b pb-2">
+                            {userNotes && userNotes.length > 0 ? (
+                              userNotes.map((note: { id: number, note: string, adminId: number, createdAt: string }, index: number) => (
+                                <div key={note.id || index} className="text-sm border-b pb-2">
                                   <p className="text-neutral-800">{note.note}</p>
                                   <div className="flex justify-between items-center mt-1">
                                     <p className="text-neutral-500 text-xs">
