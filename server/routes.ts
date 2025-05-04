@@ -9,6 +9,8 @@ import Stripe from "stripe";
 import fs from "fs";
 import { createObjectCsvWriter } from "csv-writer";
 import { and, eq, gte, lte, like, or, sql } from "drizzle-orm";
+import { db } from "./db";
+import * as schema from "@shared/schema";
 import { 
   insertEventSchema, 
   insertTicketSchema, 
@@ -1712,7 +1714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/orders/:id", requireAdmin, async (req, res) => {
     try {
       const orderId = parseInt(req.params.id);
-      console.log(`Admin deleting order: ${orderId}`);
+      console.log(`Admin PERMANENTLY deleting order: ${orderId}`);
       
       // First check if order exists
       const order = await storage.getOrder(orderId);
@@ -1720,11 +1722,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Order not found" });
       }
       
-      // Make order items in the database as deleted
-      await storage.updateOrderStatus(orderId, "deleted");
+      // Get all order items associated with this order
+      const orderItems = await storage.getOrderItems(orderId);
+      
+      // Get all tickets associated with this order
+      const tickets = await storage.getTicketsByOrder(orderId);
+      
+      // Delete all tickets associated with the order
+      for (const ticket of tickets) {
+        await db.delete(schema.tickets).where(eq(schema.tickets.id, ticket.id));
+      }
+      
+      // Delete all order items associated with the order
+      for (const item of orderItems) {
+        await db.delete(schema.orderItems).where(eq(schema.orderItems.id, item.id));
+      }
+      
+      // Delete the order itself
+      await db.delete(schema.orders).where(eq(schema.orders.id, orderId));
       
       // Return success
-      res.status(200).json({ success: true, message: "Order marked as deleted" });
+      res.status(200).json({ success: true, message: "Order permanently deleted" });
     } catch (error: any) {
       console.error("Error deleting order:", error);
       res.status(500).json({ message: error.message || "Failed to delete order" });
@@ -1735,7 +1753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/tickets/:id", requireAdmin, async (req, res) => {
     try {
       const ticketId = parseInt(req.params.id);
-      console.log(`Admin deleting ticket: ${ticketId}`);
+      console.log(`Admin PERMANENTLY deleting ticket: ${ticketId}`);
       
       // First check if ticket exists
       const ticket = await storage.getTicket(ticketId);
@@ -1743,11 +1761,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found" });
       }
       
-      // Mark ticket in the database as deleted
-      await storage.updateTicketStatus(ticketId, "deleted");
+      // Delete the ticket from the database
+      await db.delete(schema.tickets).where(eq(schema.tickets.id, ticketId));
       
       // Return success
-      res.status(200).json({ success: true, message: "Ticket marked as deleted" });
+      res.status(200).json({ success: true, message: "Ticket permanently deleted" });
     } catch (error: any) {
       console.error("Error deleting ticket:", error);
       res.status(500).json({ message: error.message || "Failed to delete ticket" });
@@ -1758,7 +1776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/vendors/:id", requireAdmin, async (req, res) => {
     try {
       const registrationId = parseInt(req.params.id);
-      console.log(`Admin deleting vendor registration: ${registrationId}`);
+      console.log(`Admin PERMANENTLY deleting vendor registration: ${registrationId}`);
       
       // First check if registration exists
       const registration = await storage.getVendorRegistration(registrationId);
@@ -1766,11 +1784,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Vendor registration not found" });
       }
       
-      // Mark registration in the database as deleted
-      await storage.updateVendorRegistrationStatus(registrationId, "deleted", req.user.id);
+      // Delete the vendor registration from the database
+      await db.delete(schema.vendorRegistrations).where(eq(schema.vendorRegistrations.id, registrationId));
       
       // Return success
-      res.status(200).json({ success: true, message: "Vendor registration marked as deleted" });
+      res.status(200).json({ success: true, message: "Vendor registration permanently deleted" });
     } catch (error: any) {
       console.error("Error deleting vendor registration:", error);
       res.status(500).json({ message: error.message || "Failed to delete vendor registration" });
@@ -1781,7 +1799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/volunteers/:id", requireAdmin, async (req, res) => {
     try {
       const assignmentId = parseInt(req.params.id);
-      console.log(`Admin deleting volunteer assignment: ${assignmentId}`);
+      console.log(`Admin PERMANENTLY deleting volunteer assignment: ${assignmentId}`);
       
       // First check if assignment exists
       const assignment = await storage.getVolunteerAssignment(assignmentId);
@@ -1789,11 +1807,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Volunteer assignment not found" });
       }
       
-      // Mark assignment in the database as deleted
-      await storage.updateVolunteerAssignmentStatus(assignmentId, "deleted", req.user.id);
+      // Delete the volunteer assignment from the database
+      await db.delete(schema.volunteerAssignments).where(eq(schema.volunteerAssignments.id, assignmentId));
       
       // Return success
-      res.status(200).json({ success: true, message: "Volunteer assignment marked as deleted" });
+      res.status(200).json({ success: true, message: "Volunteer assignment permanently deleted" });
     } catch (error: any) {
       console.error("Error deleting volunteer assignment:", error);
       res.status(500).json({ message: error.message || "Failed to delete volunteer assignment" });
