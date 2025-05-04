@@ -41,60 +41,73 @@ export function setupStripeRoutes(app: Express) {
       });
     }
 
-    // Build the OAuth link
-    const state = Math.random().toString(36).substring(2);
-    req.session.stripeState = state;
-
     // Get domain from environment or request
     const domain = process.env.REPLIT_DOMAINS 
-      ? process.env.REPLIT_DOMAINS.split(',')[0] 
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` 
       : `${req.protocol}://${req.get('host')}`;
 
-    const redirectUri = `${domain}/api/stripe/oauth/callback`;
+    // We'll use Stripe Express accounts instead of OAuth as it doesn't require a client ID
+    // Create an Express account onboarding link instead
+    const accountParams: Stripe.AccountCreateParams = {
+      type: 'express',
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
+      business_type: 'individual',
+      metadata: {
+        userId: req.user.id.toString()
+      }
+    };
     
-    const connectLink = stripe.oauth.authorizeUrl({
-      client_id: process.env.STRIPE_CLIENT_ID || "ca_example",
-      state,
-      scope: "read_write",
-      redirect_uri: redirectUri,
-    });
-
-    res.json({ url: connectLink });
+    try {
+      // Create the account
+      const account = await stripe.accounts.create(accountParams);
+      
+      // Save the account ID to user
+      await storage.updateUserStripeAccount(req.user.id, account.id);
+      
+      // Create an account link
+      const accountLink = await stripe.accountLinks.create({
+        account: account.id,
+        refresh_url: `${domain}/payment-connections?refresh=true`,
+        return_url: `${domain}/payment-connections?success=true`,
+        type: 'account_onboarding',
+      });
+      
+      // Return the link to redirect to
+      const connectLink = accountLink.url;
+      res.json({ url: connectLink });
+    } catch (error: any) {
+      log(`Stripe account creation error: ${error.message}`, "stripe");
+      res.status(500).json({ message: error.message || "Failed to create Stripe account" });
+    }
   });
 
-  // Handle the OAuth callback from Stripe
-  app.get("/api/stripe/oauth/callback", async (req, res) => {
+  // Endpoint to check the status of a Stripe account
+  app.get("/api/stripe/account-status", async (req, res) => {
     if (!req.isAuthenticated()) {
-      return res.redirect("/auth");
-    }
-
-    const { code, state } = req.query;
-    const savedState = req.session.stripeState;
-
-    // Verify the state parameter
-    if (!state || !savedState || state !== savedState) {
-      return res.status(403).json({ message: "Invalid state parameter" });
+      return res.status(401).json({ message: "Authentication required" });
     }
 
     try {
-      // Exchange the authorization code for an access token
-      const response = await stripe.oauth.token({
-        grant_type: "authorization_code",
-        code: code as string,
+      if (!req.user.stripeAccountId) {
+        return res.json({ connected: false });
+      }
+      
+      // Retrieve the account to get its current status
+      const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
+      
+      return res.json({
+        connected: true,
+        accountId: account.id,
+        detailsSubmitted: account.details_submitted,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled
       });
-
-      // Save the connected account ID in the user record
-      const connectedAccountId = response.stripe_user_id;
-      await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
-
-      // Clear the state parameter from the session
-      delete req.session.stripeState;
-
-      // Redirect back to the payment connections page
-      res.redirect("/payment-connections");
     } catch (error: any) {
-      log(`Stripe OAuth error: ${error.message}`, "stripe");
-      res.status(500).json({ message: "Failed to connect Stripe account" });
+      log(`Error retrieving Stripe account: ${error.message}`, "stripe");
+      return res.status(500).json({ message: "Failed to retrieve Stripe account status" });
     }
   });
 
