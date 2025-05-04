@@ -41,9 +41,37 @@ export function setupStripeRoutes(app: Express) {
       });
     }
 
-    // The admin needs to enter their own Stripe account ID
-    // Return a form where they can input their Stripe account ID
-    res.json({ message: "Please provide your Stripe account ID on the form" });
+    // Check if we have a Stripe client ID
+    const stripeClientId = process.env.STRIPE_CLIENT_ID;
+    if (!stripeClientId) {
+      return res.status(500).json({ 
+        message: "Stripe Connect is not properly configured. Missing STRIPE_CLIENT_ID." 
+      });
+    }
+
+    // Get domain from environment or request
+    const domain = process.env.REPLIT_DOMAINS 
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : `${req.protocol}://${req.get('host')}`;
+    
+    // Generate OAuth URL
+    const state = Math.random().toString(36).substring(2, 15);
+    const redirectUri = `${domain}/payment-connections`;
+    
+    // Build the OAuth URL
+    const oauthUrl = new URL('https://connect.stripe.com/oauth/authorize');
+    oauthUrl.searchParams.append('response_type', 'code');
+    oauthUrl.searchParams.append('client_id', stripeClientId);
+    oauthUrl.searchParams.append('scope', 'read_write');
+    oauthUrl.searchParams.append('redirect_uri', redirectUri);
+    oauthUrl.searchParams.append('state', state);
+    
+    // Store state for verification when user returns
+    // This is optional but recommended for security
+    // You could store this in the session if needed
+
+    // Return the URL for frontend to redirect
+    res.json({ url: oauthUrl.toString() });
   });
   
   // Allow admins to manually register their Stripe account ID
