@@ -1708,6 +1708,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Delete order (admin only)
+  app.delete("/api/admin/orders/:id", requireAdmin, async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      console.log(`Admin deleting order: ${orderId}`);
+      
+      // First check if order exists
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      // Make order items in the database as deleted
+      await storage.updateOrderStatus(orderId, "deleted");
+      
+      // Return success
+      res.status(200).json({ success: true, message: "Order marked as deleted" });
+    } catch (error: any) {
+      console.error("Error deleting order:", error);
+      res.status(500).json({ message: error.message || "Failed to delete order" });
+    }
+  });
+  
+  // Delete ticket (admin only)
+  app.delete("/api/admin/tickets/:id", requireAdmin, async (req, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      console.log(`Admin deleting ticket: ${ticketId}`);
+      
+      // First check if ticket exists
+      const ticket = await storage.getTicket(ticketId);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+      
+      // Mark ticket in the database as deleted
+      await storage.updateTicketStatus(ticketId, "deleted");
+      
+      // Return success
+      res.status(200).json({ success: true, message: "Ticket marked as deleted" });
+    } catch (error: any) {
+      console.error("Error deleting ticket:", error);
+      res.status(500).json({ message: error.message || "Failed to delete ticket" });
+    }
+  });
+  
+  // Delete vendor registration (admin only)
+  app.delete("/api/admin/vendors/:id", requireAdmin, async (req, res) => {
+    try {
+      const registrationId = parseInt(req.params.id);
+      console.log(`Admin deleting vendor registration: ${registrationId}`);
+      
+      // First check if registration exists
+      const registration = await storage.getVendorRegistration(registrationId);
+      if (!registration) {
+        return res.status(404).json({ message: "Vendor registration not found" });
+      }
+      
+      // Mark registration in the database as deleted
+      await storage.updateVendorRegistrationStatus(registrationId, "deleted", req.user.id);
+      
+      // Return success
+      res.status(200).json({ success: true, message: "Vendor registration marked as deleted" });
+    } catch (error: any) {
+      console.error("Error deleting vendor registration:", error);
+      res.status(500).json({ message: error.message || "Failed to delete vendor registration" });
+    }
+  });
+  
+  // Delete volunteer assignment (admin only)
+  app.delete("/api/admin/volunteers/:id", requireAdmin, async (req, res) => {
+    try {
+      const assignmentId = parseInt(req.params.id);
+      console.log(`Admin deleting volunteer assignment: ${assignmentId}`);
+      
+      // First check if assignment exists
+      const assignment = await storage.getVolunteerAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: "Volunteer assignment not found" });
+      }
+      
+      // Mark assignment in the database as deleted
+      await storage.updateVolunteerAssignmentStatus(assignmentId, "deleted", req.user.id);
+      
+      // Return success
+      res.status(200).json({ success: true, message: "Volunteer assignment marked as deleted" });
+    } catch (error: any) {
+      console.error("Error deleting volunteer assignment:", error);
+      res.status(500).json({ message: error.message || "Failed to delete volunteer assignment" });
+    }
+  });
+  
   // Export transactions (admin only)
   app.get("/api/admin/export", requireAdmin, async (req, res) => {
     try {
