@@ -77,7 +77,51 @@ export function setupStripeRoutes(app: Express) {
     res.json({ url: oauthUrl.toString() });
   });
   
-  // Handle Stripe OAuth callback after user authorizes
+  // Route for the simplified callback URL
+  app.get("/stripe-callback", async (req, res) => {
+    log(`Stripe callback received at /stripe-callback: ${JSON.stringify(req.query)}`, "stripe");
+    
+    try {
+      const { code, state } = req.query;
+      
+      if (!code) {
+        log(`No code in callback: ${JSON.stringify(req.query)}`, "stripe");
+        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Authorization failed or was denied'));
+      }
+      
+      // Exchange the authorization code for an access token
+      const response = await stripe.oauth.token({
+        grant_type: 'authorization_code',
+        code: code as string,
+      });
+      
+      log(`OAuth token response: ${JSON.stringify(response)}`, "stripe");
+      
+      // Extract the connected account ID
+      const connectedAccountId = response.stripe_user_id as string;
+      
+      // Store the connected account ID in the session temporarily
+      // This way we can retrieve it even if the user needs to log in again
+      (req.session as any).stripeAccountId = connectedAccountId;
+      
+      if (!req.isAuthenticated()) {
+        // If user needs to log in, store the account ID in session and redirect to login
+        return res.redirect('/auth?message=' + encodeURIComponent('Please login to complete Stripe connection'));
+      }
+      
+      // Save the account ID to the user's record
+      await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
+      
+      // Redirect back to payment connections page with success
+      res.redirect('/payment-connections?success=true');
+    } catch (error: any) {
+      log(`Stripe callback error: ${error.message}`, "stripe");
+      console.error("Full OAuth error:", error);
+      res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(error.message || 'Failed to connect Stripe account'));
+    }
+  });
+  
+  // Keep original callback endpoint for backward compatibility
   app.get("/api/stripe/oauth/callback", async (req, res) => {
     try {
       log(`OAuth callback received: ${JSON.stringify(req.query)}`, "stripe");
@@ -104,11 +148,13 @@ export function setupStripeRoutes(app: Express) {
       log(`OAuth token response received: ${JSON.stringify(response)}`, "stripe");
       
       // Extract the connected account ID
-      const connectedAccountId = response.stripe_user_id;
+      const connectedAccountId = response.stripe_user_id as string;
       
       if (!req.isAuthenticated()) {
         // If user's session expired during OAuth flow, redirect them to login
         log(`User not authenticated during OAuth callback`, "stripe");
+        // Store in session for later use
+        (req.session as any).stripeAccountId = connectedAccountId;
         return res.redirect('/auth?message=' + encodeURIComponent('Please login to complete Stripe connection'));
       }
       

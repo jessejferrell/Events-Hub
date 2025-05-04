@@ -200,6 +200,12 @@ function requireOwnerOrAdmin(req: Request, res: Response, next: Function) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Redirect any Stripe callback to our API
+  app.get("/stripe-callback", (req, res) => {
+    log(`Stripe callback at root detected, redirecting to API handler`, "stripe");
+    // Forward to our handler
+    res.redirect(`/api/stripe/oauth/callback${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`);
+  });
   // Set up authentication routes
   setupAuth(app);
   
