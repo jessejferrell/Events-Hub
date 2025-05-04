@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -26,30 +25,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { BadgeCheck, ExternalLink } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-
-// Define a schema for the Stripe account ID form
-const stripeAccountFormSchema = z.object({
-  stripeAccountId: z.string()
-    .min(3, { message: "Stripe account ID is required" })
-    .refine(val => val.startsWith('acct_'), { 
-      message: "Stripe account ID should start with 'acct_'" 
-    })
-});
-
-type StripeAccountFormValues = z.infer<typeof stripeAccountFormSchema>;
 
 export default function PaymentConnectionsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Fetch Stripe connection status
+  // Fetch Stripe configuration
   const { data: stripeConfig, isLoading } = useQuery({
     queryKey: ["/api/stripe/config"],
     queryFn: async () => {
@@ -59,8 +41,8 @@ export default function PaymentConnectionsPage() {
     },
   });
 
-  // Check for Stripe account status
-  const { data: accountStatus, isLoading: isLoadingAccount, refetch: refetchAccountStatus } = useQuery({
+  // Check for Stripe account connection status
+  const { data: connectionStatus, isLoading: isLoadingConnection, refetch: refetchStatus } = useQuery({
     queryKey: ["/api/stripe/account-status"],
     queryFn: async () => {
       const res = await fetch("/api/stripe/account-status");
@@ -70,46 +52,42 @@ export default function PaymentConnectionsPage() {
     enabled: !!user,
   });
 
-  // Form for Stripe account ID
-  const form = useForm<StripeAccountFormValues>({
-    resolver: zodResolver(stripeAccountFormSchema),
-    defaultValues: {
-      stripeAccountId: "",
-    },
-  });
-
-  // Mutation to register Stripe account
-  const registerAccount = useMutation({
-    mutationFn: async (values: StripeAccountFormValues) => {
-      const res = await apiRequest("POST", "/api/stripe/register-account", values);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to register Stripe account");
-      }
-      return await res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Account connected",
-        description: "Your Stripe account has been successfully connected.",
+  // Redirect to Stripe Connect flow
+  const handleConnectStripe = () => {
+    setIsRedirecting(true);
+    
+    fetch("/api/stripe/connect")
+      .then(res => res.json())
+      .then(data => {
+        if (data.connected) {
+          // Already connected
+          toast({
+            title: "Already connected",
+            description: "Your account is already connected to Stripe.",
+          });
+          refetchStatus();
+          setIsRedirecting(false);
+        } else if (data.url) {
+          // Redirect to Stripe Connect OAuth
+          window.location.href = data.url;
+        } else {
+          // Something went wrong
+          toast({
+            title: "Connection error",
+            description: data.message || "Could not connect to Stripe.",
+            variant: "destructive",
+          });
+          setIsRedirecting(false);
+        }
+      })
+      .catch(error => {
+        toast({
+          title: "Connection error",
+          description: error.message || "Could not connect to Stripe.",
+          variant: "destructive",
+        });
+        setIsRedirecting(false);
       });
-      refetchAccountStatus();
-      setIsSubmitting(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Connection failed",
-        description: error.message,
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-    },
-  });
-
-  // Handle form submission
-  const onSubmit = (values: StripeAccountFormValues) => {
-    setIsSubmitting(true);
-    registerAccount.mutate(values);
   };
 
   // Check URL for successful redirect
@@ -120,16 +98,16 @@ export default function PaymentConnectionsPage() {
     if (success === "true") {
       toast({
         title: "Connection successful",
-        description: "Please verify your account status below.",
+        description: "Your Stripe account has been connected.",
       });
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
       // Refetch account status
-      refetchAccountStatus();
+      refetchStatus();
     }
-  }, [toast, refetchAccountStatus]);
+  }, [toast, refetchStatus]);
 
-  const isConnected = accountStatus?.connected;
+  const isConnected = connectionStatus?.connected;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -147,7 +125,7 @@ export default function PaymentConnectionsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading || isLoadingAccount ? (
+            {isLoading || isLoadingConnection ? (
               <div className="space-y-4">
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-4 w-5/6" />
@@ -164,7 +142,7 @@ export default function PaymentConnectionsPage() {
                   </div>
                 </div>
                 <p className="text-neutral-600 mb-6">
-                  Your Stripe account (ID: {accountStatus?.accountId}) is successfully connected to City Event Hub. 
+                  Your Stripe account (ID: {connectionStatus?.accountId}) is successfully connected to City Event Hub. 
                   Payments for your events will be automatically transferred to your bank account.
                 </p>
                 <div className="flex space-x-4">
@@ -181,52 +159,33 @@ export default function PaymentConnectionsPage() {
             ) : (
               <>
                 <p className="text-neutral-600 mb-4">
-                  By connecting your existing Stripe account, you can accept credit and debit card payments directly to your bank account. 
+                  By connecting with Stripe, you can accept credit and debit card payments directly to your bank account. 
                   Stripe charges standard processing fees of 2.9% + 30¢ per successful transaction.
                 </p>
                 
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-md">
-                    <FormField
-                      control={form.control}
-                      name="stripeAccountId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your Stripe Account ID</FormLabel>
-                          <FormControl>
-                            <Input placeholder="acct_..." {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Enter your Stripe account ID, which starts with "acct_"
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="space-y-2">
-                      <Button 
-                        type="submit" 
-                        className="bg-indigo-600 hover:bg-indigo-700"
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? "Connecting..." : "Connect Account"}
-                      </Button>
-                      
-                      <p className="text-sm text-muted-foreground mt-2">
-                        <a 
-                          href="https://dashboard.stripe.com/settings/account" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-indigo-600 hover:text-indigo-800 underline inline-flex items-center"
-                        >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          Find your Stripe Account ID in your Stripe Dashboard
-                        </a>
-                      </p>
-                    </div>
-                  </form>
-                </Form>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                      disabled={isRedirecting}
+                    >
+                      {isRedirecting ? "Redirecting..." : "Connect with Stripe"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Connect with Stripe</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        You will be redirected to Stripe to complete the connection process. 
+                        After connecting, payments for your events will be sent directly to your bank account.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleConnectStripe}>Continue</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </>
             )}
           </CardContent>
