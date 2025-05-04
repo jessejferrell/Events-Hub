@@ -77,6 +77,7 @@ export function setupStripeRoutes(app: Express) {
   // Handle Stripe OAuth callback after user authorizes
   app.get("/api/stripe/oauth/callback", async (req, res) => {
     try {
+      log(`OAuth callback received: ${JSON.stringify(req.query)}`, "stripe");
       const { code, state } = req.query;
       
       if (!code) {
@@ -89,27 +90,37 @@ export function setupStripeRoutes(app: Express) {
         return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(errorDescription as string || 'Authorization denied'));
       }
       
+      log(`Attempting to exchange authorization code for access token...`, "stripe");
+      
       // Exchange the authorization code for an access token
       const response = await stripe.oauth.token({
         grant_type: 'authorization_code',
         code: code as string,
       });
       
+      log(`OAuth token response received: ${JSON.stringify(response)}`, "stripe");
+      
       // Extract the connected account ID
       const connectedAccountId = response.stripe_user_id;
       
       if (!req.isAuthenticated()) {
         // If user's session expired during OAuth flow, redirect them to login
+        log(`User not authenticated during OAuth callback`, "stripe");
         return res.redirect('/auth?message=' + encodeURIComponent('Please login to complete Stripe connection'));
       }
       
+      log(`Saving Stripe account ID ${connectedAccountId} for user ${req.user.id}`, "stripe");
+      
       // Save the account ID to the user record
       await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
+      
+      log(`Successfully connected Stripe account for user ${req.user.id}`, "stripe");
       
       // Redirect back to the payment connections page with success
       res.redirect('/payment-connections?success=true');
     } catch (error: any) {
       log(`OAuth callback error: ${error.message}`, "stripe");
+      console.error("Full OAuth error:", error);
       res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(error.message || 'Failed to connect Stripe account'));
     }
   });

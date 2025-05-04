@@ -90,10 +90,12 @@ export default function PaymentConnectionsPage() {
       });
   };
 
-  // Check URL for successful redirect
+  // Check URL for successful redirect or error
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const success = searchParams.get("success");
+    const error = searchParams.get("error");
+    const message = searchParams.get("message");
     
     if (success === "true") {
       toast({
@@ -104,8 +106,35 @@ export default function PaymentConnectionsPage() {
       window.history.replaceState({}, document.title, window.location.pathname);
       // Refetch account status
       refetchStatus();
+    } else if (error === "true") {
+      toast({
+        title: "Connection failed",
+        description: message || "Failed to connect Stripe account. Please try again.",
+        variant: "destructive"
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [toast, refetchStatus]);
+  
+  // Force refresh of connection status periodically when not connected
+  useEffect(() => {
+    // If not connected and not loading, check every 3 seconds
+    // This helps catch when the OAuth flow completes but the app doesn't notice
+    let interval: number | undefined;
+    
+    if (!connectionStatus?.connected && !isLoadingConnection) {
+      interval = window.setInterval(() => {
+        refetchStatus();
+      }, 3000);
+    }
+    
+    return () => {
+      if (interval) {
+        window.clearInterval(interval);
+      }
+    };
+  }, [connectionStatus?.connected, isLoadingConnection, refetchStatus]);
 
   const isConnected = connectionStatus?.connected;
 
