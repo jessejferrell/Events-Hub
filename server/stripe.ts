@@ -70,7 +70,21 @@ export function setupStripeRoutes(app: Express) {
     oauthUrl.searchParams.append('response_type', 'code');
     oauthUrl.searchParams.append('client_id', stripeClientId);
     oauthUrl.searchParams.append('scope', 'read_write');
-    oauthUrl.searchParams.append('redirect_uri', redirectUri);
+    
+    // Determine if we're in development or production
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    if (isDev) {
+      // In development, we can omit the redirect_uri parameter entirely
+      // This makes Stripe use the default redirect URI from the dashboard
+      // and eliminates the redirect URI mismatch error
+      log(`Development mode detected, omitting redirect_uri parameter`, "stripe");
+    } else {
+      // In production, use the specified redirect URI
+      oauthUrl.searchParams.append('redirect_uri', redirectUri);
+      log(`Production mode, using redirect URI: ${redirectUri}`, "stripe");
+    }
+    
     oauthUrl.searchParams.append('state', state);
     
     // Additional logging for debugging
