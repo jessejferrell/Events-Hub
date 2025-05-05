@@ -173,8 +173,9 @@ const getAudienceName = (audience: string) => {
   return audienceMap[audience] || 'Unknown';
 };
 
-// Email history data - empty by default since no emails have been sent
-const mockEmailHistory: EmailHistoryEntry[] = [];
+// Email history data will be fetched from the server eventually
+// For now, we just show an empty state
+const emailHistory: EmailHistoryEntry[] = [];
 
 export default function EmailNotificationsPage() {
   // State variables
@@ -299,7 +300,12 @@ export default function EmailNotificationsPage() {
     // Create placeholder values
     const placeholders: Record<string, string> = {
       recipientName: 'Jane Doe',
-      organizationName: 'City Event Hub',
+      organizationName: 'Moss Point Main Street',
+      organizationEmail: 'info@mosspointmainstreet.org',
+      organizationPhone: '(228) 219-1713',
+      organizationWebsite: 'https://mosspointmainstreet.org',
+      applicationUrl: 'https://events.mosspointmainstreet.org',
+      currentYear: new Date().getFullYear().toString(),
       messageContent: watchedCustomMessage || 'No custom message provided.',
       eventName: selectedEvent?.title || 'Sample Event',
       eventDate: selectedEvent ? new Date(selectedEvent.startDate).toLocaleDateString() : 'January 1, 2023',
@@ -895,7 +901,7 @@ export default function EmailNotificationsPage() {
                     <Button
                       type="button"
                       onClick={previewEmail}
-                      disabled={!form.formState.isValid}
+                      disabled={!watchedTemplateId || !watchedAudience || (recipientCount === 0 && watchedAudience !== 'custom')}
                     >
                       Preview & Send
                       <ChevronRight className="ml-2 h-4 w-4" />
@@ -920,7 +926,7 @@ export default function EmailNotificationsPage() {
         </CardHeader>
         <CardContent>
           <div className="border rounded-md overflow-hidden">
-            {mockEmailHistory.length === 0 ? (
+            {emailHistory.length === 0 ? (
               <div className="py-12 text-center">
                 <Mail className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
                 <h3 className="text-lg font-medium mb-1">No Email History</h3>
@@ -938,7 +944,7 @@ export default function EmailNotificationsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {mockEmailHistory.map((email) => (
+                  {emailHistory.map((email: EmailHistoryEntry) => (
                     <tr key={email.id} className="hover:bg-muted/50 transition-colors">
                       <td className="p-3">{email.date}</td>
                       <td className="p-3 max-w-[200px] truncate">{email.subject}</td>
