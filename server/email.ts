@@ -330,12 +330,14 @@ async function sendBulkEmail(
     // For each recipient, attempt to send the email
     for (const recipient of targetRecipients) {
       try {
-        // Send the email
+        // Send the email with a reliable from address
         const info = await transporter.sendMail({
-          from: `"Moss Point Main Street" <${process.env.SMTP_FROM_EMAIL || 'info@mosspointmainstreet.org'}>`,
+          from: `"Moss Point Main Street" <${process.env.SMTP_USER || process.env.SMTP_FROM_EMAIL}>`,
           to: recipient.email,
           subject: subject,
           html: htmlContent,
+          // Add optional debug flag to help diagnose any issues
+          debug: true
         });
         
         log(`Email sent to ${recipient.email}: ${info.messageId}`, 'email');
