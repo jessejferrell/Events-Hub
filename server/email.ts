@@ -317,7 +317,7 @@ async function sendBulkEmail(
       try {
         // Define mail options
         const mailOptions = {
-          from: `"Moss Point Main Street" <${process.env.SMTP_FROM_EMAIL}>`,
+          from: process.env.SMTP_FROM_EMAIL,
           to: recipient.email,
           subject: subject,
           html: htmlContent
