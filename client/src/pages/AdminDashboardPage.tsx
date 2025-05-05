@@ -1220,7 +1220,7 @@ export default function AdminDashboardPage() {
                             Role
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                            Status
+                            Login Status
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                             Joined
@@ -1439,12 +1439,7 @@ export default function AdminDashboardPage() {
                                 <SelectItem value="user">Regular User</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Button 
-                              variant={selectedUser.lastLogin ? "destructive" : "default"} 
-                              className="w-full"
-                            >
-                              {selectedUser.lastLogin ? "Deactivate Account" : "Activate Account"}
-                            </Button>
+                            {/* Removed non-functional account activation button */}
                           </div>
                         </div>
                       </div>
