@@ -27,6 +27,7 @@ import {
   UserCog,
   Ticket,
   Info,
+  Edit,
 } from 'lucide-react';
 
 // UI Components
@@ -138,6 +139,7 @@ const getTemplateIcon = (templateId: string) => {
     'volunteer-assignment': <Heart className="h-10 w-10 text-rose-500" />,
     'event-cancellation': <AlertCircle className="h-10 w-10 text-amber-500" />,
     'custom-announcement': <FileText className="h-10 w-10 text-emerald-500" />,
+    'fully-custom': <Edit className="h-10 w-10 text-purple-500" />,
   };
   
   return iconMap[templateId] || <Mail className="h-10 w-10 text-primary" />;
@@ -169,33 +171,8 @@ const getAudienceName = (audience: string) => {
   return audienceMap[audience] || 'Unknown';
 };
 
-// Email history data (mock for now)
-const mockEmailHistory: EmailHistoryEntry[] = [
-  {
-    id: '1',
-    date: new Date(Date.now() - 86400000 * 2).toLocaleDateString(),
-    subject: 'Event Reminder: Upcoming River Festival',
-    recipients: 134,
-    audience: 'tickets',
-    status: 'sent',
-  },
-  {
-    id: '2',
-    date: new Date(Date.now() - 86400000 * 5).toLocaleDateString(),
-    subject: 'Vendor Setup Information',
-    recipients: 28,
-    audience: 'vendors',
-    status: 'sent',
-  },
-  {
-    id: '3',
-    date: new Date(Date.now() - 86400000 * 7).toLocaleDateString(),
-    subject: 'Volunteer Schedule Update',
-    recipients: 42,
-    audience: 'volunteers',
-    status: 'sent',
-  },
-];
+// Email history data - empty by default since no emails have been sent
+const mockEmailHistory: EmailHistoryEntry[] = [];
 
 export default function EmailNotificationsPage() {
   // State variables
@@ -259,15 +236,12 @@ export default function EmailNotificationsPage() {
         form.setValue('subject', template.subject);
         form.setValue('audience', template.audience);
         
-        // Auto-advance to step 2 if on step 1
-        if (currentStep === 1) {
-          setCurrentStep(2);
-        }
+        // Don't auto-advance anymore to allow going back and forth between steps
       } else {
         setSelectedTemplate(null);
       }
     }
-  }, [watchedTemplateId, templates, form, currentStep]);
+  }, [watchedTemplateId, templates, form]);
 
   // Fetch recipients count when relevant form fields change
   useEffect(() => {
@@ -443,7 +417,9 @@ export default function EmailNotificationsPage() {
       case 2:
         return !!watchedAudience && (watchedAudience !== 'custom' || !!watchedRole);
       case 3:
-        return !!watchedSubject && (selectedTemplate?.id !== 'custom-announcement' || !!watchedCustomMessage);
+        return !!watchedSubject && 
+          ((selectedTemplate?.id === 'custom-announcement' || selectedTemplate?.id === 'fully-custom') ? 
+            !!watchedCustomMessage : true);
       default:
         return false;
     }
@@ -516,6 +492,46 @@ export default function EmailNotificationsPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Fully Custom Email Option - No Template */}
+                    <div
+                      className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
+                        watchedTemplateId === 'fully-custom'
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                      onClick={() => {
+                        // Create custom template data when selecting this option
+                        setSelectedTemplate({
+                          id: 'fully-custom',
+                          name: 'Fully Custom Email',
+                          subject: 'Custom Email Subject',
+                          body: '<div>{{messageContent}}</div>',
+                          description: 'Create a completely custom email with your own content',
+                          audience: 'all'
+                        });
+                        form.setValue("templateId", 'fully-custom');
+                        form.setValue("subject", "");
+                        form.setValue("customMessage", "");
+                      }}
+                    >
+                      <div className="flex items-center mb-2">
+                        {getTemplateIcon('fully-custom')}
+                        <div className="ml-4">
+                          <h3 className="font-medium text-lg">Fully Custom Email</h3>
+                          <Badge variant="outline" className="mt-1 bg-purple-50 text-purple-700 border-purple-200">
+                            Complete Customization
+                          </Badge>
+                        </div>
+                        {watchedTemplateId === 'fully-custom' && (
+                          <CheckCircle className="ml-auto h-5 w-5 text-primary" />
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-sm mt-2">
+                        Start from scratch and design your own email with complete freedom
+                      </p>
+                    </div>
+                    
+                    {/* Pre-defined templates */}
                     {templates.map((template: EmailTemplate) => (
                       <div
                         key={template.id}
@@ -908,7 +924,7 @@ export default function EmailNotificationsPage() {
                       )}
                     />
 
-                    {selectedTemplate?.id === 'custom-announcement' && (
+                    {(selectedTemplate?.id === 'custom-announcement' || selectedTemplate?.id === 'fully-custom') && (
                       <FormField
                         control={form.control}
                         name="customMessage"
@@ -916,17 +932,22 @@ export default function EmailNotificationsPage() {
                           <FormItem>
                             <FormLabel className="flex items-center text-base">
                               <FileText className="mr-2 h-4 w-4 text-primary" />
-                              Custom Message
+                              {selectedTemplate?.id === 'fully-custom' ? 'Email Content' : 'Custom Message'}
                             </FormLabel>
                             <FormControl>
                               <Textarea
-                                placeholder="Enter your custom message content"
-                                className="min-h-[200px] text-base"
+                                placeholder={selectedTemplate?.id === 'fully-custom' ? 
+                                  "Enter your complete email content here. You can use HTML formatting." : 
+                                  "Enter your custom message content"}
+                                className="min-h-[300px] text-base"
                                 {...field}
                               />
                             </FormControl>
                             <FormDescription>
-                              This content will replace the <code className="bg-muted px-1 py-0.5 rounded">{"{{messageContent}}"}</code> placeholder in the template
+                              {selectedTemplate?.id === 'fully-custom' ? 
+                                "This will be the main content of your email. You can use HTML for formatting." :
+                                `This content will replace the <code className="bg-muted px-1 py-0.5 rounded">{"{{messageContent}}"}</code> placeholder in the template`
+                              }
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
