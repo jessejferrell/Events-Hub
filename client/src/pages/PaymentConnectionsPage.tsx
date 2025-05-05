@@ -302,16 +302,6 @@ export default function PaymentConnectionsPage() {
             )}
           </CardContent>
         </Card>
-        
-        {/* Connection Status Debug Card */}
-        <div className="mt-6">
-          <details className="text-sm text-neutral-500">
-            <summary className="cursor-pointer">Connection Status Details</summary>
-            <div className="mt-2 p-4 bg-neutral-50 rounded-md border border-neutral-200 font-mono text-xs overflow-x-auto">
-              <pre>{JSON.stringify(connectionStatus, null, 2)}</pre>
-            </div>
-          </details>
-        </div>
       </main>
       
       <Footer />
