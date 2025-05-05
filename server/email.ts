@@ -298,26 +298,25 @@ async function sendBulkEmail(
       ? recipients.slice(0, 1)  // Only send to the first recipient in test mode
       : recipients;
     
-    // Basic SMTP transporter with sensible timeout values
-    // For now we'll use Gmail's SMTP server as a reliable fallback if SMTP_HOST is misconfigured
-    const host = process.env.SMTP_HOST === 'events.mosspointmainstreet.org' 
-      ? 'smtp.gmail.com'  // Use Gmail as fallback 
-      : process.env.SMTP_HOST;
-      
-    log(`Using SMTP server: ${host}:${process.env.SMTP_PORT}`, 'email');
+    // SMTP transporter with your actual mail server
+    log(`Connecting to SMTP server: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`, 'email');
     
     const transporter = nodemailer.createTransport({
-      host: host,
+      host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_PORT === '465', // true for port 465, false for others
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
       },
-      // Reasonable timeouts that won't hang forever
-      connectionTimeout: 5000,  // 5 seconds connection timeout
-      greetingTimeout: 5000,    // 5 seconds for SMTP greeting
-      socketTimeout: 5000,      // 5 seconds socket timeout
+      tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false
+      },
+      // Longer timeouts for slower servers
+      connectionTimeout: 10000,  // 10 seconds connection timeout
+      greetingTimeout: 10000,    // 10 seconds for SMTP greeting
+      socketTimeout: 15000       // 15 seconds socket timeout
     });
     
     // This log is now redundant as we're logging above with the actual host used
