@@ -259,6 +259,13 @@ export default function PaymentConnectionsPage() {
                 </p>
                 <div className="flex space-x-4">
                   <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    disabled={true}
+                  >
+                    <BadgeCheck className="h-4 w-4 mr-2" />
+                    Connected
+                  </Button>
+                  <Button
                     variant="outline"
                     onClick={() => window.open("https://dashboard.stripe.com", "_blank")}
                     className="flex items-center"
