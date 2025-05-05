@@ -295,18 +295,22 @@ async function sendBulkEmail(
     // Set a timeout to avoid hanging indefinitely
     const timeout = 5000;
     
-    // Set up transport quickly with a short timeout
+    // Set up transport with proper settings for your SMTP server
     const transport = {
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '465'),
-      secure: true,
+      secure: true, // true for 465, false for other ports
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD
       },
-      connectionTimeout: timeout,
-      greetingTimeout: timeout,
-      socketTimeout: timeout
+      // Setting slightly longer timeouts for reliability
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+      // Debug level for troubleshooting
+      logger: true,
+      debug: true
     };
     
     // Use a transporter with timeout protection
