@@ -338,19 +338,38 @@ export default function EmailNotificationsPage() {
     const selectedEvent = watchedEventId ? 
       events.find((e: Event) => e.id === watchedEventId) : null;
     
-    // Create placeholder values
+    // Create placeholder values with all possible placeholders
     const placeholders: Record<string, string> = {
-      recipientName: 'Jane Doe',
+      // Organization info
       organizationName: 'Moss Point Main Street',
       organizationEmail: 'info@mosspointmainstreet.org',
       organizationPhone: '(228) 219-1713',
       organizationWebsite: 'https://mosspointmainstreet.org',
       applicationUrl: 'https://events.mosspointmainstreet.org',
       currentYear: new Date().getFullYear().toString(),
+      
+      // Recipient info
+      recipientName: 'Jane Doe',
+      recipientEmail: 'recipient@example.com',
+      firstName: 'Jane',
+      lastName: 'Doe',
+      
+      // Custom message placeholder
       messageContent: watchedCustomMessage || 'No custom message provided.',
+      subject: watchedSubject || 'Untitled Email',
+      
+      // Event info
       eventName: selectedEvent?.title || 'Sample Event',
       eventDate: selectedEvent ? new Date(selectedEvent.startDate).toLocaleDateString() : 'January 1, 2023',
       eventLocation: selectedEvent?.location || 'City Convention Center',
+      eventDescription: selectedEvent?.description || 'Sample event description',
+      eventStartTime: selectedEvent ? new Date(selectedEvent.startDate).toLocaleTimeString() : '10:00 AM',
+      eventEndTime: selectedEvent ? new Date(selectedEvent.endDate).toLocaleTimeString() : '4:00 PM',
+      
+      // Ticket info
+      ticketPrice: '$25.00',
+      ticketType: 'General Admission',
+      ticketQuantity: '2',
     };
     
     setPlaceholderValues(placeholders);
@@ -944,8 +963,8 @@ export default function EmailNotificationsPage() {
                       onClick={previewEmail}
                       disabled={!watchedTemplateId || !watchedAudience || (recipientCount === 0 && watchedAudience !== 'custom')}
                     >
-                      Preview & Send
-                      <ChevronRight className="ml-2 h-4 w-4" />
+                      Preview Email
+                      <Eye className="ml-2 h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -1112,8 +1131,13 @@ export default function EmailNotificationsPage() {
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Ready to Send?</AlertTitle>
                       <AlertDescription>
-                        This email will be sent to {recipientCount} recipients. 
-                        This action cannot be undone.
+                        <p>This email will be sent to {recipientCount} recipients. 
+                        This action cannot be undone.</p>
+                        
+                        <p className="mt-2 text-sm italic">
+                          Note: Sending requires a valid SMTP connection. If you're just 
+                          testing the system, you can view the email preview without sending.
+                        </p>
                       </AlertDescription>
                     </Alert>
 
