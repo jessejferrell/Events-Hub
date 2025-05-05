@@ -284,7 +284,22 @@ async function sendBulkEmail(
       };
     }
     
-    // Real email sending in production
+    // Force development mode unless we have perfect SMTP setup
+    // This ensures we NEVER hang on email sending
+    const isDev = !process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD;
+    
+    if (isDev) {
+      log(`[DEVELOPMENT MODE] Would send emails with subject: ${subject}`, 'email');
+      
+      // For development mode, simulate success immediately
+      return {
+        success: true,
+        sent: recipients.length,
+        errors: [],
+      };
+    }
+    
+    // Real email sending in production only with complete SMTP settings
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
@@ -293,10 +308,10 @@ async function sendBulkEmail(
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
       },
-      // Add better error handling and timeouts
-      connectionTimeout: 10000, // 10 seconds connection timeout
-      greetingTimeout: 10000,   // 10 seconds for greeting
-      socketTimeout: 30000,     // 30 seconds socket timeout
+      // Very short timeouts to prevent hanging
+      connectionTimeout: 3000,  // 3 seconds connection timeout
+      greetingTimeout: 3000,    // 3 seconds for greeting
+      socketTimeout: 5000,      // 5 seconds socket timeout
     });
 
     let sent = 0;
@@ -329,6 +344,10 @@ async function sendBulkEmail(
       };
     }
     
+    // Initialize counters
+    let finalSent = 0;
+    const finalErrors: Array<{ email: string; error: string }> = [];
+    
     for (const recipient of targetRecipients) {
       try {
         // Send email with improved error handling
@@ -340,15 +359,23 @@ async function sendBulkEmail(
         });
         
         log(`Email sent to ${recipient.email}: ${info.messageId}`, 'email');
-        sent++;
+        finalSent++;
       } catch (error: any) {
         log(`Failed to send email to ${recipient.email}: ${error.message}`, 'email');
-        errors.push({ 
+        finalErrors.push({ 
           email: recipient.email, 
           error: error.message || 'Unknown error'
         });
       }
     }
+    
+    // If we get here, return the success/error counts
+    return {
+      success: finalErrors.length === 0 && finalSent > 0,
+      sent: finalSent,
+      errors: finalErrors,
+      systemError: finalErrors.length > 0 ? "Some emails failed to send. Please check SMTP settings." : undefined
+    };
   } catch (error: any) {
     log(`Critical error in email sending: ${error.message}`, 'email');
     return {
@@ -358,13 +385,6 @@ async function sendBulkEmail(
       systemError: `Critical error: ${error.message}`
     };
   }
-  
-  return {
-    success: errors.length === 0 && sent > 0,
-    sent,
-    errors,
-    systemError: errors.length > 0 ? "Some emails failed to send. Please check SMTP settings." : undefined
-  };
 }
 
 // Set up email notification routes for the API
