@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { setupStripeRoutes } from "./stripe";
+import { setupEmailRoutes } from "./email";
 import { upload } from "./uploads";
 import { log } from "./vite";
 import { z } from "zod";
@@ -248,6 +249,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Set up Stripe routes
   setupStripeRoutes(app);
+  
+  // Set up Email notification routes
+  setupEmailRoutes(app);
   
   // === FILE UPLOAD API ===
   
