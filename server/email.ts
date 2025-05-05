@@ -2,6 +2,8 @@ import type { Express, Request, Response } from "express";
 import nodemailer from "nodemailer";
 import { storage } from "./storage";
 import { log } from "./vite";
+import dns from 'dns';
+import { promisify } from 'util';
 
 // Define the email template interface
 interface EmailTemplate {
@@ -303,22 +305,18 @@ async function sendBulkEmail(
     process.env.SMTP_PORT = '465';
     log(`Connecting to SMTP server: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`, 'email');
     
+    // Simple: Use the exact settings provided
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_PORT === '465', // true for port 465, false for others
+      host: 'events.mosspointmainstreet.org',
+      port: 465,
+      secure: true, // true for port 465
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
       },
       tls: {
-        // Do not fail on invalid certs
         rejectUnauthorized: false
-      },
-      // Longer timeouts for slower servers
-      connectionTimeout: 10000,  // 10 seconds connection timeout
-      greetingTimeout: 10000,    // 10 seconds for SMTP greeting
-      socketTimeout: 15000       // 15 seconds socket timeout
+      }
     });
     
     // This log is now redundant as we're logging above with the actual host used
@@ -330,17 +328,15 @@ async function sendBulkEmail(
     // For each recipient, attempt to send the email
     for (const recipient of targetRecipients) {
       try {
-        // Send the email with a reliable from address
+        // Send the email using correct credentials
         const info = await transporter.sendMail({
-          from: `"Moss Point Main Street" <${process.env.SMTP_USER || process.env.SMTP_FROM_EMAIL}>`,
+          from: `"Moss Point Main Street" <donotreply@events.mosspointmainstreet.org>`,
           to: recipient.email,
           subject: subject,
-          html: htmlContent,
-          // Add optional debug flag to help diagnose any issues
-          debug: true
+          html: htmlContent
         });
         
-        log(`Email sent to ${recipient.email}: ${info.messageId}`, 'email');
+        log(`Email sent to ${recipient.email}`, 'email');
         finalSent++;
       } catch (error: any) {
         log(`Failed to send email to ${recipient.email}: ${error.message}`, 'email');
