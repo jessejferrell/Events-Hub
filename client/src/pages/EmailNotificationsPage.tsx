@@ -388,7 +388,19 @@ export default function EmailNotificationsPage() {
       return;
     }
     
-    await testEmailMutation.mutateAsync(form.getValues());
+    const values = form.getValues();
+    // Convert placeholder values to actual values for API
+    if (typeof values.eventId === 'string' && values.eventId === 'any_event') {
+      values.eventId = undefined;
+    } else if (values.eventId && typeof values.eventId === 'string') {
+      values.eventId = parseInt(values.eventId);
+    }
+    
+    if (values.status === 'any_status') {
+      values.status = '';
+    }
+    
+    await testEmailMutation.mutateAsync(values);
   };
 
   // Preview and confirm before sending
@@ -399,7 +411,20 @@ export default function EmailNotificationsPage() {
 
   // Send email to all recipients
   const confirmAndSendEmail = async () => {
-    await sendEmailMutation.mutateAsync(form.getValues());
+    const values = form.getValues();
+    
+    // Convert placeholder values to actual values for API
+    if (typeof values.eventId === 'string' && values.eventId === 'any_event') {
+      values.eventId = undefined;
+    } else if (values.eventId && typeof values.eventId === 'string') {
+      values.eventId = parseInt(values.eventId);
+    }
+    
+    if (values.status === 'any_status') {
+      values.status = '';
+    }
+    
+    await sendEmailMutation.mutateAsync(values);
   };
   
   // Handle form submission
