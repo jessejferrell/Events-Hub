@@ -459,9 +459,14 @@ export function setupEmailRoutes(app: Express) {
         return res.status(400).json({ message: "No recipients found matching the criteria" });
       }
       
-      // Create standard replacements
+      // Create standard replacements with organization info
       const standardReplacements: Record<string, string> = {
         organizationName: "Moss Point Main Street",
+        organizationEmail: process.env.SMTP_FROM_EMAIL || "info@mosspointmainstreet.org",
+        organizationPhone: "(228) 219-1713",
+        organizationWebsite: "https://mosspointmainstreet.org",
+        applicationUrl: "https://events.mosspointmainstreet.org",
+        currentYear: new Date().getFullYear().toString(),
         ...replacements
       };
       
@@ -542,9 +547,14 @@ export function setupEmailRoutes(app: Express) {
         }
       }
       
-      // Create standard replacements
+      // Create standard replacements with organization info
       const standardReplacements: Record<string, string> = {
         organizationName: "Moss Point Main Street",
+        organizationEmail: process.env.SMTP_FROM_EMAIL || "info@mosspointmainstreet.org",
+        organizationPhone: "(228) 219-1713",
+        organizationWebsite: "https://mosspointmainstreet.org",
+        applicationUrl: "https://events.mosspointmainstreet.org", 
+        currentYear: new Date().getFullYear().toString(),
         recipientName: "Test Recipient",
         ...replacements
       };

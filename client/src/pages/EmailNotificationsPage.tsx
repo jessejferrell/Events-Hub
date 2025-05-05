@@ -400,7 +400,28 @@ export default function EmailNotificationsPage() {
       values.status = '';
     }
     
-    await testEmailMutation.mutateAsync(values);
+    try {
+      const result = await testEmailMutation.mutateAsync(values);
+      
+      if (result.success) {
+        toast({
+          title: 'Test Email Sent',
+          description: `Test email sent successfully to ${testEmail}`,
+        });
+      } else {
+        toast({
+          title: 'Test Email Failed',
+          description: result.message || 'Unable to send test email. Please check SMTP settings.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Test Email Failed',
+        description: error.message || 'Unable to connect to email server. Please check SMTP settings.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Preview and confirm before sending
@@ -1059,7 +1080,22 @@ export default function EmailNotificationsPage() {
                       </Button>
                       <Button 
                         className="w-full" 
-                        onClick={confirmAndSendEmail}
+                        onClick={async () => {
+                          try {
+                            await confirmAndSendEmail();
+                            setIsShowingPreview(false);
+                            toast({
+                              title: 'Email Campaign Sent',
+                              description: `Email sent successfully to ${recipientCount} recipients`,
+                            });
+                          } catch (error: any) {
+                            toast({
+                              title: 'Email Sending Failed',
+                              description: error.message || 'Unable to connect to email server. Please check SMTP settings.',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
                         disabled={sendEmailMutation.isPending}
                       >
                         {sendEmailMutation.isPending ? (
