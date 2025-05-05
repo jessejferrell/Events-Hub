@@ -1,22 +1,9 @@
-import nodemailer from 'nodemailer';
-import type { Express, Request, Response } from 'express';
-import { db } from './db';
-import { eq, and, inArray } from 'drizzle-orm';
-import { users, tickets, products, vendorRegistrations, volunteerAssignments, events } from '@shared/schema';
-import { storage } from './storage';
+import type { Express, Request, Response } from "express";
+import nodemailer from "nodemailer";
+import { storage } from "./storage";
+import { log } from "./vite";
 
-// Create the transporter using environment variables
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
-
-// Templates data
+// Define the email template interface
 interface EmailTemplate {
   id: string;
   name: string;
@@ -26,471 +13,563 @@ interface EmailTemplate {
   audience: 'all' | 'tickets' | 'vendors' | 'volunteers' | 'custom';
 }
 
-// Email templates - these will be stored in the database in a real implementation
+// Pre-defined email templates
 const emailTemplates: EmailTemplate[] = [
   {
-    id: 'welcome',
-    name: 'Welcome',
-    subject: 'Welcome to {{eventName}}',
-    body: `<h1>Welcome to {{eventName}}!</h1>
-<p>Dear {{recipientName}},</p>
-<p>Thank you for registering for {{eventName}}. We're excited to have you join us!</p>
-<p>Event Details:</p>
-<ul>
-  <li><strong>Date:</strong> {{eventDate}}</li>
-  <li><strong>Time:</strong> {{eventTime}}</li>
-  <li><strong>Location:</strong> {{eventLocation}}</li>
-</ul>
-<p>Your ticket information is attached to this email. Please present it at the entrance on the day of the event.</p>
-<p>If you have any questions, please don't hesitate to contact us.</p>
-<p>Looking forward to seeing you!</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Welcome email sent after registration',
-    audience: 'all'
-  },
-  {
-    id: 'event_update',
-    name: 'Event Update',
-    subject: 'Important Update: {{eventName}}',
-    body: `<h1>Important Update: {{eventName}}</h1>
-<p>Dear {{recipientName}},</p>
-<p>We're reaching out with an important update regarding {{eventName}}.</p>
-<p>{{updateDetails}}</p>
-<p>What This Means For You:</p>
-<p>{{impactDetails}}</p>
-<p>If you have any questions or concerns, please don't hesitate to contact us.</p>
-<p>Thank you for your understanding.</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Notify participants about event changes or updates',
-    audience: 'all'
-  },
-  {
-    id: 'vendor_instructions',
-    name: 'Vendor Instructions',
-    subject: 'Vendor Instructions for {{eventName}}',
-    body: `<h1>Vendor Instructions for {{eventName}}</h1>
-<p>Dear {{recipientName}},</p>
-<p>We're looking forward to having you as a vendor at {{eventName}}. Here are the details for your booth:</p>
-<ul>
-  <li><strong>Booth Number:</strong> {{boothNumber}}</li>
-  <li><strong>Setup Time:</strong> {{setupTime}}</li>
-  <li><strong>Breakdown Time:</strong> {{breakdownTime}}</li>
-</ul>
-<h2>Setup Instructions</h2>
-<p>{{setupInstructions}}</p>
-<h2>Important Vendor Rules</h2>
-<p>{{vendorRules}}</p>
-<p>If you have any questions, please don't hesitate to contact our vendor coordinator.</p>
-<p>Looking forward to a successful event!</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Send booth information and setup instructions to vendors',
-    audience: 'vendors'
-  },
-  {
-    id: 'volunteer_schedule',
-    name: 'Volunteer Schedule',
-    subject: 'Your Volunteer Schedule for {{eventName}}',
-    body: `<h1>Your Volunteer Schedule for {{eventName}}</h1>
-<p>Dear {{recipientName}},</p>
-<p>Thank you for volunteering for {{eventName}}. We greatly appreciate your support!</p>
-<p>Here is your assigned schedule:</p>
-<ul>
-  <li><strong>Position:</strong> {{volunteerPosition}}</li>
-  <li><strong>Date:</strong> {{volunteerDate}}</li>
-  <li><strong>Time:</strong> {{volunteerTime}}</li>
-  <li><strong>Location:</strong> {{volunteerLocation}}</li>
-  <li><strong>Supervisor:</strong> {{supervisorName}}</li>
-</ul>
-<h2>Important Information</h2>
-<p>{{volunteerInstructions}}</p>
-<p>If you have any questions or need to make changes to your schedule, please contact our volunteer coordinator as soon as possible.</p>
-<p>Thank you again for your support!</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Send schedule information to volunteers',
-    audience: 'volunteers'
-  },
-  {
-    id: 'reminder',
+    id: 'event-reminder',
     name: 'Event Reminder',
-    subject: 'Reminder: {{eventName}} Is Coming Up!',
-    body: `<h1>Reminder: {{eventName}} Is Coming Up!</h1>
-<p>Dear {{recipientName}},</p>
-<p>This is a friendly reminder that {{eventName}} is just around the corner!</p>
-<p>Event Details:</p>
-<ul>
-  <li><strong>Date:</strong> {{eventDate}}</li>
-  <li><strong>Time:</strong> {{eventTime}}</li>
-  <li><strong>Location:</strong> {{eventLocation}}</li>
-</ul>
-<p>Don't forget to bring your ticket with you. We're looking forward to seeing you there!</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Send a reminder closer to the event date',
+    subject: 'Your Event is Coming Up: {{eventName}}',
+    body: `<p>Hello {{recipientName}},</p>
+<p>This is a friendly reminder that the event <strong>{{eventName}}</strong> is coming up on <strong>{{eventDate}}</strong> at <strong>{{eventLocation}}</strong>.</p>
+<p>We're looking forward to seeing you there!</p>
+<p>Best regards,<br>The {{organizationName}} Team</p>`,
+    description: 'Send reminders to ticket holders about upcoming events',
     audience: 'tickets'
   },
   {
-    id: 'venue_change',
-    name: 'Venue Change',
-    subject: 'IMPORTANT: Venue Change for {{eventName}}',
-    body: `<h1>IMPORTANT: Venue Change for {{eventName}}</h1>
-<p>Dear {{recipientName}},</p>
-<p>We want to inform you about an important change regarding {{eventName}}.</p>
-<p><strong>The event venue has been changed.</strong></p>
-<p><strong>New Location:</strong> {{newLocation}}</p>
-<p><strong>Reason for Change:</strong> {{reasonForChange}}</p>
-<p>All other event details remain the same. We apologize for any inconvenience this may cause.</p>
-<p>If you have any questions or concerns, please don't hesitate to contact us.</p>
-<p>Thank you for your understanding.</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Notify participants about a venue change',
-    audience: 'all'
-  },
-  {
-    id: 'weather_update',
-    name: 'Weather Update',
-    subject: 'Weather Update for {{eventName}}',
-    body: `<h1>Weather Update for {{eventName}}</h1>
-<p>Dear {{recipientName}},</p>
-<p>We're writing to provide you with an important weather update for {{eventName}}.</p>
-<p><strong>Current Forecast:</strong> {{weatherForecast}}</p>
-<h2>Weather Plan</h2>
-<p>{{weatherPlan}}</p>
-<p>We recommend:</p>
+    id: 'vendor-confirmation',
+    name: 'Vendor Registration Confirmation',
+    subject: 'Your Vendor Application for {{eventName}} Has Been Approved',
+    body: `<p>Hello {{recipientName}},</p>
+<p>We're pleased to inform you that your vendor application for <strong>{{eventName}}</strong> has been approved!</p>
+<p>Event Details:</p>
 <ul>
-  <li>{{weatherRecommendation1}}</li>
-  <li>{{weatherRecommendation2}}</li>
-  <li>{{weatherRecommendation3}}</li>
+  <li>Date: {{eventDate}}</li>
+  <li>Location: {{eventLocation}}</li>
+  <li>Your Booth Number: {{boothNumber}}</li>
+  <li>Setup Time: {{setupTime}}</li>
 </ul>
-<p>We'll continue to monitor the weather and provide updates as needed.</p>
-<p>Thank you for your understanding.</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Provide weather updates and recommendations',
-    audience: 'all'
-  },
-  {
-    id: 'parking_instructions',
-    name: 'Parking Instructions',
-    subject: 'Parking Information for {{eventName}}',
-    body: `<h1>Parking Information for {{eventName}}</h1>
-<p>Dear {{recipientName}},</p>
-<p>We want to provide you with important parking information for {{eventName}}.</p>
-<h2>Parking Options</h2>
-<p>{{parkingOptions}}</p>
-<h2>Directions</h2>
-<p>{{parkingDirections}}</p>
-<h2>Additional Transportation Options</h2>
-<p>{{transportationOptions}}</p>
+<p>Please review the vendor guidelines attached to this email.</p>
 <p>If you have any questions, please don't hesitate to contact us.</p>
-<p>We look forward to seeing you at the event!</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Provide parking and transportation details',
+<p>Best regards,<br>The {{organizationName}} Team</p>`,
+    description: 'Send confirmation to approved vendors',
+    audience: 'vendors'
+  },
+  {
+    id: 'volunteer-assignment',
+    name: 'Volunteer Assignment Notification',
+    subject: 'Your Volunteer Assignment for {{eventName}}',
+    body: `<p>Hello {{recipientName}},</p>
+<p>Thank you for volunteering for <strong>{{eventName}}</strong>! We appreciate your willingness to help make this event a success.</p>
+<p>Your volunteer assignment details:</p>
+<ul>
+  <li>Role: {{volunteerRole}}</li>
+  <li>Date: {{shiftDate}}</li>
+  <li>Time: {{shiftTime}}</li>
+  <li>Location: {{eventLocation}}</li>
+  <li>Supervisor: {{supervisorName}}</li>
+</ul>
+<p>Please arrive 15 minutes before your shift begins for a brief orientation.</p>
+<p>If you have any questions or need to make changes to your assignment, please contact us as soon as possible.</p>
+<p>Best regards,<br>The {{organizationName}} Team</p>`,
+    description: 'Notify volunteers of their assignments',
+    audience: 'volunteers'
+  },
+  {
+    id: 'event-cancellation',
+    name: 'Event Cancellation Notice',
+    subject: 'Important Notice: {{eventName}} Has Been Cancelled',
+    body: `<p>Hello {{recipientName}},</p>
+<p>We regret to inform you that <strong>{{eventName}}</strong> scheduled for <strong>{{eventDate}}</strong> has been cancelled due to unforeseen circumstances.</p>
+<p>If you purchased tickets for this event, a refund will be processed automatically within 5-7 business days.</p>
+<p>We sincerely apologize for any inconvenience this may cause and appreciate your understanding.</p>
+<p>Best regards,<br>The {{organizationName}} Team</p>`,
+    description: 'Notify all participants about event cancellations',
     audience: 'all'
   },
   {
-    id: 'post_event',
-    name: 'Post-Event Thank You',
-    subject: 'Thank You for Attending {{eventName}}',
-    body: `<h1>Thank You for Attending {{eventName}}</h1>
-<p>Dear {{recipientName}},</p>
-<p>Thank you for attending {{eventName}}! We hope you had a wonderful time.</p>
-<p>We appreciate your support and participation in making this event a success.</p>
-<p>{{eventRecap}}</p>
-<p>We would love to hear your feedback! Please take a moment to complete our short survey: [Survey Link]</p>
-<p>Photos from the event will be available soon on our website and social media channels.</p>
-<p>We hope to see you at our future events!</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Thank attendees after the event',
-    audience: 'all'
-  },
-  {
-    id: 'schedule_change',
-    name: 'Schedule Change',
-    subject: 'Schedule Change for {{eventName}}',
-    body: `<h1>Schedule Change for {{eventName}}</h1>
-<p>Dear {{recipientName}},</p>
-<p>We're writing to inform you about a change in the schedule for {{eventName}}.</p>
-<p><strong>Updated Schedule:</strong></p>
-<p>{{scheduleChanges}}</p>
-<p><strong>Reason for Change:</strong> {{reasonForScheduleChange}}</p>
-<p>We apologize for any inconvenience this may cause.</p>
-<p>If you have any questions or concerns, please don't hesitate to contact us.</p>
-<p>Thank you for your understanding.</p>
-<p>Best regards,<br>The {{eventName}} Team</p>`,
-    description: 'Notify participants about schedule changes',
-    audience: 'all'
+    id: 'custom-announcement',
+    name: 'Custom Announcement',
+    subject: '{{subject}}',
+    body: `<p>Hello {{recipientName}},</p>
+<p>{{messageContent}}</p>
+<p>Best regards,<br>The {{organizationName}} Team</p>`,
+    description: 'Custom announcement template for general communications',
+    audience: 'custom'
   }
 ];
 
-// Helper function to replace template placeholders with actual values
+// Function to replace placeholders in email templates
 function replaceTemplatePlaceholders(template: string, replacements: Record<string, string>): string {
-  let result = template;
-  for (const [key, value] of Object.entries(replacements)) {
-    result = result.replace(new RegExp(`{{${key}}}`, 'g'), value);
-  }
-  return result;
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    return replacements[key] || match;
+  });
 }
 
-// Get recipients based on filters
+// Function to get recipients based on audience type and filters
 async function getRecipients(
-  eventId: number,
-  audienceType: string,
-  additionalFilters: { registrationStatus?: string; productType?: string } = {}
-) {
-  const { registrationStatus, productType } = additionalFilters;
-  
-  // Get the event details
-  const event = await storage.getEvent(eventId);
-  if (!event) {
-    throw new Error('Event not found');
+  audience: string,
+  eventId?: number,
+  customFilters?: {
+    role?: string;
+    status?: string;
+    registrationType?: string;
   }
-
-  // Base recipient list
-  let recipients: { userId: number; email: string; username: string; firstName?: string; lastName?: string }[] = [];
-
-  // Get all event participants based on audience type
-  if (audienceType === 'all' || audienceType === 'tickets') {
-    // Get ticket holders
-    const ticketHolders = await storage.getTicketsByEvent(eventId);
+): Promise<Array<{ userId: number; email: string; name: string }>> {
+  try {
+    const recipients: Array<{ userId: number; email: string; name: string }> = [];
     
-    for (const ticket of ticketHolders) {
-      const user = await storage.getUser(ticket.userId);
-      if (user && user.email) {
-        recipients.push({
-          userId: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName
-        });
+    // Get all users
+    if (audience === 'all' && eventId) {
+      // Get all users related to an event (ticket holders, vendors, volunteers)
+      const tickets = await storage.getTicketsByEvent(eventId);
+      const vendorRegs = await storage.getVendorRegistrations({ eventId, status: 'approved' });
+      const volunteerAssignments = await storage.getVolunteerAssignments({ eventId, status: 'approved' });
+      
+      // Collect unique users from tickets
+      for (const ticket of tickets) {
+        const user = await storage.getUser(ticket.userId);
+        if (user && user.email) {
+          const existing = recipients.find(r => r.userId === user.id);
+          if (!existing) {
+            recipients.push({
+              userId: user.id,
+              email: user.email,
+              name: user.name || user.username
+            });
+          }
+        }
+      }
+      
+      // Collect unique users from vendor registrations
+      for (const reg of vendorRegs) {
+        const vendorProfile = await storage.getVendorProfile(reg.vendorProfileId);
+        if (vendorProfile) {
+          const user = await storage.getUser(vendorProfile.userId);
+          if (user && user.email) {
+            const existing = recipients.find(r => r.userId === user.id);
+            if (!existing) {
+              recipients.push({
+                userId: user.id,
+                email: user.email,
+                name: user.name || user.username
+              });
+            }
+          }
+        }
+      }
+      
+      // Collect unique users from volunteer assignments
+      for (const assignment of volunteerAssignments) {
+        const volunteerProfile = await storage.getVolunteerProfile(assignment.volunteerProfileId);
+        if (volunteerProfile) {
+          const user = await storage.getUser(volunteerProfile.userId);
+          if (user && user.email) {
+            const existing = recipients.find(r => r.userId === user.id);
+            if (!existing) {
+              recipients.push({
+                userId: user.id,
+                email: user.email,
+                name: user.name || user.username
+              });
+            }
+          }
+        }
+      }
+    } 
+    // Get ticket holders for a specific event
+    else if (audience === 'tickets' && eventId) {
+      const tickets = await storage.getTicketsByEvent(eventId);
+      
+      for (const ticket of tickets) {
+        const user = await storage.getUser(ticket.userId);
+        if (user && user.email) {
+          const existing = recipients.find(r => r.userId === user.id);
+          if (!existing) {
+            recipients.push({
+              userId: user.id,
+              email: user.email,
+              name: user.name || user.username
+            });
+          }
+        }
+      }
+    } 
+    // Get vendors for a specific event
+    else if (audience === 'vendors' && eventId) {
+      const vendorRegs = await storage.getVendorRegistrations({ 
+        eventId, 
+        status: customFilters?.status || 'approved' 
+      });
+      
+      for (const reg of vendorRegs) {
+        const vendorProfile = await storage.getVendorProfile(reg.vendorProfileId);
+        if (vendorProfile) {
+          const user = await storage.getUser(vendorProfile.userId);
+          if (user && user.email) {
+            const existing = recipients.find(r => r.userId === user.id);
+            if (!existing) {
+              recipients.push({
+                userId: user.id,
+                email: user.email,
+                name: user.name || user.username
+              });
+            }
+          }
+        }
+      }
+    } 
+    // Get volunteers for a specific event
+    else if (audience === 'volunteers' && eventId) {
+      const volunteerAssignments = await storage.getVolunteerAssignments({ 
+        eventId, 
+        status: customFilters?.status || 'approved' 
+      });
+      
+      for (const assignment of volunteerAssignments) {
+        const volunteerProfile = await storage.getVolunteerProfile(assignment.volunteerProfileId);
+        if (volunteerProfile) {
+          const user = await storage.getUser(volunteerProfile.userId);
+          if (user && user.email) {
+            const existing = recipients.find(r => r.userId === user.id);
+            if (!existing) {
+              recipients.push({
+                userId: user.id,
+                email: user.email,
+                name: user.name || user.username
+              });
+            }
+          }
+        }
+      }
+    } 
+    // Get users by role (for system-wide announcements)
+    else if (audience === 'custom' && customFilters?.role) {
+      const allUsers = await storage.getAllUsers();
+      const filteredUsers = allUsers.filter(user => {
+        if (customFilters.role === 'all') return true;
+        return user.role === customFilters.role;
+      });
+      
+      for (const user of filteredUsers) {
+        if (user.email) {
+          recipients.push({
+            userId: user.id,
+            email: user.email,
+            name: user.name || user.username
+          });
+        }
       }
     }
-  }
-  
-  if (audienceType === 'all' || audienceType === 'vendors') {
-    // Get vendors
-    const vendorRegs = await storage.getVendorRegistrations({ eventId, status: registrationStatus });
     
-    for (const reg of vendorRegs) {
-      const user = await storage.getUser(reg.userId);
-      if (user && user.email) {
-        recipients.push({
-          userId: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName
-        });
-      }
-    }
+    return recipients;
+  } catch (error) {
+    console.error('Error getting email recipients:', error);
+    return [];
   }
-  
-  if (audienceType === 'all' || audienceType === 'volunteers') {
-    // Get volunteers
-    const volunteerAssignments = await storage.getVolunteerAssignments({ eventId, status: registrationStatus });
-    
-    for (const assignment of volunteerAssignments) {
-      const user = await storage.getUser(assignment.userId);
-      if (user && user.email) {
-        recipients.push({
-          userId: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName
-        });
-      }
-    }
-  }
-  
-  // Remove duplicates (a user might be both a ticket holder and a vendor)
-  const uniqueRecipients = Array.from(new Map(recipients.map(item => [item.userId, item])).values());
-  
-  return uniqueRecipients;
 }
 
-// Send email to a list of recipients
+// Function to send emails in bulk to recipients
 async function sendBulkEmail(
   subject: string,
-  body: string,
-  recipients: { email: string; username: string; firstName?: string; lastName?: string }[],
-  eventId?: number,
-  individualizeContent: boolean = false
-) {
-  const event = eventId ? await storage.getEvent(eventId) : null;
+  htmlContent: string,
+  recipients: Array<{ email: string; name: string }>,
+  testMode: boolean = false
+): Promise<{ success: boolean; sent: number; errors: Array<{ email: string; error: string }> }> {
+  // Create a nodemailer transport using SMTP
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD,
+    },
+  });
+
+  let sent = 0;
+  const errors: Array<{ email: string; error: string }> = [];
   
-  const results = {
-    success: 0,
-    failed: 0,
-    failures: [] as { email: string; error: string }[]
-  };
+  // Limit recipients count in test mode
+  const targetRecipients = testMode 
+    ? recipients.slice(0, 1)  // Only send to the first recipient in test mode
+    : recipients;
+    
+  // Log SMTP configuration
+  log(`SMTP Configuration: Host=${process.env.SMTP_HOST}, Port=${process.env.SMTP_PORT}, User=${process.env.SMTP_USER}`, 'email');
   
-  for (const recipient of recipients) {
+  // Send emails to each recipient
+  for (const recipient of targetRecipients) {
     try {
-      // Create personalized content if requested
-      let personalizedBody = body;
-      let personalizedSubject = subject;
-      
-      if (individualizeContent) {
-        const recipientName = recipient.firstName && recipient.lastName 
-          ? `${recipient.firstName} ${recipient.lastName}`
-          : recipient.username;
-          
-        const replacements: Record<string, string> = {
-          recipientName,
-          eventName: event?.title || 'Our Event',
-          eventDate: event ? new Date(event.startDate).toLocaleDateString() : 'TBD',
-          eventTime: event ? new Date(event.startDate).toLocaleTimeString() : 'TBD',
-          eventLocation: event?.location || 'TBD'
-        };
-        
-        personalizedBody = replaceTemplatePlaceholders(body, replacements);
-        personalizedSubject = replaceTemplatePlaceholders(subject, replacements);
-      }
-      
-      // Send the email
-      await transporter.sendMail({
-        from: process.env.SMTP_FROM_EMAIL,
+      const info = await transporter.sendMail({
+        from: `"City Event Hub" <${process.env.SMTP_FROM_EMAIL}>`,
         to: recipient.email,
-        subject: personalizedSubject,
-        html: personalizedBody
+        subject: subject,
+        html: htmlContent,
       });
       
-      results.success++;
+      log(`Email sent to ${recipient.email}: ${info.messageId}`, 'email');
+      sent++;
     } catch (error: any) {
-      results.failed++;
-      results.failures.push({
-        email: recipient.email,
-        error: error.message
+      log(`Failed to send email to ${recipient.email}: ${error.message}`, 'email');
+      errors.push({ 
+        email: recipient.email, 
+        error: error.message || 'Unknown error'
       });
     }
   }
   
-  return results;
+  return {
+    success: errors.length === 0,
+    sent,
+    errors
+  };
 }
 
-// Register the API routes
+// Set up email notification routes for the API
 export function setupEmailRoutes(app: Express) {
-  // Get email templates
+  // Middleware to check if user is admin
+  function requireAdmin(req: Request, res: Response, next: Function) {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    next();
+  }
+  
+  // Get all email templates
   app.get('/api/admin/email/templates', requireAdmin, (req: Request, res: Response) => {
     res.json(emailTemplates);
   });
   
-  // Get specific template
+  // Get a specific email template by ID
   app.get('/api/admin/email/templates/:id', requireAdmin, (req: Request, res: Response) => {
     const template = emailTemplates.find(t => t.id === req.params.id);
+    
     if (!template) {
-      return res.status(404).json({ message: 'Template not found' });
+      return res.status(404).json({ message: "Email template not found" });
     }
+    
     res.json(template);
   });
   
-  // Get email recipients based on filters
+  // Get potential recipients for an email based on audience and filters
   app.get('/api/admin/email/recipients', requireAdmin, async (req: Request, res: Response) => {
     try {
-      const eventId = req.query.eventId ? Number(req.query.eventId) : undefined;
-      if (!eventId) {
-        return res.status(400).json({ message: 'Event ID is required' });
-      }
+      const { audience, eventId, role, status } = req.query;
       
-      const audienceType = req.query.audienceType as string || 'all';
-      const additionalFilters = {
-        registrationStatus: req.query.registrationStatus as string,
-        productType: req.query.productType as string
-      };
-      
-      const recipients = await getRecipients(eventId, audienceType, additionalFilters);
+      const recipients = await getRecipients(
+        audience as string,
+        eventId ? parseInt(eventId as string) : undefined,
+        {
+          role: role as string,
+          status: status as string,
+        }
+      );
       
       res.json({
         count: recipients.length,
         recipients: recipients.map(r => ({
-          userId: r.userId,
           email: r.email,
-          name: r.firstName && r.lastName ? `${r.firstName} ${r.lastName}` : r.username
+          name: r.name
         }))
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: error.message || "Failed to retrieve recipients" });
     }
   });
   
-  // Send emails
+  // Send bulk email to recipients
   app.post('/api/admin/email/send', requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { subject, body, eventId, audienceType, additionalFilters, individualizeContent } = req.body;
+      const { 
+        templateId, 
+        eventId, 
+        audience,
+        subject,
+        customMessage,
+        replacements,
+        customRecipients,
+        role,
+        status
+      } = req.body;
       
-      if (!subject || !body) {
-        return res.status(400).json({ message: 'Subject and body are required' });
+      // Find the template
+      let template = emailTemplates.find(t => t.id === templateId);
+      
+      if (!template) {
+        return res.status(404).json({ message: "Email template not found" });
       }
       
-      if (!eventId) {
-        return res.status(400).json({ message: 'Event ID is required' });
+      // Get event details if eventId is provided
+      let eventDetails = null;
+      if (eventId) {
+        eventDetails = await storage.getEvent(parseInt(eventId));
+        if (!eventDetails) {
+          return res.status(404).json({ message: "Event not found" });
+        }
       }
       
-      const recipients = await getRecipients(eventId, audienceType || 'all', additionalFilters || {});
+      // Get recipients
+      let recipients: Array<{ userId: number; email: string; name: string }> = [];
+      
+      // If custom recipients are provided, use them
+      if (customRecipients && Array.isArray(customRecipients) && customRecipients.length > 0) {
+        recipients = customRecipients.map(r => ({
+          userId: r.userId || 0,
+          email: r.email,
+          name: r.name || r.email.split('@')[0]
+        }));
+      } else {
+        // Otherwise get recipients based on audience and filters
+        recipients = await getRecipients(
+          audience || template.audience,
+          eventId ? parseInt(eventId) : undefined,
+          {
+            role: role,
+            status: status,
+          }
+        );
+      }
       
       if (recipients.length === 0) {
-        return res.status(400).json({ message: 'No recipients found matching the criteria' });
+        return res.status(400).json({ message: "No recipients found matching the criteria" });
       }
       
-      const results = await sendBulkEmail(
-        subject,
-        body,
-        recipients,
-        eventId,
-        individualizeContent
+      // Create standard replacements
+      const standardReplacements: Record<string, string> = {
+        organizationName: "City Event Hub",
+        ...replacements
+      };
+      
+      // Add event details to replacements if available
+      if (eventDetails) {
+        standardReplacements.eventName = eventDetails.title;
+        standardReplacements.eventDate = new Date(eventDetails.startDate).toLocaleDateString();
+        standardReplacements.eventLocation = eventDetails.location;
+      }
+      
+      // If it's a custom message template, use the provided subject and message
+      let finalSubject = template.subject;
+      let finalBody = template.body;
+      
+      if (template.id === 'custom-announcement' || customMessage) {
+        finalSubject = subject || template.subject;
+        
+        // If there's a custom message, replace the messageContent placeholder
+        if (customMessage) {
+          standardReplacements.messageContent = customMessage;
+          standardReplacements.subject = subject || '';
+        }
+      }
+      
+      // Replace placeholders in the subject
+      const processedSubject = replaceTemplatePlaceholders(finalSubject, standardReplacements);
+      
+      // Send the email to all recipients
+      const result = await sendBulkEmail(
+        processedSubject,
+        replaceTemplatePlaceholders(finalBody, standardReplacements),
+        recipients.map(r => ({ email: r.email, name: r.name }))
       );
       
+      // Return the result
       res.json({
-        success: results.success,
-        failed: results.failed,
-        failures: results.failures,
+        success: result.success,
+        message: `Email sent to ${result.sent} recipients.`,
+        errors: result.errors,
         totalRecipients: recipients.length
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("Email sending error:", error);
+      res.status(500).json({ message: error.message || "Failed to send email" });
     }
   });
   
-  // Test email sending
+  // Test email to a single recipient (admin only)
   app.post('/api/admin/email/test', requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { recipient, subject, body } = req.body;
+      const { 
+        templateId, 
+        eventId, 
+        subject,
+        customMessage,
+        replacements,
+        testEmail
+      } = req.body;
       
-      if (!recipient || !subject || !body) {
-        return res.status(400).json({ message: 'Recipient, subject, and body are required' });
+      // Validate test email
+      if (!testEmail) {
+        return res.status(400).json({ message: "Test email address is required" });
       }
       
-      // Send test email
-      await transporter.sendMail({
-        from: process.env.SMTP_FROM_EMAIL,
-        to: recipient,
-        subject,
-        html: body
-      });
+      // Find the template
+      let template = emailTemplates.find(t => t.id === templateId);
       
-      res.json({ success: true, message: 'Test email sent successfully' });
+      if (!template) {
+        return res.status(404).json({ message: "Email template not found" });
+      }
+      
+      // Get event details if eventId is provided
+      let eventDetails = null;
+      if (eventId) {
+        eventDetails = await storage.getEvent(parseInt(eventId));
+        if (!eventDetails) {
+          return res.status(404).json({ message: "Event not found" });
+        }
+      }
+      
+      // Create standard replacements
+      const standardReplacements: Record<string, string> = {
+        organizationName: "City Event Hub",
+        recipientName: "Test Recipient",
+        ...replacements
+      };
+      
+      // Add event details to replacements if available
+      if (eventDetails) {
+        standardReplacements.eventName = eventDetails.title;
+        standardReplacements.eventDate = new Date(eventDetails.startDate).toLocaleDateString();
+        standardReplacements.eventLocation = eventDetails.location;
+      }
+      
+      // If it's a custom message template, use the provided subject and message
+      let finalSubject = template.subject;
+      let finalBody = template.body;
+      
+      if (template.id === 'custom-announcement' || customMessage) {
+        finalSubject = subject || template.subject;
+        
+        // If there's a custom message, replace the messageContent placeholder
+        if (customMessage) {
+          standardReplacements.messageContent = customMessage;
+          standardReplacements.subject = subject || '';
+        }
+      }
+      
+      // Replace placeholders in the subject
+      const processedSubject = replaceTemplatePlaceholders(finalSubject, standardReplacements);
+      
+      // Add [TEST] prefix to subject
+      const testSubject = `[TEST] ${processedSubject}`;
+      
+      // Send the test email
+      const result = await sendBulkEmail(
+        testSubject,
+        replaceTemplatePlaceholders(finalBody, standardReplacements),
+        [{ email: testEmail, name: "Test Recipient" }],
+        true // Test mode
+      );
+      
+      // Return the result
+      res.json({
+        success: result.success,
+        message: result.success 
+          ? `Test email sent to ${testEmail}` 
+          : `Failed to send test email: ${result.errors[0]?.error}`,
+        errors: result.errors
+      });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("Test email error:", error);
+      res.status(500).json({ message: error.message || "Failed to send test email" });
     }
   });
 }
 
-// Middleware to verify admin status
-function requireAdmin(req: Request, res: Response, next: Function) {
-  if (!req.isAuthenticated() || !req.user) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-  
-  if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
-    return res.status(403).json({ message: 'Forbidden' });
-  }
-  
-  next();
-}
-
-// Export the email service functions
+// Export the email service for use in other modules
 export const emailService = {
   getTemplates: () => emailTemplates,
-  getTemplateById: (id: string) => emailTemplates.find(t => t.id === id),
+  getTemplate: (id: string) => emailTemplates.find(t => t.id === id),
   getRecipients,
-  sendBulkEmail
+  sendBulkEmail,
+  replaceTemplatePlaceholders
 };

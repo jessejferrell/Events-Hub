@@ -19,6 +19,7 @@ import CheckoutPage from "@/pages/CheckoutPage";
 
 import PaymentConnectionsPage from "@/pages/PaymentConnectionsPage";
 import UserProfilePage from "@/pages/UserProfilePage";
+import EmailNotificationsPage from "@/pages/EmailNotificationsPage";
 
 function Router() {
   return (
@@ -43,6 +44,7 @@ function Router() {
       
       {/* Admin-only routes */}
       <ProtectedRoute path="/admin" component={AdminDashboardPage} roles={["admin"]} />
+      <ProtectedRoute path="/email-notifications" component={EmailNotificationsPage} roles={["admin"]} />
       
       {/* 404 page */}
       <Route component={NotFound} />

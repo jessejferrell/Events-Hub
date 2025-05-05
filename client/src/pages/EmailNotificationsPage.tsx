@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Navbar } from '@/components/Navbar';
-import { Footer } from '@/components/Footer';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+
 import {
   Card,
   CardContent,
@@ -12,12 +14,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -40,37 +36,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, Send, CheckCircle, AlertCircle, Users, Mail } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import {
-  CheckCircle,
-  Trash,
-  Edit,
-  Copy,
-  Send,
-  Mail,
-  Users,
-  FileText,
-  AlertCircle,
-  Search,
-  Filter,
-  RefreshCw,
-  Clock,
-  CheckCircle2, 
-  X
-} from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useAuth } from '@/hooks/use-auth';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
-// Define types
+// Define interface for email templates
 interface EmailTemplate {
   id: string;
   name: string;
@@ -80,12 +56,14 @@ interface EmailTemplate {
   audience: 'all' | 'tickets' | 'vendors' | 'volunteers' | 'custom';
 }
 
+// Define interface for recipients
 interface Recipient {
   userId: number;
   email: string;
   name: string;
 }
 
+// Define interface for events
 interface Event {
   id: number;
   title: string;
@@ -94,147 +72,163 @@ interface Event {
   location: string;
 }
 
-// Email sending form schema
+// Define form validation schema
 const emailFormSchema = z.object({
-  eventId: z.string().min(1, 'Please select an event'),
-  templateId: z.string().optional(),
-  subject: z.string().min(1, 'Subject is required'),
-  body: z.string().min(1, 'Email content is required'),
-  audienceType: z.string().min(1, 'Please select an audience'),
-  individualizeContent: z.boolean().default(true),
-  testEmail: z.string().email('Invalid email address').optional(),
+  templateId: z.string({
+    required_error: "Please select a template.",
+  }),
+  eventId: z.string().optional(),
+  audience: z.string().optional(),
+  subject: z.string().optional(),
+  customMessage: z.string().optional(),
+  testEmail: z.string().email("Please enter a valid email address").optional(),
+  role: z.string().optional(),
+  status: z.string().optional(),
 });
 
+// Define form values type
 type EmailFormValues = z.infer<typeof emailFormSchema>;
 
 export default function EmailNotificationsPage() {
-  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<string>('compose');
+  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
+  const [previewSubject, setPreviewSubject] = useState<string>('');
+  const [previewContent, setPreviewContent] = useState<string>('');
+  const [recipientCount, setRecipientCount] = useState<number>(0);
   const { toast } = useToast();
-  const [selectedEvent, setSelectedEvent] = useState<string>('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [selectedAudience, setSelectedAudience] = useState<string>('all');
-  const [showRecipientPreview, setShowRecipientPreview] = useState(false);
-  const [filteredStatus, setFilteredStatus] = useState<string>('approved');
-  const [previewHtml, setPreviewHtml] = useState<string>('');
 
-  // Form handling
+  // Form definition using react-hook-form
   const form = useForm<EmailFormValues>({
     resolver: zodResolver(emailFormSchema),
     defaultValues: {
-      eventId: '',
       templateId: '',
+      eventId: '',
+      audience: '',
       subject: '',
-      body: '',
-      audienceType: 'all',
-      individualizeContent: true,
-      testEmail: user?.email || '',
+      customMessage: '',
+      testEmail: '',
+      role: '',
+      status: '',
     },
   });
 
-  // Fetch events
-  const { 
-    data: events,
-    isLoading: isLoadingEvents
-  } = useQuery<Event[]>({
-    queryKey: ['/api/events'],
-    queryFn: async () => {
-      const res = await apiRequest('GET', '/api/events');
-      return res.json();
-    },
-  });
-
-  // Fetch email templates
-  const {
-    data: templates,
-    isLoading: isLoadingTemplates
-  } = useQuery<EmailTemplate[]>({
+  // Query to fetch email templates
+  const { data: templates, isLoading: isLoadingTemplates } = useQuery<EmailTemplate[]>({
     queryKey: ['/api/admin/email/templates'],
     queryFn: async () => {
-      const res = await apiRequest('GET', '/api/admin/email/templates');
+      const res = await fetch('/api/admin/email/templates');
+      if (!res.ok) throw new Error('Failed to fetch email templates');
       return res.json();
     },
   });
 
-  // Fetch recipients
-  const {
-    data: recipients,
-    isLoading: isLoadingRecipients,
-    refetch: refetchRecipients
-  } = useQuery<{ count: number; recipients: Recipient[] }>({
-    queryKey: ['/api/admin/email/recipients', selectedEvent, selectedAudience, filteredStatus],
+  // Query to fetch events
+  const { data: events, isLoading: isLoadingEvents } = useQuery<Event[]>({
+    queryKey: ['/api/events'],
     queryFn: async () => {
-      if (!selectedEvent) return { count: 0, recipients: [] };
-      const res = await apiRequest('GET', `/api/admin/email/recipients?eventId=${selectedEvent}&audienceType=${selectedAudience}&registrationStatus=${filteredStatus}`);
+      const res = await fetch('/api/events');
+      if (!res.ok) throw new Error('Failed to fetch events');
       return res.json();
     },
-    enabled: !!selectedEvent && showRecipientPreview,
   });
 
-  // Send test email
-  const sendTestMutation = useMutation({
-    mutationFn: async (data: { recipient: string; subject: string; body: string }) => {
-      const res = await apiRequest('POST', '/api/admin/email/test', data);
+  // Query to fetch recipients count based on form values
+  const { refetch: refetchRecipients, isLoading: isLoadingRecipients } = useQuery<{ count: number; recipients: any[] }>({
+    queryKey: ['/api/admin/email/recipients', form.watch('eventId'), form.watch('audience'), form.watch('role'), form.watch('status')],
+    queryFn: async () => {
+      const eventId = form.getValues('eventId');
+      const audience = form.getValues('audience') || (selectedTemplate?.audience || 'all');
+      const role = form.getValues('role');
+      const status = form.getValues('status');
+
+      if (!eventId && audience !== 'custom') {
+        return { count: 0, recipients: [] };
+      }
+
+      const queryParams = new URLSearchParams();
+      if (eventId) queryParams.append('eventId', eventId);
+      if (audience) queryParams.append('audience', audience);
+      if (role) queryParams.append('role', role);
+      if (status) queryParams.append('status', status);
+
+      const res = await fetch(`/api/admin/email/recipients?${queryParams.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch recipients');
+      return res.json();
+    },
+    enabled: false,
+  });
+
+  // Mutation to send test email
+  const testEmailMutation = useMutation({
+    mutationFn: async (data: EmailFormValues) => {
+      const res = await fetch('/api/admin/email/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to send test email');
+      }
+      
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: 'Test email sent',
-        description: 'Check your inbox to see how your email will look',
+        title: 'Test Email Sent',
+        description: 'The test email was sent successfully.',
+        variant: 'default',
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
-        title: 'Failed to send test email',
+        title: 'Error',
         description: error.message,
         variant: 'destructive',
       });
     },
   });
 
-  // Send bulk email
+  // Mutation to send email
   const sendEmailMutation = useMutation({
     mutationFn: async (data: EmailFormValues) => {
-      const payload = {
-        subject: data.subject,
-        body: data.body,
-        eventId: Number(data.eventId),
-        audienceType: data.audienceType,
-        additionalFilters: {
-          registrationStatus: filteredStatus
+      const res = await fetch('/api/admin/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        individualizeContent: data.individualizeContent
-      };
-      const res = await apiRequest('POST', '/api/admin/email/send', payload);
+        body: JSON.stringify(data),
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to send email');
+      }
+      
       return res.json();
     },
     onSuccess: (data) => {
       toast({
-        title: 'Emails sent successfully',
-        description: `${data.success} emails sent, ${data.failed} failed`,
+        title: 'Email Sent',
+        description: `Successfully sent to ${data.sent} recipients.`,
+        variant: 'default',
       });
+      form.reset();
+      setSelectedTemplate(null);
+      setIsPreviewMode(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
-        title: 'Failed to send emails',
+        title: 'Error',
         description: error.message,
         variant: 'destructive',
       });
     },
   });
-
-  // Update form values when template is selected
-  useEffect(() => {
-    if (selectedTemplateId && templates) {
-      const template = templates.find(t => t.id === selectedTemplateId);
-      if (template) {
-        form.setValue('subject', template.subject);
-        form.setValue('body', template.body);
-        form.setValue('audienceType', template.audience);
-        setSelectedAudience(template.audience);
-        setPreviewHtml(template.body);
-      }
-    }
-  }, [selectedTemplateId, templates, form]);
 
   // Handle form submission
   const onSubmit = (data: EmailFormValues) => {
@@ -242,496 +236,540 @@ export default function EmailNotificationsPage() {
   };
 
   // Handle test email
-  const handleSendTest = () => {
-    const subject = form.getValues('subject');
-    const body = form.getValues('body');
-    const testEmail = form.getValues('testEmail');
-    
-    if (!testEmail) {
+  const handleTestEmail = () => {
+    const values = form.getValues();
+    if (!values.testEmail) {
       toast({
-        title: 'Test email required',
-        description: 'Please enter a valid email address to send a test to',
+        title: 'Error',
+        description: 'Please enter a test email address',
         variant: 'destructive',
       });
       return;
     }
-    
-    sendTestMutation.mutate({
-      recipient: testEmail,
-      subject,
-      body
-    });
+    testEmailMutation.mutate(values);
   };
 
-  // Update preview when form changes
-  const handleEmailContentChange = (content: string) => {
-    form.setValue('body', content);
-    setPreviewHtml(content);
-  };
-
-  // Toggle recipient preview
-  const toggleRecipientPreview = () => {
-    setShowRecipientPreview(!showRecipientPreview);
-    if (!showRecipientPreview && selectedEvent) {
-      refetchRecipients();
+  // Update selected template when templateId changes
+  useEffect(() => {
+    const templateId = form.watch('templateId');
+    if (templateId && templates) {
+      const template = templates.find(t => t.id === templateId) || null;
+      setSelectedTemplate(template);
+      
+      // Set audience based on template if not already set
+      if (template && !form.getValues('audience')) {
+        form.setValue('audience', template.audience);
+      }
+      
+      // If it's a custom template, make the subject editable
+      if (template && template.id === 'custom-announcement') {
+        form.setValue('subject', 'Custom Announcement');
+      }
+    } else {
+      setSelectedTemplate(null);
     }
+  }, [form.watch('templateId'), templates]);
+
+  // Update recipient count when relevant form fields change
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (['eventId', 'audience', 'role', 'status'].includes(name as string)) {
+        refetchRecipients().then((result) => {
+          if (result.data) {
+            setRecipientCount(result.data.count);
+          }
+        });
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form.watch, refetchRecipients]);
+
+  // Generate preview content
+  const generatePreview = () => {
+    if (!selectedTemplate) return;
+    
+    // Get event details
+    const eventId = form.getValues('eventId');
+    const selectedEvent = events?.find(e => e.id.toString() === eventId);
+    
+    // Define replacements
+    const replacements: Record<string, string> = {
+      recipientName: 'John Doe',
+      organizationName: 'City Event Hub',
+      eventName: selectedEvent?.title || 'Sample Event',
+      eventDate: selectedEvent ? new Date(selectedEvent.startDate).toLocaleDateString() : 'January 1, 2023',
+      eventLocation: selectedEvent?.location || 'Downtown Convention Center',
+      boothNumber: 'A-12',
+      setupTime: '8:00 AM',
+      volunteerRole: 'Registration Desk Assistant',
+      shiftDate: selectedEvent ? new Date(selectedEvent.startDate).toLocaleDateString() : 'January 1, 2023',
+      shiftTime: '9:00 AM - 12:00 PM',
+      supervisorName: 'Jane Smith',
+    };
+    
+    // Replace custom message content if provided
+    const customMessage = form.getValues('customMessage');
+    if (customMessage) {
+      replacements.messageContent = customMessage;
+    }
+    
+    // Replace custom subject if provided
+    const subject = form.getValues('subject');
+    if (subject) {
+      replacements.subject = subject;
+    }
+    
+    // Replace placeholders in subject
+    let previewSubjectText = selectedTemplate.subject;
+    previewSubjectText = previewSubjectText.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      return replacements[key] || match;
+    });
+    
+    // Replace placeholders in body
+    let previewBodyText = selectedTemplate.body;
+    previewBodyText = previewBodyText.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      return replacements[key] || match;
+    });
+    
+    setPreviewSubject(previewSubjectText);
+    setPreviewContent(previewBodyText);
+    setIsPreviewMode(true);
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      
-      <main className="flex-grow container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold flex items-center">
-            <Mail className="h-6 w-6 mr-2" />
-            Email Notifications
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Send targeted emails to event participants
-          </p>
-        </div>
-        
-        <Tabs defaultValue="compose">
-          <TabsList className="mb-4">
-            <TabsTrigger value="compose" className="flex items-center">
-              <FileText className="h-4 w-4 mr-2" />
-              Compose Email
-            </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center">
-              <Copy className="h-4 w-4 mr-2" />
-              Email Templates
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="compose">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Compose Form */}
-              <Card className="md:col-span-2">
+    <div className="container mx-auto py-8">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Email Notifications</h1>
+        <p className="text-muted-foreground">
+          Send targeted emails to event participants and users
+        </p>
+      </header>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-8">
+          <TabsTrigger value="compose">
+            <Mail className="h-4 w-4 mr-2" />
+            Compose Email
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Sent History
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="compose" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Email composition form */}
+            <div className="md:col-span-2">
+              <Card>
                 <CardHeader>
                   <CardTitle>Compose Email</CardTitle>
                   <CardDescription>
-                    Create and send emails to your event participants
+                    Create and send emails to event participants
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="eventId"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Select Event</FormLabel>
-                              <Select 
-                                onValueChange={(value) => {
-                                  field.onChange(value);
-                                  setSelectedEvent(value);
-                                }} 
-                                defaultValue={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select an event" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {events?.map((event) => (
-                                    <SelectItem key={event.id} value={event.id.toString()}>
-                                      {event.title}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
+                  {isPreviewMode ? (
+                    <div className="space-y-4">
+                      <div className="pb-4 border-b">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setIsPreviewMode(false)}
+                          className="mb-4"
+                        >
+                          Back to Edit
+                        </Button>
+                        <div className="bg-muted p-4 rounded-md">
+                          <h3 className="font-semibold text-lg mb-2">Subject: {previewSubject}</h3>
+                          <Separator className="my-2" />
+                          <div className="mt-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: previewContent }} />
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-sm text-muted-foreground">Recipients: </span>
+                          <Badge variant="secondary" className="ml-2">
+                            <Users className="h-3 w-3 mr-1" />
+                            {recipientCount}
+                          </Badge>
+                        </div>
+                        <div className="space-x-2">
+                          <Button 
+                            variant="outline" 
+                            disabled={!form.getValues('testEmail')}
+                            onClick={handleTestEmail}
+                          >
+                            {testEmailMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : "Send Test"}
+                          </Button>
+                          <Button 
+                            type="button" 
+                            onClick={() => onSubmit(form.getValues())}
+                            disabled={sendEmailMutation.isPending || recipientCount === 0}
+                          >
+                            {sendEmailMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4 mr-2" />
+                            )}
+                            Send Email
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         <FormField
                           control={form.control}
                           name="templateId"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Email Template</FormLabel>
-                              <Select 
-                                onValueChange={(value) => {
-                                  field.onChange(value);
-                                  setSelectedTemplateId(value);
-                                }} 
+                              <Select
+                                onValueChange={field.onChange}
                                 defaultValue={field.value}
                               >
                                 <FormControl>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Select a template or start from scratch" />
+                                    <SelectValue placeholder="Select a template" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="">Start from scratch</SelectItem>
-                                  {templates?.map((template) => (
-                                    <SelectItem key={template.id} value={template.id}>
-                                      {template.name}
-                                    </SelectItem>
-                                  ))}
+                                  {isLoadingTemplates ? (
+                                    <div className="flex items-center justify-center p-4">
+                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                      Loading templates...
+                                    </div>
+                                  ) : (
+                                    templates?.map((template) => (
+                                      <SelectItem key={template.id} value={template.id}>
+                                        {template.name}
+                                      </SelectItem>
+                                    ))
+                                  )}
                                 </SelectContent>
                               </Select>
+                              <FormDescription>
+                                {selectedTemplate?.description || "Choose a template for your email"}
+                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </div>
-                      
-                      <FormField
-                        control={form.control}
-                        name="audienceType"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Recipient Group</FormLabel>
-                            <Select 
-                              onValueChange={(value) => {
-                                field.onChange(value);
-                                setSelectedAudience(value);
-                              }} 
-                              defaultValue={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select recipient group" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="all">All Participants</SelectItem>
-                                <SelectItem value="tickets">Ticket Holders Only</SelectItem>
-                                <SelectItem value="vendors">Vendors Only</SelectItem>
-                                <SelectItem value="volunteers">Volunteers Only</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormDescription>
-                              Choose who should receive this email
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      {selectedAudience !== 'all' && (
-                        <div className="flex items-center space-x-4">
-                          <Label className="text-sm font-medium">Filter by Status:</Label>
-                          <Select
-                            value={filteredStatus}
-                            onValueChange={setFilteredStatus}
-                          >
-                            <SelectTrigger className="w-40">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Statuses</SelectItem>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="approved">Approved</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            onClick={toggleRecipientPreview}
-                            className="ml-auto"
-                            size="sm"
-                          >
-                            <Users className="h-4 w-4 mr-2" />
-                            {showRecipientPreview ? 'Hide Recipients' : 'Preview Recipients'}
-                          </Button>
-                        </div>
-                      )}
-                      
-                      {showRecipientPreview && (
-                        <div className="border rounded-md p-4 mt-2 bg-muted/30">
-                          <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-sm font-medium">Recipients Preview</h3>
-                            <Badge variant="outline" className="font-normal">
-                              {isLoadingRecipients ? (
-                                <span className="flex items-center">
-                                  <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                                  Loading...
-                                </span>
-                              ) : (
-                                <span>{recipients?.count || 0} recipients</span>
+
+                        {selectedTemplate && (
+                          <>
+                            <FormField
+                              control={form.control}
+                              name="eventId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Event</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select an event" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {isLoadingEvents ? (
+                                        <div className="flex items-center justify-center p-4">
+                                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                          Loading events...
+                                        </div>
+                                      ) : (
+                                        events?.map((event) => (
+                                          <SelectItem key={event.id} value={event.id.toString()}>
+                                            {event.title}
+                                          </SelectItem>
+                                        ))
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormDescription>
+                                    Select the event related to this email
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
                               )}
-                            </Badge>
-                          </div>
-                          
-                          {recipients?.recipients && recipients.recipients.length > 0 ? (
-                            <ScrollArea className="h-24 rounded-md border">
-                              <div className="p-4">
-                                {recipients.recipients.map((recipient) => (
-                                  <div key={recipient.userId} className="text-sm py-1 flex justify-between">
-                                    <span>{recipient.name}</span>
-                                    <span className="text-muted-foreground">{recipient.email}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </ScrollArea>
-                          ) : !isLoadingRecipients && (
-                            <div className="flex flex-col items-center justify-center h-24 text-muted-foreground">
-                              <Users className="h-8 w-8 mb-2 opacity-30" />
-                              <p className="text-sm">No recipients found with the selected criteria</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      <FormField
-                        control={form.control}
-                        name="subject"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email Subject</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter email subject" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              Use {{eventName}} and other template variables if needed
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="body"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email Content</FormLabel>
-                            <FormControl>
-                              <Textarea 
-                                placeholder="Enter your email content here. HTML is supported."
-                                className="min-h-32 font-mono text-sm"
-                                value={field.value}
-                                onChange={(e) => handleEmailContentChange(e.target.value)}
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              You can use HTML and template variables like {{recipientName}}, {{eventName}}, etc.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="individualizeContent"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Personalize emails</FormLabel>
-                              <FormDescription>
-                                Replace template variables with recipient-specific information
-                              </FormDescription>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
+                            />
 
-                      <Separator />
-                      
-                      <FormField
-                        control={form.control}
-                        name="testEmail"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Test Email Address</FormLabel>
-                            <div className="flex space-x-2">
-                              <FormControl>
-                                <Input placeholder="Enter email for testing" {...field} />
-                              </FormControl>
-                              <Button 
-                                type="button" 
-                                variant="secondary"
-                                onClick={handleSendTest}
-                                disabled={sendTestMutation.isPending}
-                              >
-                                {sendTestMutation.isPending ? (
-                                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                                ) : (
-                                  <Send className="h-4 w-4 mr-2" />
+                            <FormField
+                              control={form.control}
+                              name="audience"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Recipient Group</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value || selectedTemplate.audience}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select audience" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="all">All Event Participants</SelectItem>
+                                      <SelectItem value="tickets">Ticket Holders</SelectItem>
+                                      <SelectItem value="vendors">Vendors</SelectItem>
+                                      <SelectItem value="volunteers">Volunteers</SelectItem>
+                                      <SelectItem value="custom">Custom Selection</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormDescription>
+                                    Choose which group of people will receive this email
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            {form.watch('audience') === 'custom' && (
+                              <FormField
+                                control={form.control}
+                                name="role"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>User Role</FormLabel>
+                                    <Select
+                                      onValueChange={field.onChange}
+                                      defaultValue={field.value}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select user role" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="all">All Users</SelectItem>
+                                        <SelectItem value="admin">Administrators</SelectItem>
+                                        <SelectItem value="event_owner">Event Organizers</SelectItem>
+                                        <SelectItem value="user">Regular Users</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormDescription>
+                                      Filter recipients by their role
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
                                 )}
-                                Send Test
-                              </Button>
-                            </div>
-                            <FormDescription>
-                              Send a test email to verify how it will look
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              />
+                            )}
 
-                      <div className="flex justify-between items-center pt-4">
-                        <div className="text-sm text-muted-foreground">
-                          {selectedEvent && recipients ? (
-                            <span className="flex items-center">
-                              <Users className="h-4 w-4 mr-1" />
-                              {recipients.count} recipients selected
-                            </span>
-                          ) : (
-                            <span className="flex items-center">
-                              <AlertCircle className="h-4 w-4 mr-1" />
-                              Select an event to see recipient count
-                            </span>
-                          )}
-                        </div>
-                        
-                        <Button 
-                          type="submit" 
-                          disabled={sendEmailMutation.isPending || !selectedEvent || (recipients && recipients.count === 0)}
-                          className="bg-primary"
-                        >
-                          {sendEmailMutation.isPending ? (
-                            <>
-                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                              Sending...
-                            </>
-                          ) : (
-                            <>
-                              <Send className="h-4 w-4 mr-2" />
-                              Send Email
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-              
-              {/* Preview & Help Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Email Preview</CardTitle>
-                  <CardDescription>
-                    Preview how your email will look
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="border rounded-md mx-4 overflow-hidden">
-                    <div className="bg-slate-100 px-4 py-2 border-b">
-                      <div className="text-sm font-medium truncate">
-                        {form.watch('subject') || 'Email Subject'}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        From: {process.env.SMTP_FROM_EMAIL || 'events@mosspointmainstreet.org'}
-                      </div>
-                    </div>
-                    <div className="p-4 bg-white max-h-[500px] overflow-auto">
-                      {previewHtml ? (
-                        <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-                      ) : (
-                        <div className="text-muted-foreground text-center py-8">
-                          Email preview will appear here
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex flex-col items-start">
-                  <p className="text-sm font-medium mb-2">Available Template Variables:</p>
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <p><code>{'{{recipientName}}'}</code> - Recipient's full name</p>
-                    <p><code>{'{{eventName}}'}</code> - Event title</p>
-                    <p><code>{'{{eventDate}}'}</code> - Event date</p>
-                    <p><code>{'{{eventTime}}'}</code> - Event time</p>
-                    <p><code>{'{{eventLocation}}'}</code> - Event location</p>
-                  </div>
-                </CardFooter>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="templates">
-            <div className="grid grid-cols-1 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Email Templates</CardTitle>
-                  <CardDescription>
-                    Pre-designed email templates for common scenarios
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingTemplates ? (
-                    <div className="py-8 flex justify-center">
-                      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-                    </div>
-                  ) : (
-                    <Accordion type="single" collapsible className="w-full">
-                      {templates?.map((template) => (
-                        <AccordionItem key={template.id} value={template.id}>
-                          <AccordionTrigger className="hover:no-underline">
-                            <div className="flex items-center">
-                              <span>{template.name}</span>
-                              <Badge className="ml-2" variant="outline">
-                                {template.audience === 'all' ? 'All' : 
-                                 template.audience === 'tickets' ? 'Tickets' : 
-                                 template.audience === 'vendors' ? 'Vendors' : 
-                                 'Volunteers'}
-                              </Badge>
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <div className="space-y-4">
-                              <p className="text-sm text-muted-foreground">{template.description}</p>
-                              <div className="grid grid-cols-1 gap-4">
-                                <div>
-                                  <Label className="text-xs text-muted-foreground">Subject</Label>
-                                  <div className="text-sm border rounded-md p-2 bg-muted/20 mt-1">
-                                    {template.subject}
-                                  </div>
-                                </div>
-                                <div>
-                                  <Label className="text-xs text-muted-foreground">Content Preview</Label>
-                                  <div className="text-sm border rounded-md p-2 bg-muted/20 mt-1 h-24 overflow-y-auto">
-                                    <div dangerouslySetInnerHTML={{ __html: template.body }} />
-                                  </div>
-                                </div>
-                              </div>
+                            {['vendors', 'volunteers'].includes(form.watch('audience') || '') && (
+                              <FormField
+                                control={form.control}
+                                name="status"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Registration Status</FormLabel>
+                                    <Select
+                                      onValueChange={field.onChange}
+                                      defaultValue={field.value || 'approved'}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="all">All Statuses</SelectItem>
+                                        <SelectItem value="pending">Pending</SelectItem>
+                                        <SelectItem value="approved">Approved</SelectItem>
+                                        <SelectItem value="rejected">Rejected</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormDescription>
+                                      Filter recipients by their registration status
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {selectedTemplate.id === 'custom-announcement' && (
+                              <FormField
+                                control={form.control}
+                                name="subject"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Email Subject</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="Enter email subject" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {(selectedTemplate.id === 'custom-announcement' || selectedTemplate.audience === 'custom') && (
+                              <FormField
+                                control={form.control}
+                                name="customMessage"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Message Content</FormLabel>
+                                    <FormControl>
+                                      <Textarea
+                                        placeholder="Enter your message here"
+                                        className="min-h-[200px]"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      This will replace the {"{{messageContent}}"} placeholder in the template
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            <FormField
+                              control={form.control}
+                              name="testEmail"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Test Email Address</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="your@email.com" {...field} />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Enter an email address to send a test email
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <div className="flex justify-between pt-4">
                               <Button
+                                type="button"
                                 variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedTemplateId(template.id);
-                                  form.setValue('templateId', template.id);
-                                  form.setValue('subject', template.subject);
-                                  form.setValue('body', template.body);
-                                  form.setValue('audienceType', template.audience);
-                                  setSelectedAudience(template.audience);
-                                }}
+                                onClick={() => form.reset()}
                               >
-                                <Copy className="h-4 w-4 mr-2" />
-                                Use This Template
+                                Clear Form
                               </Button>
+                              <div className="space-x-2">
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  onClick={generatePreview}
+                                  disabled={!form.getValues('templateId')}
+                                >
+                                  Preview
+                                </Button>
+                              </div>
                             </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
+                          </>
+                        )}
+                      </form>
+                    </Form>
                   )}
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-        </Tabs>
-      </main>
-      
-      <Footer />
+
+            {/* Help and information panel */}
+            <div className="md:col-span-1">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Information</CardTitle>
+                  <CardDescription>
+                    Tips and guidelines for sending emails
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Recipient Count</AlertTitle>
+                    <AlertDescription>
+                      Currently selected: <Badge variant="outline">{recipientCount}</Badge> recipients
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="templates">
+                      <AccordionTrigger>Email Templates</AccordionTrigger>
+                      <AccordionContent>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Choose from pre-defined templates for common communications:
+                        </p>
+                        <ul className="text-sm space-y-2">
+                          <li><Badge variant="outline">Event Reminder</Badge> - Remind ticket holders about upcoming events</li>
+                          <li><Badge variant="outline">Vendor Confirmation</Badge> - Confirm vendor registrations</li>
+                          <li><Badge variant="outline">Volunteer Assignment</Badge> - Notify volunteers of their assignments</li>
+                          <li><Badge variant="outline">Event Cancellation</Badge> - Inform all participants about cancellations</li>
+                          <li><Badge variant="outline">Custom Announcement</Badge> - Create a custom message</li>
+                        </ul>
+                      </AccordionContent>
+                    </AccordionItem>
+                    
+                    <AccordionItem value="placeholders">
+                      <AccordionTrigger>Template Placeholders</AccordionTrigger>
+                      <AccordionContent>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          You can use these placeholders in your templates:
+                        </p>
+                        <ul className="text-sm space-y-1">
+                          <li><Badge variant="outline">{"{{recipientName}}"}</Badge> - Recipient's name</li>
+                          <li><Badge variant="outline">{"{{eventName}}"}</Badge> - Event name</li>
+                          <li><Badge variant="outline">{"{{eventDate}}"}</Badge> - Event date</li>
+                          <li><Badge variant="outline">{"{{eventLocation}}"}</Badge> - Event location</li>
+                          <li><Badge variant="outline">{"{{organizationName}}"}</Badge> - Your organization name</li>
+                        </ul>
+                      </AccordionContent>
+                    </AccordionItem>
+                    
+                    <AccordionItem value="best-practices">
+                      <AccordionTrigger>Email Best Practices</AccordionTrigger>
+                      <AccordionContent>
+                        <ul className="text-sm space-y-2">
+                          <li>Always send a test email before sending to all recipients</li>
+                          <li>Use clear and concise subject lines</li>
+                          <li>Include essential information in the first paragraph</li>
+                          <li>Check recipient count before sending</li>
+                          <li>Avoid sending too many emails in a short period</li>
+                        </ul>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card>
+            <CardHeader>
+              <CardTitle>Email History</CardTitle>
+              <CardDescription>
+                Record of previously sent email campaigns
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Email History Coming Soon</h3>
+                <p className="text-muted-foreground">
+                  This feature is under development and will be available in a future update.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

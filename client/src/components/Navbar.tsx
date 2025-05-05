@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "wouter";
-import { LogOut, User, Settings } from "lucide-react";
+import { LogOut, User, Settings, Mail } from "lucide-react";
 import { useCallback } from "react";
 import { CartWidget } from "@/components/cart/CartWidget";
 
@@ -80,12 +80,20 @@ export default function Navbar() {
                 </Link>
                 
                 {user.role === "admin" && (
-                  <Link href="/admin">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Admin Dashboard</span>
-                    </DropdownMenuItem>
-                  </Link>
+                  <>
+                    <Link href="/admin">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Admin Dashboard</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/email-notifications">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Mail className="mr-2 h-4 w-4" />
+                        <span>Email Notifications</span>
+                      </DropdownMenuItem>
+                    </Link>
+                  </>
                 )}
                 
                 <DropdownMenuSeparator />
@@ -144,17 +152,30 @@ export default function Navbar() {
               </li>
             )}
             {user && user.role === "admin" && (
-              <li className="mr-2">
-                <Link href="/admin">
-                  <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                    location === "/admin" 
-                      ? "text-white border-b-2 border-white" 
-                      : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                  }`}>
-                    Admin
-                  </div>
-                </Link>
-              </li>
+              <>
+                <li className="mr-2">
+                  <Link href="/admin">
+                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                      location === "/admin" 
+                        ? "text-white border-b-2 border-white" 
+                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                    }`}>
+                      Admin
+                    </div>
+                  </Link>
+                </li>
+                <li className="mr-2">
+                  <Link href="/email-notifications">
+                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                      location === "/email-notifications" 
+                        ? "text-white border-b-2 border-white" 
+                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                    }`}>
+                      Email Notifications
+                    </div>
+                  </Link>
+                </li>
+              </>
             )}
             {user && (user.role === "event_owner" || user.role === "admin") && (
               <li className="mr-2">
