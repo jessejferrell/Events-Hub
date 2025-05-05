@@ -499,7 +499,8 @@ export default function EmailNotificationsPage() {
 
                   <div className="flex justify-end">
                     <Button
-                      type="submit"
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
                       disabled={!watchedTemplateId}
                     >
                       Continue to Recipients
@@ -692,7 +693,8 @@ export default function EmailNotificationsPage() {
                       Back to Templates
                     </Button>
                     <Button
-                      type="submit"
+                      type="button"
+                      onClick={() => setCurrentStep(3)}
                       disabled={!watchedAudience || recipientCount === 0}
                     >
                       Continue to Compose
@@ -740,7 +742,7 @@ export default function EmailNotificationsPage() {
                               />
                             </FormControl>
                             <FormDescription>
-                              This text will replace the {{messageContent}} placeholder in the template
+                              This text will replace the message content placeholder in the template
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -778,7 +780,7 @@ export default function EmailNotificationsPage() {
                             <span className="text-muted-foreground">Your organization</span>
                           </div>
                           <div className="flex justify-between py-1 px-2 rounded bg-white">
-                            <code className="text-pink-600">{'{{messageContent}}'}</code>
+                            <code className="text-pink-600">{'{{customMessage}}'}</code>
                             <span className="text-muted-foreground">Your custom message</span>
                           </div>
                         </div>
