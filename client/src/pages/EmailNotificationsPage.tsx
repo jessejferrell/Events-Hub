@@ -563,7 +563,7 @@ export default function EmailNotificationsPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Any Event</SelectItem>
+                              <SelectItem value="any_event">Any Event</SelectItem>
                               {events.map((event: Event) => (
                                 <SelectItem key={event.id} value={event.id.toString()}>
                                   {event.title}
@@ -631,7 +631,7 @@ export default function EmailNotificationsPage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">Any Status</SelectItem>
+                                <SelectItem value="any_status">Any Status</SelectItem>
                                 {watchedAudience === 'tickets' && (
                                   <>
                                     <SelectItem value="active">Active Tickets</SelectItem>
