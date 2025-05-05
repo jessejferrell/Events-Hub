@@ -285,12 +285,53 @@ export default function EmailNotificationsPage() {
   // Update preview whenever relevant fields change
   useEffect(() => {
     if (selectedTemplate && (watchedSubject || watchedCustomMessage || watchedEventId)) {
-      generatePreview();
+      clientSidePreview(); // Use client-side preview for live updates as typing
     }
   }, [watchedSubject, watchedCustomMessage, watchedEventId, selectedTemplate]);
 
-  // Generate email preview
-  const generatePreview = () => {
+  // Generate email preview using the server API
+  const generatePreview = async () => {
+    if (!selectedTemplate) return;
+    
+    try {
+      const values = form.getValues();
+      
+      // Convert placeholder values to actual values for API
+      if (typeof values.eventId === 'string' && values.eventId === 'any_event') {
+        values.eventId = undefined;
+      } else if (values.eventId && typeof values.eventId === 'string') {
+        values.eventId = parseInt(values.eventId);
+      }
+      
+      // Call the preview API endpoint
+      const response = await apiRequest('POST', '/api/admin/email/preview', {
+        templateId: values.templateId,
+        eventId: values.eventId,
+        audience: values.audience,
+        subject: values.subject,
+        customMessage: values.customMessage,
+        replacements: {}
+      });
+      
+      const previewData = await response.json();
+      
+      if (previewData.success) {
+        setPreviewSubject(previewData.subject);
+        setPreviewHtml(previewData.html);
+      } else {
+        // If there's an error, fall back to client-side preview
+        clientSidePreview();
+      }
+      
+    } catch (error) {
+      console.error("Preview generation error:", error);
+      // Fall back to client-side preview if the API call fails
+      clientSidePreview();
+    }
+  };
+  
+  // Client-side preview generation as fallback
+  const clientSidePreview = () => {
     if (!selectedTemplate) return;
     
     // Get the event details if any
@@ -431,8 +472,8 @@ export default function EmailNotificationsPage() {
   };
 
   // Preview and confirm before sending
-  const previewEmail = () => {
-    generatePreview();
+  const previewEmail = async () => {
+    await generatePreview();
     setIsShowingPreview(true);
   };
 
@@ -455,13 +496,13 @@ export default function EmailNotificationsPage() {
   };
   
   // Handle form submission
-  const onSubmit = (data: EmailFormValues) => {
+  const onSubmit = async (data: EmailFormValues) => {
     if (currentStep < 3) {
       // Move to next step
       setCurrentStep(currentStep + 1);
     } else {
       // Preview email before sending
-      previewEmail();
+      await previewEmail();
     }
   };
 

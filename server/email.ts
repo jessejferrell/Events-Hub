@@ -402,6 +402,84 @@ export function setupEmailRoutes(app: Express) {
     }
   });
   
+  // Get email preview content without sending
+  app.post('/api/admin/email/preview', requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { 
+        templateId, 
+        eventId, 
+        audience,
+        subject,
+        customMessage,
+        replacements,
+      } = req.body;
+      
+      // Find the template
+      let template = emailTemplates.find(t => t.id === templateId);
+      
+      if (!template) {
+        return res.status(404).json({ message: "Email template not found" });
+      }
+      
+      // Get event details if eventId is provided
+      let eventDetails = null;
+      if (eventId) {
+        eventDetails = await storage.getEvent(parseInt(eventId));
+        if (!eventDetails) {
+          return res.status(404).json({ message: "Event not found" });
+        }
+      }
+      
+      // Create standard replacements with organization info
+      const standardReplacements: Record<string, string> = {
+        organizationName: "Moss Point Main Street",
+        organizationEmail: process.env.SMTP_FROM_EMAIL || "info@mosspointmainstreet.org",
+        organizationPhone: "(228) 219-1713",
+        organizationWebsite: "https://mosspointmainstreet.org",
+        applicationUrl: "https://events.mosspointmainstreet.org",
+        currentYear: new Date().getFullYear().toString(),
+        recipientName: "Sample Recipient",
+        ...replacements
+      };
+      
+      // Add event details to replacements if available
+      if (eventDetails) {
+        standardReplacements.eventName = eventDetails.title;
+        standardReplacements.eventDate = new Date(eventDetails.startDate).toLocaleDateString();
+        standardReplacements.eventLocation = eventDetails.location;
+      }
+      
+      // If it's a custom message template, use the provided subject and message
+      let finalSubject = template.subject;
+      let finalBody = template.body;
+      
+      if (template.id === 'custom-announcement' || customMessage) {
+        finalSubject = subject || template.subject;
+        
+        // If there's a custom message, replace the messageContent placeholder
+        if (customMessage) {
+          standardReplacements.messageContent = customMessage;
+          standardReplacements.subject = subject || '';
+        }
+      }
+      
+      // Replace placeholders in the subject and body
+      const processedSubject = replaceTemplatePlaceholders(finalSubject, standardReplacements);
+      const processedBody = replaceTemplatePlaceholders(finalBody, standardReplacements);
+      
+      // Return the preview content
+      res.json({
+        success: true,
+        subject: processedSubject,
+        html: processedBody
+      });
+      
+    } catch (error: any) {
+      console.error("Email preview error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate email preview" });
+    }
+  });
+  
   // Send bulk email to recipients
   app.post('/api/admin/email/send', requireAdmin, async (req: Request, res: Response) => {
     try {
