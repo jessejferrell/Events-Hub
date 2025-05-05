@@ -162,55 +162,22 @@ export default function PaymentConnectionsPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Payment Connections</h1>
           <div className="flex items-center space-x-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleManualRefresh}
-                    disabled={isLoadingConnection}
-                  >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingConnection ? 'animate-spin' : ''}`} />
-                    Refresh Status
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Check for updated connection status</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
-            <Badge variant={isConnected ? "success" : "outline"} className={isConnected ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-neutral-100"}>
-              {isConnected ? "Connected" : "Not Connected"}
-            </Badge>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleManualRefresh}
+              disabled={isLoadingConnection}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingConnection ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
         </div>
-        
-        {/* Status bar */}
-        {isConnected && (
-          <div className="mb-6 p-3 bg-green-50 rounded-md border border-green-200 max-w-3xl">
-            <div className="flex items-center">
-              <BadgeCheck className="h-6 w-6 text-green-600 mr-2 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-green-800">Your Stripe account is successfully connected</p>
-                <p className="text-sm text-green-700">Account ID: {connectionStatus?.accountId}</p>
-              </div>
-            </div>
-          </div>
-        )}
         
         {/* Stripe Connect Card */}
         <Card className="max-w-3xl">
           <CardHeader>
-            <CardTitle className="flex justify-between items-center">
-              <span>Stripe Connect</span>
-              {isConnected && (
-                <Badge variant="outline" className="bg-green-100 text-green-800 ml-2">
-                  Connected
-                </Badge>
-              )}
-            </CardTitle>
+            <CardTitle>Stripe Connect</CardTitle>
             <CardDescription>
               Connect your Stripe account to accept payments directly to your bank account.
             </CardDescription>
@@ -260,15 +227,7 @@ export default function PaymentConnectionsPage() {
                 <div className="flex space-x-4">
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white"
-                    disabled={true}
-                  >
-                    <BadgeCheck className="h-4 w-4 mr-2" />
-                    Connected
-                  </Button>
-                  <Button
-                    variant="outline"
                     onClick={() => window.open("https://dashboard.stripe.com", "_blank")}
-                    className="flex items-center"
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
                     Open Stripe Dashboard
