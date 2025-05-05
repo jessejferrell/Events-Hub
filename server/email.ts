@@ -298,8 +298,26 @@ async function sendBulkEmail(
       ? recipients.slice(0, 1)  // Only send to the first recipient in test mode
       : recipients;
     
-    // Connect to mail.events.mosspointmainstreet.org mail server
-    process.env.SMTP_HOST = 'mail.events.mosspointmainstreet.org';
+    // Connect to SMTP server - try standard Gmail if custom server fails
+    const originalHost = process.env.SMTP_HOST;
+    
+    // Try to ping the host to check if it exists
+    if (originalHost !== 'smtp.gmail.com') {
+      try {
+        require('dns').lookup(originalHost, (err) => {
+          if (err) {
+            log(`Cannot resolve mail server ${originalHost}, will use smtp.gmail.com instead`, 'email');
+            process.env.SMTP_HOST = 'smtp.gmail.com';
+            process.env.SMTP_PORT = '587';
+          }
+        });
+      } catch (e) {
+        // If DNS lookup fails, fall back to Gmail
+        log(`DNS lookup error for ${originalHost}: ${e.message}`, 'email');
+        process.env.SMTP_HOST = 'smtp.gmail.com';
+        process.env.SMTP_PORT = '587';
+      }
+    }
     log(`Connecting to SMTP server: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`, 'email');
     
     const transporter = nodemailer.createTransport({
