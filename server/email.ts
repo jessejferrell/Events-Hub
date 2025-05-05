@@ -288,17 +288,45 @@ async function sendBulkEmail(
   // Log SMTP configuration
   log(`SMTP Configuration: Host=${process.env.SMTP_HOST}, Port=${process.env.SMTP_PORT}, User=${process.env.SMTP_USER}`, 'email');
   
-  // Send emails to each recipient
+  // First verify SMTP connection works
+  try {
+    await transporter.verify();
+    log(`SMTP connection verified successfully`, 'email');
+  } catch (error: any) {
+    log(`SMTP connection failed: ${error.message}`, 'email');
+    // Return early with a clear error message about the connection issue
+    return {
+      success: false,
+      sent: 0,
+      errors: targetRecipients.map(r => ({ 
+        email: r.email, 
+        error: `SMTP server connection error: ${error.message}` 
+      })),
+      systemError: `Unable to connect to email server: ${error.message}`
+    };
+  }
+  
+  // Send emails to each recipient (with 30 second timeout for each)
+  const timeoutPromise = (ms: number) => new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Operation timed out')), ms)
+  );
+  
   for (const recipient of targetRecipients) {
     try {
-      const info = await transporter.sendMail({
+      // Set timeout of 30 seconds per email send
+      const emailPromise = transporter.sendMail({
         from: `"City Event Hub" <${process.env.SMTP_FROM_EMAIL}>`,
         to: recipient.email,
         subject: subject,
         html: htmlContent,
       });
       
-      log(`Email sent to ${recipient.email}: ${info.messageId}`, 'email');
+      const info = await Promise.race([
+        emailPromise,
+        timeoutPromise(30000) // 30 second timeout
+      ]);
+      
+      log(`Email sent to ${recipient.email}: ${(info as any).messageId}`, 'email');
       sent++;
     } catch (error: any) {
       log(`Failed to send email to ${recipient.email}: ${error.message}`, 'email');
@@ -310,9 +338,10 @@ async function sendBulkEmail(
   }
   
   return {
-    success: errors.length === 0,
+    success: errors.length === 0 && sent > 0,
     sent,
-    errors
+    errors,
+    systemError: errors.length > 0 ? "Some emails failed to send. Please check SMTP settings." : undefined
   };
 }
 
@@ -427,7 +456,7 @@ export function setupEmailRoutes(app: Express) {
       
       // Create standard replacements
       const standardReplacements: Record<string, string> = {
-        organizationName: "City Event Hub",
+        organizationName: "Moss Point Main Street",
         ...replacements
       };
       
@@ -510,7 +539,7 @@ export function setupEmailRoutes(app: Express) {
       
       // Create standard replacements
       const standardReplacements: Record<string, string> = {
-        organizationName: "City Event Hub",
+        organizationName: "Moss Point Main Street",
         recipientName: "Test Recipient",
         ...replacements
       };
