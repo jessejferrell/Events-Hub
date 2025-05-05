@@ -261,7 +261,7 @@ async function getRecipients(
   }
 }
 
-// Mock implementation for email sending to avoid SMTP issues
+// Real implementation for email sending to real recipients
 async function sendBulkEmail(
   subject: string,
   htmlContent: string,
@@ -285,19 +285,72 @@ async function sendBulkEmail(
     };
   }
   
-  log(`Email would be sent to ${targetRecipients.length} recipients`, 'email');
+  log(`Attempting to send email to ${targetRecipients.length} recipients`, 'email');
   
-  // Log details about the email for debugging
-  log(`Subject: ${subject}`, 'email');
-  log(`Recipients: ${targetRecipients.map(r => r.email).join(', ')}`, 'email');
-  
-  // Return immediate success since we can't connect to the SMTP server
-  return {
-    success: true,
-    sent: targetRecipients.length,
-    errors: [],
-    systemError: undefined
+  // Use environment variables for SMTP configuration
+  const transport = {
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '465'),
+    secure: true,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD
+    },
+    // Add timeouts to prevent hanging
+    connectionTimeout: 8000,
+    greetingTimeout: 8000
   };
+  
+  log(`SMTP Configuration: ${transport.host}:${transport.port}`, 'email');
+  
+  // Tracking variables
+  let sent = 0;
+  const errors: Array<{ email: string; error: string }> = [];
+  
+  try {
+    // Create a transporter with our configuration
+    const transporter = nodemailer.createTransport(transport);
+    
+    // Send to all recipients one by one
+    for (const recipient of targetRecipients) {
+      try {
+        const mailOptions = {
+          from: `"Moss Point Main Street" <${process.env.SMTP_FROM_EMAIL}>`,
+          to: recipient.email,
+          subject: subject,
+          html: htmlContent
+        };
+        
+        log(`Sending to ${recipient.email}...`, 'email');
+        await transporter.sendMail(mailOptions);
+        log(`SUCCESS: Email sent to ${recipient.email}`, 'email');
+        sent++;
+      } catch (err: any) {
+        const errorMsg = err.message || 'Unknown error';
+        log(`ERROR: Failed to send to ${recipient.email}: ${errorMsg}`, 'email');
+        errors.push({
+          email: recipient.email,
+          error: errorMsg
+        });
+      }
+    }
+    
+    return {
+      success: sent > 0,
+      sent,
+      errors,
+      systemError: errors.length > 0 ? "Some emails failed to send" : undefined
+    };
+  } catch (err: any) {
+    const errorMsg = err.message || 'Unknown error';
+    log(`CRITICAL ERROR in email sending: ${errorMsg}`, 'email');
+    return {
+      success: false,
+      sent: 0,
+      errors,
+      systemError: `Critical error: ${errorMsg}`
+    };
+  }
 }
 
 
