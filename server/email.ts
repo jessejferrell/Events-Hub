@@ -272,85 +272,57 @@ async function sendBulkEmail(
   systemError?: string;
 }> {
   try {
-    // Force success in development mode for better testing
-    if (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST) {
-      log(`[DEV MODE] Would send ${recipients.length} emails with subject: ${subject}`, 'email');
-      
-      // For development mode, simulate success
+    // Check for SMTP settings - they're absolutely required
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+      log('ERROR: Missing SMTP configuration - cannot send emails', 'email');
       return {
-        success: true,
-        sent: recipients.length,
-        errors: [],
+        success: false,
+        sent: 0,
+        errors: recipients.map(r => ({ email: r.email, error: 'Missing SMTP configuration' })),
+        systemError: 'SMTP configuration missing. Cannot send emails without proper settings.'
       };
     }
     
-    // Force development mode unless we have perfect SMTP setup
-    // This ensures we NEVER hang on email sending
-    const isDev = !process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD;
-    
-    if (isDev) {
-      log(`[DEVELOPMENT MODE] Would send emails with subject: ${subject}`, 'email');
-      
-      // For development mode, simulate success immediately
+    // Make sure we have recipients
+    if (!recipients || recipients.length === 0) {
       return {
-        success: true,
-        sent: recipients.length,
+        success: false,
+        sent: 0,
         errors: [],
+        systemError: 'No recipients provided'
       };
     }
-    
-    // Real email sending in production only with complete SMTP settings
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-      },
-      // Very short timeouts to prevent hanging
-      connectionTimeout: 3000,  // 3 seconds connection timeout
-      greetingTimeout: 3000,    // 3 seconds for greeting
-      socketTimeout: 5000,      // 5 seconds socket timeout
-    });
-
-    let sent = 0;
-    const errors: Array<{ email: string; error: string }> = [];
     
     // Limit recipients count in test mode
     const targetRecipients = testMode 
       ? recipients.slice(0, 1)  // Only send to the first recipient in test mode
       : recipients;
-      
-    // Log SMTP configuration
-    log(`SMTP Configuration: Host=${process.env.SMTP_HOST}, Port=${process.env.SMTP_PORT}, User=${process.env.SMTP_USER}`, 'email');
     
-    // First verify SMTP connection works
-    try {
-      await transporter.verify();
-      log(`SMTP connection verified successfully`, 'email');
-    } catch (error: any) {
-      log(`SMTP connection failed: ${error.message}`, 'email');
-      
-      // Return early with a clear error message about the connection issue
-      return {
-        success: false,
-        sent: 0,
-        errors: targetRecipients.map(r => ({ 
-          email: r.email, 
-          error: `SMTP server connection error: ${error.message}` 
-        })),
-        systemError: `Unable to connect to email server: ${error.message}`
-      };
-    }
+    // Basic SMTP transporter with sensible timeout values
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_PORT === '465', // true for port 465, false for others
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD,
+      },
+      // Reasonable timeouts that won't hang forever
+      connectionTimeout: 5000,  // 5 seconds connection timeout
+      greetingTimeout: 5000,    // 5 seconds for SMTP greeting
+      socketTimeout: 5000,      // 5 seconds socket timeout
+    });
     
-    // Initialize counters
+    log(`SMTP settings: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`, 'email');
+    
+    // Track successful and failed emails
     let finalSent = 0;
     const finalErrors: Array<{ email: string; error: string }> = [];
     
+    // For each recipient, attempt to send the email
     for (const recipient of targetRecipients) {
       try {
-        // Send email with improved error handling
+        // Send the email
         const info = await transporter.sendMail({
           from: `"Moss Point Main Street" <${process.env.SMTP_FROM_EMAIL || 'info@mosspointmainstreet.org'}>`,
           to: recipient.email,
@@ -385,6 +357,20 @@ async function sendBulkEmail(
       systemError: `Critical error: ${error.message}`
     };
   }
+}
+
+/**
+ * A mock email function for local testing without SMTP server
+ * This is ONLY used when explicitly called for testing
+ */
+export function mockSendEmail(
+  subject: string,
+  htmlContent: string,
+  recipients: Array<{ email: string; name: string }>,
+): { success: boolean; sent: number } {
+  log(`[MOCK EMAIL] Would send "${subject}" to ${recipients.length} recipients`, 'email');
+  recipients.forEach(r => log(`  → To: ${r.email}`, 'email'));
+  return { success: true, sent: recipients.length };
 }
 
 // Set up email notification routes for the API

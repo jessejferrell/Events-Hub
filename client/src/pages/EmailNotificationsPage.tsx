@@ -520,8 +520,16 @@ export default function EmailNotificationsPage() {
       // Move to next step
       setCurrentStep(currentStep + 1);
     } else {
-      // Preview email before sending
-      await previewEmail();
+      try {
+        // Preview email before sending
+        await previewEmail();
+      } catch (error: any) {
+        toast({
+          title: 'Preview Failed',
+          description: error.message || 'Unable to generate preview. Please try again.',
+          variant: 'destructive'
+        });
+      }
     }
   };
 
