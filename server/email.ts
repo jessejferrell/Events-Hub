@@ -273,94 +273,93 @@ async function sendBulkEmail(
   errors: Array<{ email: string; error: string }>;
   systemError?: string;
 }> {
-  try {
-    // Check for SMTP settings - they're absolutely required
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-      log('ERROR: Missing SMTP configuration - cannot send emails', 'email');
-      return {
-        success: false,
-        sent: 0,
-        errors: recipients.map(r => ({ email: r.email, error: 'Missing SMTP configuration' })),
-        systemError: 'SMTP configuration missing. Cannot send emails without proper settings.'
-      };
-    }
-    
-    // Make sure we have recipients
-    if (!recipients || recipients.length === 0) {
-      return {
-        success: false,
-        sent: 0,
-        errors: [],
-        systemError: 'No recipients provided'
-      };
-    }
-    
-    // Limit recipients count in test mode
-    const targetRecipients = testMode 
-      ? recipients.slice(0, 1)  // Only send to the first recipient in test mode
-      : recipients;
-    
-    // Use the exact SMTP settings from hosting provider
-    process.env.SMTP_HOST = 'events.mosspointmainstreet.org';
-    process.env.SMTP_PORT = '465';
-    log(`Connecting to SMTP server: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`, 'email');
-    
-    // Simple: Use the exact settings provided
-    const transporter = nodemailer.createTransport({
-      host: 'events.mosspointmainstreet.org',
-      port: 465,
-      secure: true, // true for port 465
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-      },
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-    
-    // This log is now redundant as we're logging above with the actual host used
-    
-    // Track successful and failed emails
-    let finalSent = 0;
-    const finalErrors: Array<{ email: string; error: string }> = [];
-    
-    // For each recipient, attempt to send the email
-    for (const recipient of targetRecipients) {
-      try {
-        // Send the email using correct credentials
-        const info = await transporter.sendMail({
-          from: `"Moss Point Main Street" <donotreply@events.mosspointmainstreet.org>`,
-          to: recipient.email,
-          subject: subject,
-          html: htmlContent
-        });
-        
-        log(`Email sent to ${recipient.email}`, 'email');
-        finalSent++;
-      } catch (error: any) {
-        log(`Failed to send email to ${recipient.email}: ${error.message}`, 'email');
-        finalErrors.push({ 
-          email: recipient.email, 
-          error: error.message || 'Unknown error'
-        });
-      }
-    }
-    
-    // If we get here, return the success/error counts
-    return {
-      success: finalErrors.length === 0 && finalSent > 0,
-      sent: finalSent,
-      errors: finalErrors,
-      systemError: finalErrors.length > 0 ? "Some emails failed to send. Please check SMTP settings." : undefined
-    };
-  } catch (error: any) {
-    log(`Critical error in email sending: ${error.message}`, 'email');
+  // For test mode, use only the first recipient
+  const targetRecipients = testMode ? recipients.slice(0, 1) : recipients;
+  
+  if (targetRecipients.length === 0) {
     return {
       success: false,
       sent: 0,
       errors: [],
-      systemError: `Critical error: ${error.message}`
+      systemError: 'No recipients provided'
+    };
+  }
+  
+  log(`Attempting to send email to ${targetRecipients.length} recipients`, 'email');
+  
+  // Set up a much simpler nodemailer transport
+  const transport = {
+    host: 'events.mosspointmainstreet.org',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASSWORD || ''
+    }
+  };
+  
+  log(`SMTP Configuration: ${transport.host}:${transport.port}`, 'email');
+  
+  // Tracking variables
+  let sent = 0;
+  const errors: Array<{ email: string; error: string }> = [];
+  
+  try {
+    // Create a new transporter for each batch 
+    const transporter = nodemailer.createTransport(transport);
+    
+    // Try to verify SMTP connection
+    try {
+      await transporter.verify();
+      log('SMTP connection verified successfully', 'email');
+    } catch (err: any) {
+      log(`ERROR: SMTP connection verification failed: ${err.message}`, 'email');
+      return {
+        success: false,
+        sent: 0,
+        errors: [],
+        systemError: `SMTP connection failed: ${err.message}`
+      };
+    }
+    
+    // Send to all recipients one by one
+    for (const recipient of targetRecipients) {
+      try {
+        const mailOptions = {
+          from: `"Moss Point Main Street" <donotreply@events.mosspointmainstreet.org>`,
+          to: recipient.email,
+          subject: subject,
+          html: htmlContent
+        };
+        
+        log(`Sending to ${recipient.email}...`, 'email');
+        await transporter.sendMail(mailOptions);
+        log(`SUCCESS: Email sent to ${recipient.email}`, 'email');
+        sent++;
+      } catch (err: any) {
+        const errorMsg = err.message || 'Unknown error';
+        log(`ERROR: Failed to send to ${recipient.email}: ${errorMsg}`, 'email');
+        errors.push({
+          email: recipient.email,
+          error: errorMsg
+        });
+      }
+    }
+    
+    return {
+      success: sent > 0,
+      sent,
+      errors,
+      systemError: errors.length > 0 ? "Some emails failed to send" : undefined
+    };
+  } catch (err: any) {
+    const errorMsg = err.message || 'Unknown error';
+    log(`CRITICAL ERROR in email sending: ${errorMsg}`, 'email');
+    return {
+      success: false,
+      sent: 0,
+      errors,
+      systemError: `Critical error: ${errorMsg}`
     };
   }
 }
