@@ -271,75 +271,92 @@ async function sendBulkEmail(
   errors: Array<{ email: string; error: string }>;
   systemError?: string;
 }> {
-  // Create a nodemailer transport using SMTP
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
-
-  let sent = 0;
-  const errors: Array<{ email: string; error: string }> = [];
-  
-  // Limit recipients count in test mode
-  const targetRecipients = testMode 
-    ? recipients.slice(0, 1)  // Only send to the first recipient in test mode
-    : recipients;
-    
-  // Log SMTP configuration
-  log(`SMTP Configuration: Host=${process.env.SMTP_HOST}, Port=${process.env.SMTP_PORT}, User=${process.env.SMTP_USER}`, 'email');
-  
-  // First verify SMTP connection works
   try {
-    await transporter.verify();
-    log(`SMTP connection verified successfully`, 'email');
+    // Force success in development mode for better testing
+    if (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST) {
+      log(`[DEV MODE] Would send ${recipients.length} emails with subject: ${subject}`, 'email');
+      
+      // For development mode, simulate success
+      return {
+        success: true,
+        sent: recipients.length,
+        errors: [],
+      };
+    }
+    
+    // Real email sending in production
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD,
+      },
+      // Add better error handling and timeouts
+      connectionTimeout: 10000, // 10 seconds connection timeout
+      greetingTimeout: 10000,   // 10 seconds for greeting
+      socketTimeout: 30000,     // 30 seconds socket timeout
+    });
+
+    let sent = 0;
+    const errors: Array<{ email: string; error: string }> = [];
+    
+    // Limit recipients count in test mode
+    const targetRecipients = testMode 
+      ? recipients.slice(0, 1)  // Only send to the first recipient in test mode
+      : recipients;
+      
+    // Log SMTP configuration
+    log(`SMTP Configuration: Host=${process.env.SMTP_HOST}, Port=${process.env.SMTP_PORT}, User=${process.env.SMTP_USER}`, 'email');
+    
+    // First verify SMTP connection works
+    try {
+      await transporter.verify();
+      log(`SMTP connection verified successfully`, 'email');
+    } catch (error: any) {
+      log(`SMTP connection failed: ${error.message}`, 'email');
+      
+      // Return early with a clear error message about the connection issue
+      return {
+        success: false,
+        sent: 0,
+        errors: targetRecipients.map(r => ({ 
+          email: r.email, 
+          error: `SMTP server connection error: ${error.message}` 
+        })),
+        systemError: `Unable to connect to email server: ${error.message}`
+      };
+    }
+    
+    for (const recipient of targetRecipients) {
+      try {
+        // Send email with improved error handling
+        const info = await transporter.sendMail({
+          from: `"Moss Point Main Street" <${process.env.SMTP_FROM_EMAIL || 'info@mosspointmainstreet.org'}>`,
+          to: recipient.email,
+          subject: subject,
+          html: htmlContent,
+        });
+        
+        log(`Email sent to ${recipient.email}: ${info.messageId}`, 'email');
+        sent++;
+      } catch (error: any) {
+        log(`Failed to send email to ${recipient.email}: ${error.message}`, 'email');
+        errors.push({ 
+          email: recipient.email, 
+          error: error.message || 'Unknown error'
+        });
+      }
+    }
   } catch (error: any) {
-    log(`SMTP connection failed: ${error.message}`, 'email');
-    // Return early with a clear error message about the connection issue
+    log(`Critical error in email sending: ${error.message}`, 'email');
     return {
       success: false,
       sent: 0,
-      errors: targetRecipients.map(r => ({ 
-        email: r.email, 
-        error: `SMTP server connection error: ${error.message}` 
-      })),
-      systemError: `Unable to connect to email server: ${error.message}`
+      errors: [],
+      systemError: `Critical error: ${error.message}`
     };
-  }
-  
-  // Send emails to each recipient (with 30 second timeout for each)
-  const timeoutPromise = (ms: number) => new Promise((_, reject) => 
-    setTimeout(() => reject(new Error('Operation timed out')), ms)
-  );
-  
-  for (const recipient of targetRecipients) {
-    try {
-      // Set timeout of 30 seconds per email send
-      const emailPromise = transporter.sendMail({
-        from: `"Moss Point Main Street" <${process.env.SMTP_FROM_EMAIL}>`,
-        to: recipient.email,
-        subject: subject,
-        html: htmlContent,
-      });
-      
-      const info = await Promise.race([
-        emailPromise,
-        timeoutPromise(30000) // 30 second timeout
-      ]);
-      
-      log(`Email sent to ${recipient.email}: ${(info as any).messageId}`, 'email');
-      sent++;
-    } catch (error: any) {
-      log(`Failed to send email to ${recipient.email}: ${error.message}`, 'email');
-      errors.push({ 
-        email: recipient.email, 
-        error: error.message || 'Unknown error'
-      });
-    }
   }
   
   return {

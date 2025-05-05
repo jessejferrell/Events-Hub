@@ -1131,13 +1131,8 @@ export default function EmailNotificationsPage() {
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Ready to Send?</AlertTitle>
                       <AlertDescription>
-                        <p>This email will be sent to {recipientCount} recipients. 
-                        This action cannot be undone.</p>
-                        
-                        <p className="mt-2 text-sm italic">
-                          Note: Sending requires a valid SMTP connection. If you're just 
-                          testing the system, you can view the email preview without sending.
-                        </p>
+                        This email will be sent to {recipientCount} recipients. 
+                        This action cannot be undone.
                       </AlertDescription>
                     </Alert>
 
