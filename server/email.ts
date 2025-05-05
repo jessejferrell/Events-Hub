@@ -359,19 +359,7 @@ async function sendBulkEmail(
   }
 }
 
-/**
- * A mock email function for local testing without SMTP server
- * This is ONLY used when explicitly called for testing
- */
-export function mockSendEmail(
-  subject: string,
-  htmlContent: string,
-  recipients: Array<{ email: string; name: string }>,
-): { success: boolean; sent: number } {
-  log(`[MOCK EMAIL] Would send "${subject}" to ${recipients.length} recipients`, 'email');
-  recipients.forEach(r => log(`  → To: ${r.email}`, 'email'));
-  return { success: true, sent: recipients.length };
-}
+
 
 // Set up email notification routes for the API
 export function setupEmailRoutes(app: Express) {
