@@ -285,35 +285,37 @@ async function sendBulkEmail(
     };
   }
   
-  log(`Attempting to send email to ${targetRecipients.length} recipients`, 'email');
+  log(`Processing email to ${targetRecipients.length} recipients`, 'email');
   
-  // Use environment variables for SMTP configuration
-  const transport = {
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: true,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD
-    },
-    // Add timeouts to prevent hanging
-    connectionTimeout: 8000,
-    greetingTimeout: 8000
-  };
-  
-  log(`SMTP Configuration: ${transport.host}:${transport.port}`, 'email');
-  
-  // Tracking variables
+  // Records for tracking send status
   let sent = 0;
   const errors: Array<{ email: string; error: string }> = [];
   
   try {
-    // Create a transporter with our configuration
+    // Set a timeout to avoid hanging indefinitely
+    const timeout = 5000;
+    
+    // Set up transport quickly with a short timeout
+    const transport = {
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '465'),
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD
+      },
+      connectionTimeout: timeout,
+      greetingTimeout: timeout,
+      socketTimeout: timeout
+    };
+    
+    // Use a transporter with timeout protection
     const transporter = nodemailer.createTransport(transport);
     
-    // Send to all recipients one by one
+    // Process each recipient with timeout protection
     for (const recipient of targetRecipients) {
       try {
+        // Define mail options
         const mailOptions = {
           from: `"Moss Point Main Street" <${process.env.SMTP_FROM_EMAIL}>`,
           to: recipient.email,
@@ -321,13 +323,37 @@ async function sendBulkEmail(
           html: htmlContent
         };
         
-        log(`Sending to ${recipient.email}...`, 'email');
-        await transporter.sendMail(mailOptions);
-        log(`SUCCESS: Email sent to ${recipient.email}`, 'email');
+        // Wrap sending in a promise with timeout
+        const sendWithTimeout = async () => {
+          return new Promise<void>((resolve, reject) => {
+            // Set timeout to prevent hanging
+            const timeoutId = setTimeout(() => {
+              reject(new Error("Email sending timed out"));
+            }, timeout);
+            
+            // Attempt to send
+            transporter.sendMail(mailOptions)
+              .then(() => {
+                clearTimeout(timeoutId);
+                resolve();
+              })
+              .catch((err) => {
+                clearTimeout(timeoutId);
+                reject(err);
+              });
+          });
+        };
+        
+        // Send with timeout protection
+        await sendWithTimeout();
+        
+        // If we get here, email was sent
+        log(`Email sent to ${recipient.email}`, 'email');
         sent++;
       } catch (err: any) {
+        // Handle errors for this recipient
         const errorMsg = err.message || 'Unknown error';
-        log(`ERROR: Failed to send to ${recipient.email}: ${errorMsg}`, 'email');
+        log(`Failed to send email to ${recipient.email}: ${errorMsg}`, 'email');
         errors.push({
           email: recipient.email,
           error: errorMsg
@@ -335,6 +361,7 @@ async function sendBulkEmail(
       }
     }
     
+    // Return results
     return {
       success: sent > 0,
       sent,
@@ -342,13 +369,14 @@ async function sendBulkEmail(
       systemError: errors.length > 0 ? "Some emails failed to send" : undefined
     };
   } catch (err: any) {
+    // Handle critical errors
     const errorMsg = err.message || 'Unknown error';
-    log(`CRITICAL ERROR in email sending: ${errorMsg}`, 'email');
+    log(`Critical email error: ${errorMsg}`, 'email');
     return {
       success: false,
       sent: 0,
       errors,
-      systemError: `Critical error: ${errorMsg}`
+      systemError: `Email service error: ${errorMsg}`
     };
   }
 }
