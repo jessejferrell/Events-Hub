@@ -1553,80 +1553,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userGrowthData = generateTimeSeriesData(userMetrics, timeframe as string, 'count');
       const eventGrowthData = generateTimeSeriesData(eventMetrics, timeframe as string, 'count');
       
-      // Generate pie chart data
-      const revenueByEventType = [
-        { name: "Festival", value: Math.round(currentRevenueTotal * 0.4) },
-        { name: "Concert", value: Math.round(currentRevenueTotal * 0.3) },
-        { name: "Exhibition", value: Math.round(currentRevenueTotal * 0.15) },
-        { name: "Conference", value: Math.round(currentRevenueTotal * 0.1) },
-        { name: "Other", value: Math.round(currentRevenueTotal * 0.05) }
-      ];
+      // Get real event and product type data from the database
+      const events = await db.select().from(schema.events);
+      const eventTypes = events.reduce((acc, event) => {
+        const type = event.type || 'Other';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
       
-      const revenueByProductType = [
-        { name: "Tickets", value: Math.round(currentRevenueTotal * 0.65) },
-        { name: "Merchandise", value: Math.round(currentRevenueTotal * 0.15) },
-        { name: "VIP Packages", value: Math.round(currentRevenueTotal * 0.1) },
-        { name: "Vendor Spots", value: Math.round(currentRevenueTotal * 0.08) },
-        { name: "Add-ons", value: Math.round(currentRevenueTotal * 0.02) }
-      ];
+      // Build revenue by event type from actual data
+      const revenueByEventType = Object.entries(eventTypes).map(([name, count]) => {
+        return { 
+          name, 
+          value: Math.round(currentRevenueTotal * (count / events.length)) 
+        };
+      });
       
-      const userTypeData = [
-        { name: "Standard", value: 70 },
-        { name: "VIP", value: 15 },
-        { name: "Vendor", value: 10 },
-        { name: "Volunteer", value: 5 }
-      ];
+      // Get product types from database
+      const products = await db.select().from(schema.products);
+      const productTypes = products.reduce((acc, product) => {
+        const type = product.type || 'Other';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
       
-      const eventTypeData = [
-        { name: "Festival", value: 30 },
-        { name: "Concert", value: 25 },
-        { name: "Exhibition", value: 20 },
-        { name: "Conference", value: 15 },
-        { name: "Other", value: 10 }
-      ];
+      // Build revenue by product type from actual data
+      const revenueByProductType = Object.entries(productTypes).map(([name, count]) => {
+        return { 
+          name, 
+          value: Math.round(currentRevenueTotal * (count / products.length)) 
+        };
+      });
       
-      // Top events by revenue
-      const topEvents = [
-        { name: "Summer Music Fest", value: Math.round(currentRevenueTotal * 0.25) },
-        { name: "Tech Conference 2023", value: Math.round(currentRevenueTotal * 0.2) },
-        { name: "Food & Wine Festival", value: Math.round(currentRevenueTotal * 0.15) },
-        { name: "Art Exhibition", value: Math.round(currentRevenueTotal * 0.1) },
-        { name: "Jazz Night", value: Math.round(currentRevenueTotal * 0.05) }
-      ];
+      // Get real user data
+      const users = await db.select().from(schema.users);
+      const userTypes = users.reduce((acc, user) => {
+        const type = user.role || 'standard';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
       
-      // Top user segments
-      const topUserSegments = [
-        { name: "Repeat Purchasers", count: 120, description: "Bought 3+ tickets" },
-        { name: "VIP Members", count: 85, description: "Purchased premium tickets" },
-        { name: "New Users", count: 210, description: "Joined in last 30 days" },
-        { name: "High Spenders", count: 45, description: "$500+ lifetime value" },
-        { name: "Volunteer-Attendees", count: 35, description: "Volunteered and attended" }
-      ];
+      // Build user type data from actual user records
+      const userTypeData = Object.entries(userTypes).map(([name, count]) => {
+        return { 
+          name, 
+          value: Math.round((count / users.length) * 100) 
+        };
+      });
       
-      // Event performance metrics
-      const eventPerformanceData = [
-        { name: "Summer Festival", attendance: 1200, revenue: 45000, ticketsSold: 1350 },
-        { name: "Tech Conference", attendance: 850, revenue: 34000, ticketsSold: 900 },
-        { name: "Food Festival", attendance: 700, revenue: 21000, ticketsSold: 750 },
-        { name: "Art Exhibition", attendance: 450, revenue: 13500, ticketsSold: 500 },
-        { name: "Jazz Night", attendance: 350, revenue: 8750, ticketsSold: 400 }
-      ];
+      // Build event type data from actual events
+      const eventTypeData = Object.entries(eventTypes).map(([name, count]) => {
+        return { 
+          name, 
+          value: Math.round((count / events.length) * 100) 
+        };
+      });
       
-      // Event location data
-      const eventLocationData = [
-        { name: "Downtown", value: 45 },
-        { name: "Westside", value: 25 },
-        { name: "Riverside", value: 15 },
-        { name: "Convention Center", value: 10 },
-        { name: "Other", value: 5 }
-      ];
+      // Get orders to calculate event performance
+      const orders = await db.select().from(schema.orders);
       
-      // Revenue analysis for funnel chart
+      // Group orders by event
+      const eventPerformance = orders.reduce((acc, order) => {
+        if (!order.eventId) return acc;
+        
+        if (!acc[order.eventId]) {
+          acc[order.eventId] = {
+            eventId: order.eventId,
+            revenue: 0,
+            orderCount: 0
+          };
+        }
+        
+        acc[order.eventId].revenue += order.totalAmount || 0;
+        acc[order.eventId].orderCount += 1;
+        
+        return acc;
+      }, {} as Record<number, {eventId: number, revenue: number, orderCount: number}>);
+      
+      // Get the top 5 events by revenue
+      const topEventIds = Object.values(eventPerformance)
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5)
+        .map(e => e.eventId);
+      
+      // Get event details for top events
+      const topEventDetails = await Promise.all(
+        topEventIds.map(async id => {
+          const event = await storage.getEvent(id);
+          return event ? {
+            name: event.title,
+            value: eventPerformance[id].revenue
+          } : null;
+        })
+      );
+      
+      // Filter out null values
+      const topEvents = topEventDetails.filter(e => e !== null) as {name: string, value: number}[];
+      
+      // For user segments, location data, etc., we'll calculate from real data if possible
+      // or provide empty placeholder structures
+      const topUserSegments = [];
+      const eventPerformanceData = [];
+      const eventLocationData = [];
+      
+      // Revenue analysis from real data
       const revenueAnalysis = [
         { name: "Gross Revenue", value: currentRevenueTotal },
-        { name: "After Discounts", value: Math.round(currentRevenueTotal * 0.9) },
-        { name: "After Returns", value: Math.round(currentRevenueTotal * 0.85) },
-        { name: "Net Revenue", value: Math.round(currentRevenueTotal * 0.8) }
+        { name: "Net Revenue", value: currentRevenueTotal } // Without mock data, just use the actual revenue
       ];
       
       // Generate recent activity
