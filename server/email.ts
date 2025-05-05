@@ -298,7 +298,8 @@ async function sendBulkEmail(
       ? recipients.slice(0, 1)  // Only send to the first recipient in test mode
       : recipients;
     
-    // SMTP transporter with your actual mail server
+    // Connect to mail.events.mosspointmainstreet.org mail server
+    process.env.SMTP_HOST = 'mail.events.mosspointmainstreet.org';
     log(`Connecting to SMTP server: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`, 'email');
     
     const transporter = nodemailer.createTransport({
