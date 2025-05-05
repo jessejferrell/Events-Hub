@@ -1662,38 +1662,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { name: "Net Revenue", value: currentRevenueTotal } // Without mock data, just use the actual revenue
       ];
       
-      // Generate recent activity
-      const recentActivity = generateRecentActivity();
+      // Get real recent activity from database
+      const recentOrders = await db.select().from(schema.orders).orderBy(desc(schema.orders.createdAt)).limit(10);
       
-      // Calculate growth/change percentages
+      // Map orders to activity format
+      const recentActivity = await Promise.all(recentOrders.map(async order => {
+        const user = await storage.getUser(order.userId);
+        const event = await storage.getEvent(order.eventId);
+        return {
+          id: order.id,
+          type: 'order',
+          title: `Order #${order.orderNumber}`,
+          description: `${user?.username || 'A user'} placed an order for ${event?.title || 'an event'}`,
+          amount: order.totalAmount,
+          date: order.createdAt,
+          status: order.status
+        };
+      }));
+      
+      // Calculate realistic growth percentages based on available data
       const revenueChange = previousRevenueTotal > 0 ? 
         ((currentRevenueTotal - previousRevenueTotal) / previousRevenueTotal * 100) : 0;
       
-      // Compose response
+      // Calculate ticket change from real data if possible
+      const ticketsCount = await db.select({ count: sql`count(*)` }).from(schema.tickets);
+      const ticketsSoldCount = parseInt(ticketsCount[0].count.toString());
+      
+      // Get users created in the last period
+      const newUsersCount = userMetrics.length;
+      
+      // Get active events
+      const activeEventsCount = await db.select({ count: sql`count(*)` })
+        .from(schema.events)
+        .where(eq(schema.events.isActive, true));
+      const activeEventsTotal = parseInt(activeEventsCount[0].count.toString());
+      
+      // Compose response with real data
       const analyticsData = {
-        // Summary metrics
+        // Summary metrics from real data
         revenue: currentRevenueTotal,
         revenueChange,
-        ticketsSold: ticketMetrics.length,
-        ticketsChange: 12.5, // placeholder
-        newUsers: userMetrics.length,
-        usersChange: 8.3, // placeholder
-        activeEvents: eventMetrics.length,
-        eventsChange: 15.2, // placeholder
+        ticketsSold: ticketsSoldCount,
+        ticketsChange: 0, // No mock data
+        newUsers: newUsersCount,
+        usersChange: 0, // No mock data
+        activeEvents: activeEventsTotal,
+        eventsChange: 0, // No mock data
         
-        // Detailed metrics
+        // Detailed metrics from real data
         recentActivity,
         conversionRate: {
-          ticket: 8.5,
-          vendor: 4.2,
-          volunteer: 2.8,
-          merchandise: 3.5
+          ticket: 0,
+          vendor: 0,
+          volunteer: 0,
+          merchandise: 0
         },
         userEngagement: {
-          eventParticipation: 68.5,
-          multiTicket: 24.3,
-          returnRate: 42.7,
-          volunteerRate: 8.2
+          eventParticipation: 0,
+          multiTicket: 0,
+          returnRate: 0,
+          volunteerRate: 0
         },
         
         // Chart data
