@@ -1259,7 +1259,7 @@ export default function AdminDashboardPage() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <Badge variant={user.lastLogin ? 'success' : 'outline'}>
-                                {user.lastLogin ? 'Active' : 'Inactive'}
+                                {user.lastLogin ? 'Logged in recently' : 'Never logged in'}
                               </Badge>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
