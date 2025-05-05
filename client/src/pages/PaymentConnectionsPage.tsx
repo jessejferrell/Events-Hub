@@ -159,19 +159,8 @@ export default function PaymentConnectionsPage() {
       <Navbar />
       
       <main className="flex-grow container mx-auto px-4 py-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="mb-6">
           <h1 className="text-2xl font-bold">Payment Connections</h1>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleManualRefresh}
-              disabled={isLoadingConnection}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingConnection ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
         </div>
         
         {/* Stripe Connect Card */}
