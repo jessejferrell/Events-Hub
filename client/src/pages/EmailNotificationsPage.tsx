@@ -5,6 +5,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 
 // Icons
 import {
@@ -374,747 +376,541 @@ export default function EmailNotificationsPage() {
   });
 
   // Send a test email
-  const handleSendTest = () => {
+  const sendTestEmail = async () => {
     const testEmail = form.getValues('testEmail');
+    
     if (!testEmail) {
       toast({
         title: 'Test Email Required',
-        description: 'Please enter an email address to send a test to',
+        description: 'Please enter a valid email address for the test',
         variant: 'destructive',
       });
       return;
     }
     
-    testEmailMutation.mutate(form.getValues());
+    await testEmailMutation.mutateAsync(form.getValues());
   };
 
-  // Handle form submission for main email campaign
-  const onSubmit = (data: EmailFormValues) => {
-    if (recipientCount === 0) {
-      toast({
-        title: 'No Recipients',
-        description: 'There are no recipients matching your criteria',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    // Show preview first
+  // Preview and confirm before sending
+  const previewEmail = () => {
+    generatePreview();
     setIsShowingPreview(true);
   };
 
-  // Confirm and send email after preview
-  const confirmAndSendEmail = () => {
-    setIsShowingPreview(false);
-    sendEmailMutation.mutate(form.getValues());
+  // Send email to all recipients
+  const confirmAndSendEmail = async () => {
+    await sendEmailMutation.mutateAsync(form.getValues());
   };
-
-  // Check if current step is complete
-  const isStepComplete = (step: number): boolean => {
-    switch (step) {
-      case 1:
-        return !!watchedTemplateId;
-      case 2:
-        return !!watchedAudience && (watchedAudience !== 'custom' || !!watchedRole);
-      case 3:
-        return !!watchedSubject && 
-          ((selectedTemplate?.id === 'custom-announcement' || selectedTemplate?.id === 'fully-custom') ? 
-            !!watchedCustomMessage : true);
-      default:
-        return false;
-    }
-  };
-
-  // Navigation handlers
-  const handleNextStep = () => {
-    if (currentStep < 3 && isStepComplete(currentStep)) {
+  
+  // Handle form submission
+  const onSubmit = (data: EmailFormValues) => {
+    if (currentStep < 3) {
+      // Move to next step
       setCurrentStep(currentStep + 1);
+    } else {
+      // Preview email before sending
+      previewEmail();
     }
   };
 
-  const handlePrevStep = () => {
+  // Go back to previous step
+  const goToPreviousStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
   };
 
-  // Render the Compose Email Wizard
+  // Render the email wizard based on current step
   const renderEmailWizard = () => {
     return (
-      <div className="space-y-8">
-        {/* Progress Bar */}
-        <div className="w-full">
-          <div className="flex justify-between mb-2">
-            <div className="w-full">
-              <Progress value={currentStep * 33.33} className="h-2" />
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Email Composer</CardTitle>
+              <CardDescription>Create and send emails to your event participants</CardDescription>
+            </div>
+            <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+              <div className={`flex items-center ${currentStep >= 1 ? 'text-primary font-medium' : ''}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${
+                  currentStep >= 1 ? 'bg-primary text-white' : 'bg-muted'
+                }`}>
+                  1
+                </div>
+                <span className="hidden sm:inline">Template</span>
+              </div>
+              <ChevronRight className="w-4 h-4 mx-1" />
+              <div className={`flex items-center ${currentStep >= 2 ? 'text-primary font-medium' : ''}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${
+                  currentStep >= 2 ? 'bg-primary text-white' : 'bg-muted'
+                }`}>
+                  2
+                </div>
+                <span className="hidden sm:inline">Recipients</span>
+              </div>
+              <ChevronRight className="w-4 h-4 mx-1" />
+              <div className={`flex items-center ${currentStep >= 3 ? 'text-primary font-medium' : ''}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${
+                  currentStep >= 3 ? 'bg-primary text-white' : 'bg-muted'
+                }`}>
+                  3
+                </div>
+                <span className="hidden sm:inline">Compose</span>
+              </div>
             </div>
           </div>
-          <div className="flex justify-between">
-            <div className={`text-center ${currentStep >= 1 ? 'text-primary' : 'text-muted-foreground'}`}>
-              <div className="mx-auto rounded-full w-8 h-8 flex items-center justify-center mb-1 border-2 border-primary bg-background">
-                {currentStep > 1 ? <CheckCircle className="h-5 w-5 text-primary" /> : <Mail className="h-5 w-5" />}
-              </div>
-              <div className="text-sm font-medium">Template</div>
-            </div>
-            <div className={`text-center ${currentStep >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
-              <div className="mx-auto rounded-full w-8 h-8 flex items-center justify-center mb-1 border-2 border-primary bg-background">
-                {currentStep > 2 ? <CheckCircle className="h-5 w-5 text-primary" /> : <Users className="h-5 w-5" />}
-              </div>
-              <div className="text-sm font-medium">Recipients</div>
-            </div>
-            <div className={`text-center ${currentStep >= 3 ? 'text-primary' : 'text-muted-foreground'}`}>
-              <div className="mx-auto rounded-full w-8 h-8 flex items-center justify-center mb-1 border-2 border-primary bg-background">
-                <FileText className="h-5 w-5" />
-              </div>
-              <div className="text-sm font-medium">Compose</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 1: Choose Template */}
-        {currentStep === 1 && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center text-xl">
-                  <Mail className="mr-2 h-5 w-5 text-primary" />
-                  Step 1: Choose Email Template
-                </CardTitle>
-                <CardDescription>
-                  Select the type of email you want to send
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoadingTemplates ? (
-                  <div className="flex justify-center items-center py-8">
-                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                    <span>Loading templates...</span>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Fully Custom Email Option - No Template */}
-                    <div
-                      className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
-                        watchedTemplateId === 'fully-custom'
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                      onClick={() => {
-                        // Create custom template data when selecting this option
-                        setSelectedTemplate({
-                          id: 'fully-custom',
-                          name: 'Fully Custom Email',
-                          subject: 'Custom Email Subject',
-                          body: '<div>{{messageContent}}</div>',
-                          description: 'Create a completely custom email with your own content',
-                          audience: 'all'
-                        });
-                        form.setValue("templateId", 'fully-custom');
-                        form.setValue("subject", "");
-                        form.setValue("customMessage", "");
-                      }}
-                    >
-                      <div className="flex items-center mb-2">
-                        {getTemplateIcon('fully-custom')}
-                        <div className="ml-4">
-                          <h3 className="font-medium text-lg">Fully Custom Email</h3>
-                          <Badge variant="outline" className="mt-1 bg-purple-50 text-purple-700 border-purple-200">
-                            Complete Customization
-                          </Badge>
-                        </div>
-                        {watchedTemplateId === 'fully-custom' && (
-                          <CheckCircle className="ml-auto h-5 w-5 text-primary" />
-                        )}
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Step 1: Select Email Template */}
+              {currentStep === 1 && (
+                <div className="space-y-6">
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {isLoadingTemplates ? (
+                      <div className="col-span-full flex justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       </div>
-                      <p className="text-muted-foreground text-sm mt-2">
-                        Start from scratch and design your own email with complete freedom
-                      </p>
-                    </div>
-                    
-                    {/* Pre-defined templates */}
-                    {templates.map((template: EmailTemplate) => (
-                      <div
-                        key={template.id}
-                        className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
-                          watchedTemplateId === template.id
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/50"
-                        }`}
-                        onClick={() => form.setValue("templateId", template.id)}
-                      >
-                        <div className="flex items-center mb-2">
-                          {getTemplateIcon(template.id)}
-                          <div className="ml-4">
-                            <h3 className="font-medium text-lg">{template.name}</h3>
-                            <Badge variant="outline" className="mt-1">
-                              {getAudienceName(template.audience)}
-                            </Badge>
-                          </div>
+                    ) : (
+                      templates.map((template: EmailTemplate) => (
+                        <div
+                          key={template.id}
+                          className={`relative rounded-lg border p-4 hover:border-primary cursor-pointer transition-all ${
+                            watchedTemplateId === template.id
+                              ? "border-primary bg-primary/5"
+                              : ""
+                          }`}
+                          onClick={() => form.setValue("templateId", template.id)}
+                        >
+                          <div className="mb-3">{getTemplateIcon(template.id)}</div>
+                          <h3 className="font-medium mb-1">{template.name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {template.description}
+                          </p>
                           {watchedTemplateId === template.id && (
-                            <CheckCircle className="ml-auto h-5 w-5 text-primary" />
+                            <div className="absolute top-3 right-3 text-primary">
+                              <CheckCircle className="h-5 w-5" />
+                            </div>
                           )}
                         </div>
-                        <p className="text-muted-foreground text-sm mt-2">
-                          {template.description}
-                        </p>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
-                )}
-              </CardContent>
-              <CardFooter className="flex justify-end border-t p-4">
-                <Button
-                  onClick={handleNextStep}
-                  disabled={!isStepComplete(1)}
-                >
-                  Next: Choose Recipients
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-        )}
 
-        {/* Step 2: Choose Recipients */}
-        {currentStep === 2 && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center text-xl">
-                  <Users className="mr-2 h-5 w-5 text-primary" />
-                  Step 2: Choose Recipients
-                </CardTitle>
-                <CardDescription>
-                  Select who will receive this email
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                  <form className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="eventId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center">
-                            <Calendar className="mr-2 h-4 w-4 text-primary" />
-                            Related Event
-                          </FormLabel>
-                          <Select
-                            onValueChange={(value) => field.onChange(parseInt(value))}
-                            value={field.value?.toString()}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select an event (optional)" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {isLoadingEvents ? (
-                                <div className="flex items-center justify-center p-2">
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  <span>Loading events...</span>
-                                </div>
-                              ) : (
-                                events.map((event: Event) => (
-                                  <SelectItem key={event.id} value={event.id.toString()}>
-                                    {event.title}
-                                  </SelectItem>
-                                ))
-                              )}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Selecting an event will filter recipients and include event details in the email
-                          </FormDescription>
-                        </FormItem>
-                      )}
-                    />
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!watchedTemplateId}
+                    >
+                      Continue to Recipients
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
 
+              {/* Step 2: Select Recipients */}
+              {currentStep === 2 && (
+                <div className="space-y-6">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    {/* Audience Selection */}
                     <FormField
                       control={form.control}
                       name="audience"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="flex items-center">
-                            <Users className="mr-2 h-4 w-4 text-primary" />
-                            Recipient Group
-                          </FormLabel>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div
-                                    className={`border rounded-lg p-3 cursor-pointer transition-all text-center ${
-                                      field.value === 'all'
-                                        ? "border-primary bg-primary/5"
-                                        : "border-border hover:border-primary/50"
-                                    }`}
-                                    onClick={() => field.onChange('all')}
-                                  >
-                                    <Users className="h-8 w-8 mx-auto mb-1 text-slate-600" />
-                                    <div className="font-medium">All Users</div>
-                                    {field.value === 'all' && (
-                                      <CheckCircle className="h-4 w-4 absolute top-2 right-2 text-primary" />
-                                    )}
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  Send to all users in the system
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div
-                                    className={`border rounded-lg p-3 cursor-pointer transition-all text-center ${
-                                      field.value === 'tickets'
-                                        ? "border-primary bg-primary/5"
-                                        : "border-border hover:border-primary/50"
-                                    }`}
-                                    onClick={() => field.onChange('tickets')}
-                                  >
-                                    <Ticket className="h-8 w-8 mx-auto mb-1 text-emerald-500" />
-                                    <div className="font-medium">Ticket Holders</div>
-                                    {field.value === 'tickets' && (
-                                      <CheckCircle className="h-4 w-4 absolute top-2 right-2 text-primary" />
-                                    )}
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  Only users who have purchased tickets
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div
-                                    className={`border rounded-lg p-3 cursor-pointer transition-all text-center ${
-                                      field.value === 'vendors'
-                                        ? "border-primary bg-primary/5"
-                                        : "border-border hover:border-primary/50"
-                                    }`}
-                                    onClick={() => field.onChange('vendors')}
-                                  >
-                                    <Store className="h-8 w-8 mx-auto mb-1 text-indigo-500" />
-                                    <div className="font-medium">Vendors</div>
-                                    {field.value === 'vendors' && (
-                                      <CheckCircle className="h-4 w-4 absolute top-2 right-2 text-primary" />
-                                    )}
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  Registered vendors and exhibitors
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div
-                                    className={`border rounded-lg p-3 cursor-pointer transition-all text-center ${
-                                      field.value === 'volunteers'
-                                        ? "border-primary bg-primary/5"
-                                        : "border-border hover:border-primary/50"
-                                    }`}
-                                    onClick={() => field.onChange('volunteers')}
-                                  >
-                                    <Heart className="h-8 w-8 mx-auto mb-1 text-rose-500" />
-                                    <div className="font-medium">Volunteers</div>
-                                    {field.value === 'volunteers' && (
-                                      <CheckCircle className="h-4 w-4 absolute top-2 right-2 text-primary" />
-                                    )}
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  Volunteers who have signed up
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div
-                                    className={`border rounded-lg p-3 cursor-pointer transition-all text-center ${
-                                      field.value === 'custom'
-                                        ? "border-primary bg-primary/5"
-                                        : "border-border hover:border-primary/50"
-                                    }`}
-                                    onClick={() => field.onChange('custom')}
-                                  >
-                                    <UserCog className="h-8 w-8 mx-auto mb-1 text-amber-500" />
-                                    <div className="font-medium">Custom</div>
-                                    {field.value === 'custom' && (
-                                      <CheckCircle className="h-4 w-4 absolute top-2 right-2 text-primary" />
-                                    )}
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  Create a custom recipient group
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-
-                    {watchedAudience === 'custom' && (
-                      <FormField
-                        control={form.control}
-                        name="role"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>User Role</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select user role" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="all">All Roles</SelectItem>
-                                <SelectItem value="user">Regular Users</SelectItem>
-                                <SelectItem value="admin">Administrators</SelectItem>
-                                <SelectItem value="event_owner">Event Organizers</SelectItem>
-                                <SelectItem value="vendor">Vendors</SelectItem>
-                                <SelectItem value="volunteer">Volunteers</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormItem>
-                        )}
-                      />
-                    )}
-
-                    {(watchedAudience === 'vendors' || watchedAudience === 'volunteers') && (
-                      <FormField
-                        control={form.control}
-                        name="status"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Registration Status</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                              defaultValue="all"
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select status" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="approved">Approved</SelectItem>
-                                <SelectItem value="rejected">Rejected</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormItem>
-                        )}
-                      />
-                    )}
-
-                    <Alert
-                      className={recipientCount > 0 ? 'bg-primary/10 border-primary/20' : 'bg-amber-50 border-amber-200'}
-                    >
-                      <Users className="h-4 w-4" />
-                      <AlertTitle>Recipient Summary</AlertTitle>
-                      <AlertDescription>
-                        {recipientCount > 0 ? (
-                          <span>This email will be sent to <strong>{recipientCount} recipients</strong></span>
-                        ) : (
-                          <span>No recipients match your selected criteria</span>
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  </form>
-                </Form>
-              </CardContent>
-              <CardFooter className="flex justify-between border-t p-4">
-                <Button variant="outline" onClick={handlePrevStep}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Templates
-                </Button>
-                <Button
-                  onClick={handleNextStep}
-                  disabled={!isStepComplete(2) || recipientCount === 0}
-                >
-                  Next: Compose Email
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-        )}
-
-        {/* Step 3: Compose Email */}
-        {currentStep === 3 && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center text-xl">
-                  <FileText className="mr-2 h-5 w-5 text-primary" />
-                  Step 3: Compose Email
-                </CardTitle>
-                <CardDescription>
-                  Customize your email content and preview before sending
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="bg-muted/30 rounded-lg p-4 border mb-6">
-                      <div className="flex items-start">
-                        {selectedTemplate && getTemplateIcon(selectedTemplate.id)}
-                        <div className="ml-4">
-                          <h3 className="text-lg font-medium">{selectedTemplate?.name}</h3>
-                          <div className="flex flex-wrap items-center text-sm text-muted-foreground mt-1 space-x-4">
-                            <span className="flex items-center">
-                              {getAudienceIcon(watchedAudience)}
-                              <span className="ml-1">{getAudienceName(watchedAudience)}</span>
-                            </span>
-                            <span className="flex items-center">
-                              <Users className="h-4 w-4 mr-1" />
-                              <span>{recipientCount} recipients</span>
-                            </span>
-                            {watchedEventId && (
-                              <span className="flex items-center">
-                                <Calendar className="h-4 w-4 mr-1" />
-                                <span>
-                                  {events.find((e: Event) => e.id === watchedEventId)?.title}
-                                </span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <FormField
-                      control={form.control}
-                      name="subject"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center text-base">
-                            <Mail className="mr-2 h-4 w-4 text-primary" />
-                            Email Subject
-                          </FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Enter email subject" 
-                              className="text-base"
-                              {...field} 
-                            />
-                          </FormControl>
+                          <FormLabel>Recipient Audience</FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select audience" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="all">All Participants</SelectItem>
+                              <SelectItem value="tickets">Ticket Holders</SelectItem>
+                              <SelectItem value="vendors">Vendors</SelectItem>
+                              <SelectItem value="volunteers">Volunteers</SelectItem>
+                              <SelectItem value="custom">Custom Group</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormDescription>
-                            A clear subject line increases open rates
+                            Choose who will receive this email
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
-                    {(selectedTemplate?.id === 'custom-announcement' || selectedTemplate?.id === 'fully-custom') && (
+                    {/* Event Selection */}
+                    <FormField
+                      control={form.control}
+                      name="eventId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Related Event (Optional)</FormLabel>
+                          <Select
+                            value={field.value?.toString() || ''}
+                            onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select event" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">Any Event</SelectItem>
+                              {events.map((event: Event) => (
+                                <SelectItem key={event.id} value={event.id.toString()}>
+                                  {event.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Limit recipients to a specific event
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Custom filters when audience is "custom" */}
+                    {watchedAudience === 'custom' && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="role"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>User Role</FormLabel>
+                              <Select
+                                value={field.value || ''}
+                                onValueChange={field.onChange}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select role" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="admin">Administrators</SelectItem>
+                                  <SelectItem value="event_owner">Event Organizers</SelectItem>
+                                  <SelectItem value="user">Regular Users</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                Filter by user role
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
+                    
+                    {/* Additional filters for tickets/vendors/volunteers */}
+                    {['tickets', 'vendors', 'volunteers'].includes(watchedAudience) && (
                       <FormField
                         control={form.control}
-                        name="customMessage"
+                        name="status"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="flex items-center text-base">
-                              <FileText className="mr-2 h-4 w-4 text-primary" />
-                              {selectedTemplate?.id === 'fully-custom' ? 'Email Content' : 'Custom Message'}
-                            </FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder={selectedTemplate?.id === 'fully-custom' ? 
-                                  "Enter your complete email content here. You can use HTML formatting." : 
-                                  "Enter your custom message content"}
-                                className="min-h-[300px] text-base"
-                                {...field}
-                              />
-                            </FormControl>
+                            <FormLabel>Status</FormLabel>
+                            <Select
+                              value={field.value || ''}
+                              onValueChange={field.onChange}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Any status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">Any Status</SelectItem>
+                                {watchedAudience === 'tickets' && (
+                                  <>
+                                    <SelectItem value="active">Active Tickets</SelectItem>
+                                    <SelectItem value="used">Used Tickets</SelectItem>
+                                    <SelectItem value="refunded">Refunded Tickets</SelectItem>
+                                  </>
+                                )}
+                                {watchedAudience === 'vendors' && (
+                                  <>
+                                    <SelectItem value="pending">Pending Applications</SelectItem>
+                                    <SelectItem value="approved">Approved Vendors</SelectItem>
+                                    <SelectItem value="rejected">Rejected Applications</SelectItem>
+                                  </>
+                                )}
+                                {watchedAudience === 'volunteers' && (
+                                  <>
+                                    <SelectItem value="pending">Pending Applications</SelectItem>
+                                    <SelectItem value="scheduled">Scheduled Volunteers</SelectItem>
+                                    <SelectItem value="completed">Completed Shifts</SelectItem>
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
                             <FormDescription>
-                              {selectedTemplate?.id === 'fully-custom' ? 
-                                "This will be the main content of your email. You can use HTML for formatting." :
-                                `This content will replace the <code className="bg-muted px-1 py-0.5 rounded">{"{{messageContent}}"}</code> placeholder in the template`
-                              }
+                              Filter by {watchedAudience} status
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     )}
+                  </div>
 
-                    <div className="bg-muted/20 rounded-lg p-4 border">
-                      <Label className="flex items-center text-base mb-3">
-                        <Eye className="mr-2 h-4 w-4 text-primary" />
-                        Email Preview & Testing
-                      </Label>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => setIsShowingPreview(true)}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Preview Email
-                          </Button>
-                        </div>
-                        
-                        <div className="flex space-x-2">
-                          <FormField
-                            control={form.control}
-                            name="testEmail"
-                            render={({ field }) => (
-                              <FormControl>
-                                <Input 
-                                  placeholder="your@email.com" 
-                                  className="flex-1"
-                                  {...field} 
-                                />
-                              </FormControl>
-                            )}
-                          />
-                          <Button 
-                            type="button"
-                            variant="secondary"
-                            onClick={handleSendTest}
-                            disabled={isSendingTest || !form.getValues('testEmail')}
-                          >
-                            {isSendingTest ? (
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            ) : (
-                              <Send className="h-4 w-4 mr-2" />
-                            )}
-                            Test
-                          </Button>
-                        </div>
-                      </div>
+                  {recipientCount > 0 ? (
+                    <Alert className="bg-green-50 text-green-800 border-green-200">
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertTitle>Recipients Found</AlertTitle>
+                      <AlertDescription>
+                        This email will be sent to {recipientCount} {getAudienceName(watchedAudience).toLowerCase()}.
+                      </AlertDescription>
+                    </Alert>
+                  ) : watchedAudience ? (
+                    <Alert className="bg-amber-50 text-amber-800 border-amber-200">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>No Recipients Found</AlertTitle>
+                      <AlertDescription>
+                        No recipients match your selected criteria. Try adjusting your filters.
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+
+                  <div className="flex justify-between">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={goToPreviousStep}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back to Templates
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={!watchedAudience || recipientCount === 0}
+                    >
+                      Continue to Compose
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Compose Email */}
+              {currentStep === 3 && (
+                <div className="space-y-6">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <FormField
+                        control={form.control}
+                        name="subject"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email Subject</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter subject line" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              An effective subject line improves open rates
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                      <Card className="bg-muted/10">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">Available Placeholders</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex flex-wrap gap-2">
-                            <Badge variant="outline" className="bg-white">
-                              <code>{"{{recipientName}}"}</code>
-                            </Badge>
-                            <Badge variant="outline" className="bg-white">
-                              <code>{"{{eventName}}"}</code>
-                            </Badge>
-                            <Badge variant="outline" className="bg-white">
-                              <code>{"{{eventDate}}"}</code>
-                            </Badge>
-                            <Badge variant="outline" className="bg-white">
-                              <code>{"{{eventLocation}}"}</code>
-                            </Badge>
-                            <Badge variant="outline" className="bg-white">
-                              <code>{"{{organizationName}}"}</code>
-                            </Badge>
+                    
+                    <div className="sm:col-span-2">
+                      <FormField
+                        control={form.control}
+                        name="customMessage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Custom Message (Optional)</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Add your personal message here..."
+                                className="min-h-[150px]"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              This text will replace the {{messageContent}} placeholder in the template
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <Card className="sm:col-span-2 bg-slate-50 border">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">Available Placeholders</CardTitle>
+                        <CardDescription>
+                          These tags will be replaced with actual content
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                          <div className="flex justify-between py-1 px-2 rounded bg-white">
+                            <code className="text-pink-600">{'{{recipientName}}'}</code>
+                            <span className="text-muted-foreground">Recipient's full name</span>
                           </div>
-                        </CardContent>
-                      </Card>
-                      
-                      <Card className="bg-muted/10">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">Placeholder Values</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-1 text-sm">
-                          {Object.entries(placeholderValues).map(([key, value]) => (
-                            <div key={key} className="flex justify-between">
-                              <span className="text-muted-foreground"><code>{`{{${key}}}`}</code></span>
-                              <span className="font-medium truncate max-w-[150px]">{value}</span>
+                          <div className="flex justify-between py-1 px-2 rounded bg-white">
+                            <code className="text-pink-600">{'{{eventName}}'}</code>
+                            <span className="text-muted-foreground">Event title</span>
+                          </div>
+                          <div className="flex justify-between py-1 px-2 rounded bg-white">
+                            <code className="text-pink-600">{'{{eventDate}}'}</code>
+                            <span className="text-muted-foreground">Event date</span>
+                          </div>
+                          <div className="flex justify-between py-1 px-2 rounded bg-white">
+                            <code className="text-pink-600">{'{{eventLocation}}'}</code>
+                            <span className="text-muted-foreground">Event venue</span>
+                          </div>
+                          <div className="flex justify-between py-1 px-2 rounded bg-white">
+                            <code className="text-pink-600">{'{{organizationName}}'}</code>
+                            <span className="text-muted-foreground">Your organization</span>
+                          </div>
+                          <div className="flex justify-between py-1 px-2 rounded bg-white">
+                            <code className="text-pink-600">{'{{messageContent}}'}</code>
+                            <span className="text-muted-foreground">Your custom message</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <div className="sm:col-span-2">
+                      <FormField
+                        control={form.control}
+                        name="testEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Send Test Email (Optional)</FormLabel>
+                            <div className="flex space-x-2">
+                              <FormControl>
+                                <Input type="email" placeholder="your@email.com" {...field} />
+                              </FormControl>
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={sendTestEmail}
+                                disabled={isSendingTest || !field.value}
+                              >
+                                {isSendingTest ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Sending...
+                                  </>
+                                ) : (
+                                  <>
+                                    Send Test
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  generatePreview();
+                                  setIsShowingPreview(true);
+                                }}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                Preview
+                              </Button>
                             </div>
-                          ))}
-                        </CardContent>
-                      </Card>
+                            <FormDescription>
+                              Send yourself a test email to verify the content
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-                  </form>
-                </Form>
-              </CardContent>
-              <CardFooter className="flex justify-between border-t p-4">
-                <Button variant="outline" onClick={handlePrevStep}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Recipients
-                </Button>
-                <Button
-                  type="submit"
-                  onClick={form.handleSubmit(onSubmit)}
-                  disabled={!isStepComplete(3) || recipientCount === 0}
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  Send Email Campaign
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-        )}
-      </div>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={goToPreviousStep}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back to Recipients
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={previewEmail}
+                      disabled={!form.formState.isValid}
+                    >
+                      Preview & Send
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     );
   };
 
-  // Render Sent History view
+  // Render sent history
   const renderSentHistory = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <ArchiveIcon className="mr-2 h-5 w-5 text-primary" />
-            Email Campaign History
-          </CardTitle>
-          <CardDescription>
-            View details of previously sent email campaigns
-          </CardDescription>
+          <CardTitle>Email History</CardTitle>
+          <CardDescription>Track your previous email campaigns</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="text-left p-3 font-medium">Date</th>
-                  <th className="text-left p-3 font-medium">Subject</th>
-                  <th className="text-left p-3 font-medium">Audience</th>
-                  <th className="text-left p-3 font-medium">Recipients</th>
-                  <th className="text-left p-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockEmailHistory.map((email, i) => (
-                  <tr key={email.id} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
-                    <td className="p-3">{email.date}</td>
-                    <td className="p-3 max-w-[200px] truncate">{email.subject}</td>
-                    <td className="p-3">
-                      <div className="flex items-center">
-                        {getAudienceIcon(email.audience)}
-                        <span className="ml-2">{getAudienceName(email.audience)}</span>
-                      </div>
-                    </td>
-                    <td className="p-3">{email.recipients}</td>
-                    <td className="p-3">
-                      <Badge variant={email.status === 'sent' ? 'default' : (email.status === 'pending' ? 'outline' : 'destructive')}>
-                        {email.status}
-                      </Badge>
-                    </td>
+          <div className="border rounded-md overflow-hidden">
+            {mockEmailHistory.length === 0 ? (
+              <div className="py-12 text-center">
+                <Mail className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                <h3 className="text-lg font-medium mb-1">No Email History</h3>
+                <p className="text-muted-foreground">You haven't sent any emails yet</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left p-3">Date</th>
+                    <th className="text-left p-3">Subject</th>
+                    <th className="text-left p-3">Audience</th>
+                    <th className="text-left p-3">Recipients</th>
+                    <th className="text-left p-3">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y">
+                  {mockEmailHistory.map((email) => (
+                    <tr key={email.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="p-3">{email.date}</td>
+                      <td className="p-3 max-w-[200px] truncate">{email.subject}</td>
+                      <td className="p-3">
+                        <div className="flex items-center">
+                          {getAudienceIcon(email.audience)}
+                          <span className="ml-2">{getAudienceName(email.audience)}</span>
+                        </div>
+                      </td>
+                      <td className="p-3">{email.recipients}</td>
+                      <td className="p-3">
+                        <Badge variant={email.status === 'sent' ? 'default' : (email.status === 'pending' ? 'outline' : 'destructive')}>
+                          {email.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1122,138 +918,144 @@ export default function EmailNotificationsPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-1">Email Campaigns</h1>
-          <p className="text-muted-foreground">
-            Create, send, and manage email campaigns to your event participants
-          </p>
-        </div>
-        {recipientCount > 0 && (
-          <Badge variant="secondary" className="text-base py-1 px-3">
-            <Users className="mr-2 h-4 w-4" />
-            {recipientCount} Recipients
-          </Badge>
-        )}
-      </div>
-
-      <Tabs defaultValue="compose" className="space-y-4">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="compose" className="flex items-center">
-            <Mail className="mr-2 h-4 w-4" />
-            <span>Create Campaign</span>
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center">
-            <ArchiveIcon className="mr-2 h-4 w-4" />
-            <span>Campaign History</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="compose" className="space-y-4">
-          {renderEmailWizard()}
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
-          {renderSentHistory()}
-        </TabsContent>
-      </Tabs>
-
-      {/* Email Preview Modal */}
-      {isShowingPreview && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-2xl font-bold">Email Preview</h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 w-8 p-0" 
-                  onClick={() => setIsShowingPreview(false)}
-                >
-                  ✕
-                </Button>
-              </div>
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <main className="flex-grow">
+        <div className="container mx-auto py-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-1">Email Campaigns</h1>
               <p className="text-muted-foreground">
-                Review how your email will appear to recipients
+                Create, send, and manage email campaigns to your event participants
               </p>
             </div>
+            {recipientCount > 0 && (
+              <Badge variant="secondary" className="text-base py-1 px-3">
+                <Users className="mr-2 h-4 w-4" />
+                {recipientCount} Recipients
+              </Badge>
+            )}
+          </div>
 
-            <div className="grid md:grid-cols-3 gap-6 p-6">
-              <div className="md:col-span-2">
-                <div className="border rounded-xl overflow-hidden">
-                  <div className="bg-slate-50 p-4 border-b">
-                    <div className="font-medium">Subject:</div>
-                    <div className="text-lg">{previewSubject}</div>
+          <Tabs defaultValue="compose" className="space-y-4">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="compose" className="flex items-center">
+                <Mail className="mr-2 h-4 w-4" />
+                <span>Create Campaign</span>
+              </TabsTrigger>
+              <TabsTrigger value="history" className="flex items-center">
+                <ArchiveIcon className="mr-2 h-4 w-4" />
+                <span>Campaign History</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="compose" className="space-y-4">
+              {renderEmailWizard()}
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-4">
+              {renderSentHistory()}
+            </TabsContent>
+          </Tabs>
+
+          {/* Email Preview Modal */}
+          {isShowingPreview && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+              <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 border-b">
+                  <div className="flex justify-between items-center mb-2">
+                    <h2 className="text-2xl font-bold">Email Preview</h2>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0" 
+                      onClick={() => setIsShowingPreview(false)}
+                    >
+                      ✕
+                    </Button>
                   </div>
-                  <div className="bg-white p-6 prose max-w-none" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                  <p className="text-muted-foreground">
+                    Review how your email will appear to recipients
+                  </p>
                 </div>
-              </div>
 
-              <div>
-                <div className="bg-slate-50 rounded-xl border p-4 mb-4">
-                  <h3 className="font-medium text-lg mb-4">Campaign Summary</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-sm text-muted-foreground">Template</div>
-                      <div className="font-medium">{selectedTemplate?.name}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">Recipients</div>
-                      <div className="font-medium">{recipientCount} {getAudienceName(watchedAudience).toLowerCase()}</div>
-                    </div>
-                    {watchedEventId && (
-                      <div>
-                        <div className="text-sm text-muted-foreground">Event</div>
-                        <div className="font-medium">
-                          {events.find((e: Event) => e.id === watchedEventId)?.title}
-                        </div>
+                <div className="grid md:grid-cols-3 gap-6 p-6">
+                  <div className="md:col-span-2">
+                    <div className="border rounded-xl overflow-hidden">
+                      <div className="bg-slate-50 p-4 border-b">
+                        <div className="font-medium">Subject:</div>
+                        <div className="text-lg">{previewSubject}</div>
                       </div>
-                    )}
+                      <div className="bg-white p-6 prose max-w-none" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                    </div>
                   </div>
-                </div>
 
-                <Alert className="bg-amber-50 text-amber-800 border-amber-200">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Ready to Send?</AlertTitle>
-                  <AlertDescription>
-                    This email will be sent to {recipientCount} recipients. 
-                    This action cannot be undone.
-                  </AlertDescription>
-                </Alert>
+                  <div>
+                    <div className="bg-slate-50 rounded-xl border p-4 mb-4">
+                      <h3 className="font-medium text-lg mb-4">Campaign Summary</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <div className="text-sm text-muted-foreground">Template</div>
+                          <div className="font-medium">{selectedTemplate?.name}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-muted-foreground">Recipients</div>
+                          <div className="font-medium">{recipientCount} {getAudienceName(watchedAudience).toLowerCase()}</div>
+                        </div>
+                        {watchedEventId && (
+                          <div>
+                            <div className="text-sm text-muted-foreground">Event</div>
+                            <div className="font-medium">
+                              {events.find((e: Event) => e.id === watchedEventId)?.title}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                <div className="mt-4 flex flex-col space-y-2">
-                  <Button 
-                    variant="outline"
-                    className="w-full" 
-                    onClick={() => setIsShowingPreview(false)}
-                  >
-                    Back to Edit
-                  </Button>
-                  <Button 
-                    className="w-full" 
-                    onClick={confirmAndSendEmail}
-                    disabled={sendEmailMutation.isPending}
-                  >
-                    {sendEmailMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="mr-2 h-4 w-4" />
-                        Send to {recipientCount} Recipients
-                      </>
-                    )}
-                  </Button>
+                    <Alert className="bg-amber-50 text-amber-800 border-amber-200">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Ready to Send?</AlertTitle>
+                      <AlertDescription>
+                        This email will be sent to {recipientCount} recipients. 
+                        This action cannot be undone.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="mt-4 flex flex-col space-y-2">
+                      <Button 
+                        variant="outline"
+                        className="w-full" 
+                        onClick={() => setIsShowingPreview(false)}
+                      >
+                        Back to Edit
+                      </Button>
+                      <Button 
+                        className="w-full" 
+                        onClick={confirmAndSendEmail}
+                        disabled={sendEmailMutation.isPending}
+                      >
+                        {sendEmailMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="mr-2 h-4 w-4" />
+                            Send to {recipientCount} Recipients
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </main>
+      <Footer />
     </div>
   );
 }
