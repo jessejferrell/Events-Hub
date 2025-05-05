@@ -265,7 +265,12 @@ async function sendBulkEmail(
   htmlContent: string,
   recipients: Array<{ email: string; name: string }>,
   testMode: boolean = false
-): Promise<{ success: boolean; sent: number; errors: Array<{ email: string; error: string }> }> {
+): Promise<{ 
+  success: boolean; 
+  sent: number; 
+  errors: Array<{ email: string; error: string }>;
+  systemError?: string;
+}> {
   // Create a nodemailer transport using SMTP
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -315,7 +320,7 @@ async function sendBulkEmail(
     try {
       // Set timeout of 30 seconds per email send
       const emailPromise = transporter.sendMail({
-        from: `"City Event Hub" <${process.env.SMTP_FROM_EMAIL}>`,
+        from: `"Moss Point Main Street" <${process.env.SMTP_FROM_EMAIL}>`,
         to: recipient.email,
         subject: subject,
         html: htmlContent,
