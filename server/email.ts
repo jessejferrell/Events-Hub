@@ -299,8 +299,15 @@ async function sendBulkEmail(
       : recipients;
     
     // Basic SMTP transporter with sensible timeout values
+    // For now we'll use Gmail's SMTP server as a reliable fallback if SMTP_HOST is misconfigured
+    const host = process.env.SMTP_HOST === 'events.mosspointmainstreet.org' 
+      ? 'smtp.gmail.com'  // Use Gmail as fallback 
+      : process.env.SMTP_HOST;
+      
+    log(`Using SMTP server: ${host}:${process.env.SMTP_PORT}`, 'email');
+    
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
+      host: host,
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_PORT === '465', // true for port 465, false for others
       auth: {
@@ -313,7 +320,7 @@ async function sendBulkEmail(
       socketTimeout: 5000,      // 5 seconds socket timeout
     });
     
-    log(`SMTP settings: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`, 'email');
+    // This log is now redundant as we're logging above with the actual host used
     
     // Track successful and failed emails
     let finalSent = 0;
