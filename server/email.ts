@@ -287,15 +287,19 @@ async function sendBulkEmail(
   
   log(`Attempting to send email to ${targetRecipients.length} recipients`, 'email');
   
-  // Set up a much simpler nodemailer transport
+  // Set up nodemailer transport using environment variables
   const transport = {
-    host: 'events.mosspointmainstreet.org',
-    port: 465,
+    host: process.env.SMTP_HOST || 'events.mosspointmainstreet.org',
+    port: parseInt(process.env.SMTP_PORT || '465'),
     secure: true,
     auth: {
       user: process.env.SMTP_USER || '',
       pass: process.env.SMTP_PASSWORD || ''
-    }
+    },
+    // Add timeout to prevent hanging forever
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 15000
   };
   
   log(`SMTP Configuration: ${transport.host}:${transport.port}`, 'email');
@@ -308,19 +312,8 @@ async function sendBulkEmail(
     // Create a new transporter for each batch 
     const transporter = nodemailer.createTransport(transport);
     
-    // Try to verify SMTP connection
-    try {
-      await transporter.verify();
-      log('SMTP connection verified successfully', 'email');
-    } catch (err: any) {
-      log(`ERROR: SMTP connection verification failed: ${err.message}`, 'email');
-      return {
-        success: false,
-        sent: 0,
-        errors: [],
-        systemError: `SMTP connection failed: ${err.message}`
-      };
-    }
+    // Skip the verification step - it's causing the hanging
+    log('Creating mail transport (skipping verification)', 'email');
     
     // Send to all recipients one by one
     for (const recipient of targetRecipients) {
