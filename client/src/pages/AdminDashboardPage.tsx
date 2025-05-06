@@ -586,11 +586,45 @@ export default function AdminDashboardPage() {
   // User management handlers
   const fetchUserDetails = async (userId: number) => {
     try {
+      // Fetch basic user details
       const res = await fetch(`/api/admin/users/${userId}/details`);
       if (!res.ok) throw new Error('Failed to fetch user details');
       const userData = await res.json();
       setSelectedUser(userData);
       setShowUserDetail(true);
+      
+      // Fetch user transaction history
+      try {
+        // Fetch user notes
+        const notesRes = await fetch(`/api/admin/notes/user/${userId}`);
+        if (notesRes.ok) {
+          const notesData = await notesRes.json();
+          setUserNotes(notesData);
+        }
+        
+        // Fetch user orders
+        const ordersRes = await fetch(`/api/admin/users/${userId}/orders`);
+        if (ordersRes.ok) {
+          const ordersData = await ordersRes.json();
+          setUserOrders(ordersData);
+        }
+        
+        // Fetch user vendor registrations
+        const vendorRes = await fetch(`/api/admin/users/${userId}/vendor-registrations`);
+        if (vendorRes.ok) {
+          const vendorData = await vendorRes.json();
+          setUserVendorRegistrations(vendorData);
+        }
+        
+        // Fetch user volunteer assignments
+        const volunteerRes = await fetch(`/api/admin/users/${userId}/volunteer-assignments`);
+        if (volunteerRes.ok) {
+          const volunteerData = await volunteerRes.json();
+          setUserVolunteerAssignments(volunteerData);
+        }
+      } catch (historyError) {
+        console.error('Error fetching user transaction history:', historyError);
+      }
     } catch (error) {
       console.error('Error fetching user details:', error);
     }
@@ -617,11 +651,11 @@ export default function AdminDashboardPage() {
   // User edit handlers
   const handleEditUser = (user: UserType) => {
     // Can only edit if:
-    // 1. Current user is SUPER ADMIN (jessejferrell@gmail.com), or
-    // 2. Current user is admin AND target user is not an admin
+    // 1. Current user is super_admin (can edit anyone), or
+    // 2. Current user is admin AND target user is not admin or super_admin
     const canEdit = 
-      (currentUser?.email === 'jessejferrell@gmail.com') || 
-      (currentUserRole === 'admin' && user.role !== 'admin');
+      (currentUserRole === 'super_admin') || 
+      (currentUserRole === 'admin' && user.role !== 'admin' && user.role !== 'super_admin');
     
     if (!canEdit) {
       return; // Don't allow editing
@@ -1567,15 +1601,24 @@ export default function AdminDashboardPage() {
                                   <SelectValue placeholder="Select Role" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {/* Only super_admin can create another super_admin */}
-                                  {currentUserRole === 'super_admin' && (
-                                    <SelectItem value="super_admin">Super Administrator</SelectItem>
+                                  {/* Super admin can assign any role */}
+                                  {currentUserRole === 'super_admin' ? (
+                                    <>
+                                      <SelectItem value="super_admin">Super Administrator</SelectItem>
+                                      <SelectItem value="admin">Administrator</SelectItem>
+                                      <SelectItem value="event_owner">Event Organizer</SelectItem>
+                                      <SelectItem value="vendor">Vendor</SelectItem>
+                                      <SelectItem value="volunteer">Volunteer</SelectItem>
+                                      <SelectItem value="user">Regular User</SelectItem>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <SelectItem value="event_owner">Event Organizer</SelectItem>
+                                      <SelectItem value="vendor">Vendor</SelectItem>
+                                      <SelectItem value="volunteer">Volunteer</SelectItem>
+                                      <SelectItem value="user">Regular User</SelectItem>
+                                    </>
                                   )}
-                                  <SelectItem value="admin">Administrator</SelectItem>
-                                  <SelectItem value="event_owner">Event Organizer</SelectItem>
-                                  <SelectItem value="vendor">Vendor</SelectItem>
-                                  <SelectItem value="volunteer">Volunteer</SelectItem>
-                                  <SelectItem value="user">Regular User</SelectItem>
                                 </SelectContent>
                               </Select>
                             ) : (
@@ -1682,6 +1725,140 @@ export default function AdminDashboardPage() {
                               </div>
                             )}
                           </div>
+                        </div>
+                        
+                        {/* User Transaction History */}
+                        <div className="border rounded-lg p-4">
+                          <h4 className="font-medium mb-3">Transaction History</h4>
+                          <Tabs defaultValue="orders">
+                            <TabsList className="mb-3 bg-neutral-100">
+                              <TabsTrigger value="orders">Orders & Tickets</TabsTrigger>
+                              <TabsTrigger value="vendor">Vendor Registrations</TabsTrigger>
+                              <TabsTrigger value="volunteer">Volunteer Assignments</TabsTrigger>
+                            </TabsList>
+                            
+                            <TabsContent value="orders" className="space-y-4">
+                              {userOrders && userOrders.length > 0 ? (
+                                <div className="max-h-[300px] overflow-y-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b">
+                                        <th className="text-left py-2 px-2">Order #</th>
+                                        <th className="text-left py-2 px-2">Date</th>
+                                        <th className="text-left py-2 px-2">Event</th>
+                                        <th className="text-left py-2 px-2">Total</th>
+                                        <th className="text-left py-2 px-2">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {userOrders.map((order) => (
+                                        <tr key={order.id} className="border-b hover:bg-neutral-50">
+                                          <td className="py-2 px-2">
+                                            <span className="font-mono text-xs">{order.orderNumber}</span>
+                                          </td>
+                                          <td className="py-2 px-2">
+                                            {new Date(order.createdAt).toLocaleDateString()}
+                                          </td>
+                                          <td className="py-2 px-2">{order.eventTitle}</td>
+                                          <td className="py-2 px-2">${order.total.toFixed(2)}</td>
+                                          <td className="py-2 px-2">
+                                            <Badge variant={order.status === 'completed' ? 'success' : 
+                                                          order.status === 'pending' ? 'warning' : 'secondary'}>
+                                              {order.status}
+                                            </Badge>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div className="text-center py-8 text-neutral-500">
+                                  No order history found
+                                </div>
+                              )}
+                            </TabsContent>
+                            
+                            <TabsContent value="vendor" className="space-y-4">
+                              {userVendorRegistrations && userVendorRegistrations.length > 0 ? (
+                                <div className="max-h-[300px] overflow-y-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b">
+                                        <th className="text-left py-2 px-2">Event</th>
+                                        <th className="text-left py-2 px-2">Spot</th>
+                                        <th className="text-left py-2 px-2">Date</th>
+                                        <th className="text-left py-2 px-2">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {userVendorRegistrations.map((registration) => (
+                                        <tr key={registration.id} className="border-b hover:bg-neutral-50">
+                                          <td className="py-2 px-2">{registration.eventTitle}</td>
+                                          <td className="py-2 px-2">{registration.spotName}</td>
+                                          <td className="py-2 px-2">
+                                            {new Date(registration.createdAt).toLocaleDateString()}
+                                          </td>
+                                          <td className="py-2 px-2">
+                                            <Badge 
+                                              variant={registration.status === 'approved' ? 'success' : 
+                                                     registration.status === 'pending' ? 'warning' : 
+                                                     registration.status === 'rejected' ? 'destructive' : 'secondary'}>
+                                              {registration.status}
+                                            </Badge>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div className="text-center py-8 text-neutral-500">
+                                  No vendor registrations found
+                                </div>
+                              )}
+                            </TabsContent>
+                            
+                            <TabsContent value="volunteer" className="space-y-4">
+                              {userVolunteerAssignments && userVolunteerAssignments.length > 0 ? (
+                                <div className="max-h-[300px] overflow-y-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b">
+                                        <th className="text-left py-2 px-2">Event</th>
+                                        <th className="text-left py-2 px-2">Shift</th>
+                                        <th className="text-left py-2 px-2">Date</th>
+                                        <th className="text-left py-2 px-2">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {userVolunteerAssignments.map((assignment) => (
+                                        <tr key={assignment.id} className="border-b hover:bg-neutral-50">
+                                          <td className="py-2 px-2">{assignment.eventTitle}</td>
+                                          <td className="py-2 px-2">{assignment.shiftName}</td>
+                                          <td className="py-2 px-2">
+                                            {new Date(assignment.createdAt).toLocaleDateString()}
+                                          </td>
+                                          <td className="py-2 px-2">
+                                            <Badge 
+                                              variant={assignment.status === 'approved' ? 'success' : 
+                                                     assignment.status === 'pending' ? 'warning' : 
+                                                     assignment.status === 'rejected' ? 'destructive' : 'secondary'}>
+                                              {assignment.status}
+                                            </Badge>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div className="text-center py-8 text-neutral-500">
+                                  No volunteer assignments found
+                                </div>
+                              )}
+                            </TabsContent>
+                          </Tabs>
                         </div>
                       </div>
                     </div>
