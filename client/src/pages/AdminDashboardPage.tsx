@@ -568,6 +568,9 @@ export default function AdminDashboardPage() {
         description: `"${data.title}" has been created as a draft`,
       });
       setShowDuplicateDialog(false);
+      // Invalidate both events and my-events queries to ensure they both update
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-events"] });
       refetchEvents();
     },
     onError: (error) => {
