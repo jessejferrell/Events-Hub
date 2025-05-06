@@ -45,6 +45,7 @@ import {
   WhatsappIcon, 
   EmailIcon 
 } from "react-share";
+import CalendarIntegration from "@/components/events/CalendarIntegration";
 
 export default function EventDetailsPage() {
   const [match, params] = useRoute("/events/:id");
@@ -215,41 +216,46 @@ export default function EventDetailsPage() {
               <div className="flex justify-between items-start">
                 <h1 className="text-3xl font-bold mb-2">{event.title}</h1>
                 
-                {/* Share Event Button */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex items-center gap-1">
-                      <Share2 className="h-4 w-4" />
-                      Share
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="p-3">
-                    <div className="flex flex-col gap-3">
-                      <p className="text-sm text-muted-foreground mb-1">Share this event:</p>
-                      <div className="flex justify-between gap-2">
-                        <FacebookShareButton url={window.location.href} hashtag="#events">
-                          <FacebookIcon size={32} round />
-                        </FacebookShareButton>
-                        
-                        <TwitterShareButton url={window.location.href} title={`Check out ${event.title}`}>
-                          <TwitterIcon size={32} round />
-                        </TwitterShareButton>
-                        
-                        <LinkedinShareButton url={window.location.href} title={event.title} summary={event.description.substring(0, 100)}>
-                          <LinkedinIcon size={32} round />
-                        </LinkedinShareButton>
-                        
-                        <WhatsappShareButton url={window.location.href} title={`Check out ${event.title}`}>
-                          <WhatsappIcon size={32} round />
-                        </WhatsappShareButton>
-                        
-                        <EmailShareButton url={window.location.href} subject={`Check out this event: ${event.title}`} body={`I found this event and thought you might be interested:\n\n${event.title}\n${event.description.substring(0, 150)}...\n\nLearn more here: ${window.location.href}`}>
-                          <EmailIcon size={32} round />
-                        </EmailShareButton>
+                <div className="flex gap-2">
+                  {/* Calendar Integration Button */}
+                  <CalendarIntegration event={event} />
+                  
+                  {/* Share Event Button */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1">
+                        <Share2 className="h-4 w-4" />
+                        Share
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="p-3">
+                      <div className="flex flex-col gap-3">
+                        <p className="text-sm text-muted-foreground mb-1">Share this event:</p>
+                        <div className="flex justify-between gap-2">
+                          <FacebookShareButton url={window.location.href} hashtag="#events">
+                            <FacebookIcon size={32} round />
+                          </FacebookShareButton>
+                          
+                          <TwitterShareButton url={window.location.href} title={`Check out ${event.title}`}>
+                            <TwitterIcon size={32} round />
+                          </TwitterShareButton>
+                          
+                          <LinkedinShareButton url={window.location.href} title={event.title} summary={event.description.substring(0, 100)}>
+                            <LinkedinIcon size={32} round />
+                          </LinkedinShareButton>
+                          
+                          <WhatsappShareButton url={window.location.href} title={`Check out ${event.title}`}>
+                            <WhatsappIcon size={32} round />
+                          </WhatsappShareButton>
+                          
+                          <EmailShareButton url={window.location.href} subject={`Check out this event: ${event.title}`} body={`I found this event and thought you might be interested:\n\n${event.title}\n${event.description.substring(0, 150)}...\n\nLearn more here: ${window.location.href}`}>
+                            <EmailIcon size={32} round />
+                          </EmailShareButton>
+                        </div>
                       </div>
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
               
               <div className="flex flex-wrap gap-4 text-gray-600">
