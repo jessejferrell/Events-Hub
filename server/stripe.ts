@@ -68,10 +68,9 @@ export function setupStripeRoutes(app: Express) {
     // Generate OAuth URL
     const state = Math.random().toString(36).substring(2, 15);
     
-    // Use a simpler redirect URI that will be easier to configure in Stripe
-    // We'll also have route handlers for both paths
-    // Use the same domain that we're connecting from to avoid redirect URI mismatch
-    const redirectUri = `${effectiveDomain}/stripe-callback`;
+    // Use the exact redirect URI that is configured in Stripe Dashboard
+    // This must match exactly what's in the Stripe Dashboard
+    const redirectUri = `${effectiveDomain}/api/stripe/oauth/callback`;
     
     log(`Using redirect URI: ${redirectUri}`, "stripe");
     
@@ -99,7 +98,7 @@ export function setupStripeRoutes(app: Express) {
     res.json({ url: directConnectUrl.toString() });
   });
   
-  // Route for the simplified callback URL
+  // Keep this route just for backward compatibility, though we're now using the standard callback path
   app.get("/stripe-callback", async (req, res) => {
     log(`Stripe callback received at /stripe-callback: ${JSON.stringify(req.query)}`, "stripe");
     
