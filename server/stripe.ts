@@ -149,6 +149,11 @@ export function setupStripeRoutes(app: Express) {
       log(`OAuth callback received: ${JSON.stringify(req.query)}`, "stripe");
       const { code, state } = req.query;
       
+      // Log authentication status and session info for debugging
+      log(`Authentication Status: ${req.isAuthenticated()}`, "stripe");
+      log(`Session ID: ${req.session.id}`, "stripe");
+      log(`Session Data: ${JSON.stringify(req.session)}`, "stripe");
+      
       if (!code) {
         // If there's an error or denial, Stripe redirects with error information instead of a code
         const error = req.query.error;
@@ -167,19 +172,27 @@ export function setupStripeRoutes(app: Express) {
         code: code as string,
       });
       
-      log(`OAuth token response received: ${JSON.stringify(response)}`, "stripe");
+      log(`OAuth token response received successfully`, "stripe");
       
       // Extract the connected account ID
       const connectedAccountId = response.stripe_user_id as string;
+      log(`Connected Account ID: ${connectedAccountId}`, "stripe");
       
       if (!req.isAuthenticated()) {
-        // If user's session expired during OAuth flow, redirect them to login
-        log(`User not authenticated during OAuth callback`, "stripe");
+        // If user's session expired during OAuth flow, store the account ID and redirect to login
+        log(`User not authenticated during OAuth callback - storing account ID in session`, "stripe");
         // Store in session for later use
         (req.session as any).stripeAccountId = connectedAccountId;
+        await new Promise<void>((resolve) => {
+          req.session.save(() => {
+            log(`Session saved with account ID`, "stripe");
+            resolve();
+          });
+        });
         return res.redirect('/auth?message=' + encodeURIComponent('Please login to complete Stripe connection'));
       }
       
+      log(`User is authenticated: ${req.user.id}, username: ${req.user.username}`, "stripe");
       log(`Saving Stripe account ID ${connectedAccountId} for user ${req.user.id}`, "stripe");
       
       // Save the account ID to the user record
@@ -192,6 +205,9 @@ export function setupStripeRoutes(app: Express) {
     } catch (error: any) {
       log(`OAuth callback error: ${error.message}`, "stripe");
       console.error("Full OAuth error:", error);
+      // Add more details about the error for better debugging
+      const errorDetails = error.stack || JSON.stringify(error);
+      log(`Error stack: ${errorDetails}`, "stripe");
       res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(error.message || 'Failed to connect Stripe account'));
     }
   });

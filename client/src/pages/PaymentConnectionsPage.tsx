@@ -132,6 +132,7 @@ export default function PaymentConnectionsPage() {
     
     if (!connectionStatus?.connected && !isLoadingConnection) {
       interval = window.setInterval(() => {
+        console.log("Auto-refreshing Stripe connection status...");
         refetchStatus();
       }, 3000);
     }
@@ -142,6 +143,23 @@ export default function PaymentConnectionsPage() {
       }
     };
   }, [connectionStatus?.connected, isLoadingConnection, refetchStatus]);
+  
+  // Special handler for when "Connection Failed" appears but Stripe confirmed success
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const error = searchParams.get("error");
+    
+    // If there's an error in the URL but we know the connection was actually made,
+    // this is a false error from session issues
+    if (error === "true" && connectionStatus?.connected) {
+      // Clean up URL and show success message instead
+      window.history.replaceState({}, document.title, window.location.pathname);
+      toast({
+        title: "Connection successful",
+        description: "Your Stripe account was actually connected successfully! The error was incorrect.",
+      });
+    }
+  }, [toast, connectionStatus?.connected]);
 
   const isConnected = connectionStatus?.connected;
   
