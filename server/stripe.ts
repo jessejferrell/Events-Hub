@@ -69,8 +69,8 @@ export function setupStripeRoutes(app: Express) {
     
     log(`Using redirect URI: ${redirectUri}`, "stripe");
     
-    // Build the OAuth URL - Use Express flow for easier onboarding
-    const oauthUrl = new URL('https://connect.stripe.com/express/oauth/authorize');
+    // Build the OAuth URL - Use Standard flow instead of Express (which requires approval)
+    const oauthUrl = new URL('https://connect.stripe.com/oauth/authorize');
     oauthUrl.searchParams.append('response_type', 'code');
     oauthUrl.searchParams.append('client_id', stripeClientId);
     oauthUrl.searchParams.append('scope', 'read_write');
