@@ -53,7 +53,7 @@ export function setupStripeRoutes(app: Express) {
     const idPrefix = stripeClientId.substring(0, 8);
     log(`Using Stripe Client ID starting with: ${idPrefix}...`, "stripe");
 
-    // Use the correct domains as specified by the client
+    // Use the verified domains as specified by the client
     const domain = "https://events.mosspointmainstreet.org";
     const replitAppDomain = "https://events-manager.replit.app";
     
