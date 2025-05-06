@@ -10,7 +10,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name"),
-  role: text("role").default("user").notNull(), // "user", "event_owner", "vendor", "volunteer", "admin"
+  role: text("role").default("user").notNull(), // "user", "event_owner", "vendor", "volunteer", "admin", "super_admin"
   phoneNumber: text("phone_number"),
   address: text("address"),
   city: text("city"),

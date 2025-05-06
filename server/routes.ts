@@ -127,7 +127,7 @@ function requireAuth(req: Request, res: Response, next: Function) {
 
 // Helper function to check admin role
 function requireAdmin(req: Request, res: Response, next: Function) {
-  if (!req.isAuthenticated() || req.user.role !== "admin") {
+  if (!req.isAuthenticated() || (req.user.role !== "admin" && req.user.role !== "super_admin")) {
     return res.status(403).json({ message: "Admin access required" });
   }
   next();
@@ -139,7 +139,7 @@ function requireOwnerOrAdmin(req: Request, res: Response, next: Function) {
     return res.status(401).json({ message: "Authentication required" });
   }
   
-  if (req.user.role !== "admin" && req.user.role !== "event_owner") {
+  if (req.user.role !== "admin" && req.user.role !== "super_admin" && req.user.role !== "event_owner") {
     return res.status(403).json({ message: "Not authorized" });
   }
   
@@ -1446,8 +1446,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = parseInt(req.params.id);
       const { role } = req.body;
       
-      if (!["user", "event_owner", "vendor", "volunteer", "admin"].includes(role)) {
+      if (!["user", "event_owner", "vendor", "volunteer", "admin", "super_admin"].includes(role)) {
         return res.status(400).json({ message: "Invalid role" });
+      }
+      
+      // Check permissions:
+      // 1. Only super_admin can create another super_admin
+      // 2. Only super_admin can change an admin's role
+      if (role === "super_admin" || (await storage.getUser(userId))?.role === "admin") {
+        // Check if current user is super_admin
+        const isSuperAdmin = req.user.email === 'jessejferrell@gmail.com' || req.user.role === 'super_admin';
+        if (!isSuperAdmin) {
+          return res.status(403).json({
+            message: "Only super admins can create another super admin or modify admin roles"
+          });
+        }
       }
       
       const updatedUser = await storage.updateUserRole(userId, role);
@@ -1470,7 +1483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userData = req.body;
       
       // Check permissions
-      const isSuperAdmin = req.user.email === 'jessejferrell@gmail.com';
+      const isSuperAdmin = req.user.email === 'jessejferrell@gmail.com' || req.user.role === 'super_admin';
       const isAdmin = req.user.role === 'admin';
       
       // Get user to edit
@@ -1480,7 +1493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Super admin can edit anyone, regular admins can only edit non-admin users
-      const canEdit = isSuperAdmin || (isAdmin && userToEdit.role !== 'admin');
+      const canEdit = isSuperAdmin || (isAdmin && userToEdit.role !== 'admin' && userToEdit.role !== 'super_admin');
       
       if (!canEdit) {
         return res.status(403).json({ message: "Not authorized to edit this user" });
