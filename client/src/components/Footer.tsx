@@ -89,19 +89,14 @@ export default function Footer() {
             <h3 className="text-lg font-bold text-primary mb-4">Support</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/help" className="text-gray-600 hover:text-primary transition-colors">
-                  Help Center
-                </Link>
-              </li>
-              <li>
-                <Link href="/faq" className="text-gray-600 hover:text-primary transition-colors">
-                  FAQ
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="text-gray-600 hover:text-primary transition-colors">
+                <a 
+                  href="https://mosspointmainstreet.org/contact-us/" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-gray-600 hover:text-primary transition-colors"
+                >
                   Contact Us
-                </Link>
+                </a>
               </li>
               <li>
                 <Link href="/privacy" className="text-gray-600 hover:text-primary transition-colors">

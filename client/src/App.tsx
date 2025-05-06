@@ -20,6 +20,8 @@ import CheckoutPage from "@/pages/CheckoutPage";
 import PaymentConnectionsPage from "@/pages/PaymentConnectionsPage";
 import UserProfilePage from "@/pages/UserProfilePage";
 import EmailNotificationsPage from "@/pages/EmailNotificationsPage";
+import PrivacyPolicyPage from "@/pages/PrivacyPolicyPage";
+import TermsOfServicePage from "@/pages/TermsOfServicePage";
 
 function Router() {
   return (
@@ -29,6 +31,8 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <Route path="/events" component={EventsPage} />
       <Route path="/events/:id" component={EventDetailsPage} />
+      <Route path="/privacy" component={PrivacyPolicyPage} />
+      <Route path="/terms" component={TermsOfServicePage} />
       
       {/* Basic user features - any logged in user */}
       <ProtectedRoute path="/profile" component={UserProfilePage} />
