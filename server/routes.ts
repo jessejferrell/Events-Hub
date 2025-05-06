@@ -1560,25 +1560,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           previousEndDate = new Date(0);
       }
       
-      // Get current period revenue metrics
-      const revenueMetrics = await storage.getAnalyticsByMetric('revenue', undefined, timeframe as string);
-      const ticketMetrics = await storage.getAnalyticsByMetric('ticket_sale', undefined, timeframe as string);
-      const userMetrics = await storage.getAnalyticsByMetric('new_user', undefined, timeframe as string);
-      const eventMetrics = await storage.getAnalyticsByMetric('new_event', undefined, timeframe as string);
+      // Get actual revenue from orders
+      const ordersRevenue = await db
+        .select({ sum: sql`COALESCE(SUM(total_amount), 0)` })
+        .from(schema.orders)
+        .where(
+          and(
+            eq(schema.orders.paymentStatus, 'paid'),
+            gte(schema.orders.createdAt, startDate)
+          )
+        );
       
-      // Get previous period metrics for comparison
-      // In a real implementation, these would query with previous date ranges
-      // This is simplified for the demo
-      const previousRevenueTotal = revenueMetrics.length > 0 ? 
-        revenueMetrics.reduce((sum, item) => sum + (parseFloat(item.value as string) || 0), 0) * 0.8 : 0;
+      // Get actual ticket sales count
+      const ticketsSold = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(schema.tickets)
+        .where(gte(schema.tickets.createdAt, startDate));
       
-      const currentRevenueTotal = revenueMetrics.length > 0 ? 
-        revenueMetrics.reduce((sum, item) => sum + (parseFloat(item.value as string) || 0), 0) : 0;
+      // Get new users count
+      const newUsers = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(schema.users)
+        .where(gte(schema.users.createdAt, startDate));
       
-      // Generate time series data for charts (simplified version)
-      const revenueData = generateTimeSeriesData(revenueMetrics, timeframe as string);
-      const userGrowthData = generateTimeSeriesData(userMetrics, timeframe as string, 'count');
-      const eventGrowthData = generateTimeSeriesData(eventMetrics, timeframe as string, 'count');
+      // Get new events count
+      const newEvents = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(schema.events)
+        .where(gte(schema.events.createdAt, startDate));
+      
+      // Calculate actual revenue totals
+      const currentRevenueTotal = Number(ordersRevenue[0].sum) || 0;
+      const previousRevenueTotal = 0; // We'll use 0 for now as we don't have previous data
+      
+      // Create empty time series data for charts (no mock data)
+      const revenueData = [];
+      const userGrowthData = [];
+      const eventGrowthData = [];
       
       // Get real event and product type data from the database
       const events = await db.select().from(schema.events);
@@ -1716,7 +1734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticketsSoldCount = parseInt(ticketsCount[0].count.toString());
       
       // Get users created in the last period
-      const newUsersCount = userMetrics.length;
+      const newUsersCount = Number(newUsers[0].count) || 0;
       
       // Get active events
       const activeEventsCount = await db.select({ count: sql`count(*)` })
