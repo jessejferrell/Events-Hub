@@ -25,7 +25,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Calendar, Clock, MapPin, Edit, Trash2, PlusCircle, Copy } from "lucide-react";
+import { Calendar, Clock, MapPin, Edit, Trash2, PlusCircle, Copy, Eye } from "lucide-react";
 import EventForm from "@/components/ui/event-form";
 import { format } from "date-fns";
 
@@ -181,21 +181,34 @@ export default function MyEventsPage() {
                     <span>{format(new Date(event.startDate), "h:mm a")}</span>
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between pt-2">
-                  <Button
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleEditEvent(event)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <div className="flex space-x-2">
+                <CardFooter className="flex flex-col pt-2 gap-2">
+                  <div className="flex justify-between w-full gap-2">
+                    <Button
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleEditEvent(event)}
+                      className="flex-1"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="secondary" 
+                      size="sm"
+                      onClick={() => navigate(`/events/${event.id}`)}
+                      className="flex-1"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                  </div>
+                  <div className="flex justify-between w-full gap-2">
                     <Button
                       variant="outline" 
                       size="sm"
                       onClick={() => handleDuplicateEvent(event)}
                       disabled={duplicateEventMutation.isPending}
+                      className="flex-1"
                     >
                       {duplicateEventMutation.isPending ? (
                         <>
@@ -213,16 +226,10 @@ export default function MyEventsPage() {
                       variant="destructive" 
                       size="sm"
                       onClick={() => handleDeleteEvent(event)}
+                      className="flex-1"
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
-                    </Button>
-                    <Button
-                      variant="secondary" 
-                      size="sm"
-                      onClick={() => navigate(`/events/${event.id}`)}
-                    >
-                      View
                     </Button>
                   </div>
                 </CardFooter>
