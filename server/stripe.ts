@@ -57,9 +57,11 @@ export function setupStripeRoutes(app: Express) {
     const domain = "https://events.mosspointmainstreet.org";
     const replitAppDomain = "https://events-manager.replit.app";
     
-    // For local development, use one of the published domains instead of localhost
-    // This ensures Stripe can properly redirect back
-    const effectiveDomain = process.env.NODE_ENV === 'production' ? domain : replitAppDomain;
+    // Use the appropriate domain based on the request origin
+    // This ensures we always use the actual domain the user is accessing from
+    const effectiveDomain = req.headers.origin ? 
+                            req.headers.origin.replace(/\/$/, '') : 
+                            (process.env.NODE_ENV === 'production' ? domain : replitAppDomain);
     
     log(`Using domain for redirect: ${effectiveDomain}`, "stripe");
     
@@ -285,8 +287,11 @@ export function setupStripeRoutes(app: Express) {
       const domain = "https://events.mosspointmainstreet.org";
       const replitAppDomain = "https://events-manager.replit.app";
       
-      // For local development, use one of the published domains instead of localhost
-      const effectiveDomain = process.env.NODE_ENV === 'production' ? domain : replitAppDomain;
+      // Use the appropriate domain based on the request origin
+      // This ensures we always use the actual domain the user is accessing from
+      const effectiveDomain = req.headers.origin ? 
+                             req.headers.origin.replace(/\/$/, '') : 
+                             (process.env.NODE_ENV === 'production' ? domain : replitAppDomain);
 
       // Create a Checkout Session
       const session = await stripe.checkout.sessions.create({
