@@ -792,6 +792,26 @@ export default function AdminDashboardPage() {
     
     window.open(`/api/admin/export?${queryParams.toString()}`, "_blank");
   };
+  
+  // Handler for exporting financial reports
+  const handleFinancialExport = async (reportType: 'detailed' | 'summary') => {
+    let queryParams = new URLSearchParams();
+    
+    if (selectedEventId && selectedEventId !== "all_events") queryParams.append("eventId", selectedEventId);
+    
+    if (startDate) queryParams.append("startDate", startDate.toISOString());
+    if (endDate) queryParams.append("endDate", endDate.toISOString());
+    
+    // Add report type parameter
+    queryParams.append("reportType", reportType);
+    
+    window.open(`/api/admin/financial-report?${queryParams.toString()}`, "_blank");
+    
+    toast({
+      title: "Financial report export started",
+      description: `Your ${reportType} financial report is being generated.`,
+    });
+  };
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status.toLowerCase()) {
@@ -1196,7 +1216,7 @@ export default function AdminDashboardPage() {
                   </table>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between">
+              <CardFooter className="flex flex-col sm:flex-row justify-between gap-4">
                 <div className="flex items-center space-x-2">
                   <Label>Date Range:</Label>
                   <DatePicker
@@ -1211,14 +1231,42 @@ export default function AdminDashboardPage() {
                     placeholder="End Date"
                   />
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                   <Button variant="outline" onClick={() => refetchTransactions()}>
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
                   </Button>
+                  
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Financial Reports
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Export Financial Reports</DialogTitle>
+                        <DialogDescription>
+                          Choose a report format for exporting financial data.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <Button onClick={() => handleFinancialExport('detailed')}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Detailed Financial Report
+                        </Button>
+                        <Button onClick={() => handleFinancialExport('summary')}>
+                          <BarChart2Icon className="h-4 w-4 mr-2" />
+                          Summary Financial Report
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  
                   <Button onClick={handleExport}>
                     <Download className="h-4 w-4 mr-2" />
-                    Export CSV
+                    Export All Transactions
                   </Button>
                 </div>
               </CardFooter>

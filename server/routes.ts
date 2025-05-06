@@ -13,6 +13,34 @@ import { createObjectCsvWriter } from "csv-writer";
 import { and, eq, gte, lte, like, or, sql, desc } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
+
+// Helper function to determine fiscal quarter from date
+function getFiscalQuarter(date: Date): string {
+  const month = date.getMonth();
+  const year = date.getFullYear();
+  
+  // Fiscal quarters (assuming standard calendar quarters)
+  if (month >= 0 && month <= 2) return `Q1 ${year}`;
+  if (month >= 3 && month <= 5) return `Q2 ${year}`;
+  if (month >= 6 && month <= 8) return `Q3 ${year}`;
+  return `Q4 ${year}`;
+}
+
+// Helper function to determine reporting category from transaction type
+function getReportingCategory(type: string): string {
+  switch (type) {
+    case 'ticket':
+      return 'Ticket Sales';
+    case 'order':
+      return 'Merchandise Sales';
+    case 'vendor':
+      return 'Vendor Registration';
+    case 'volunteer':
+      return 'Volunteer';
+    default:
+      return 'Other Revenue';
+  }
+}
 import { 
   insertEventSchema, 
   insertTicketSchema, 
