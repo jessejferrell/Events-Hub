@@ -84,7 +84,19 @@ export default function EventCalendar({ events, isLoading, isError }: EventCalen
     return filteredEvents.filter(event => {
       const eventStart = new Date(event.startDate);
       const eventEnd = new Date(event.endDate);
-      return (day >= eventStart && day <= eventEnd);
+      
+      // Reset time components to compare dates only
+      const dayDate = new Date(day);
+      const startDate = new Date(eventStart);
+      const endDate = new Date(eventEnd);
+      
+      // Set all times to midnight to compare dates only
+      dayDate.setHours(0, 0, 0, 0);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+      
+      // Check if the given day is between the start and end dates (inclusive)
+      return dayDate >= startDate && dayDate <= endDate;
     });
   };
 
