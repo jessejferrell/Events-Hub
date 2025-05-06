@@ -13,6 +13,7 @@ import { createObjectCsvWriter } from "csv-writer";
 import { and, eq, gte, lte, like, or, sql, desc } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
+import { generateICalendar } from "./icalendar";
 
 // Helper function to determine fiscal quarter from date
 function getFiscalQuarter(date: Date): string {
@@ -310,6 +311,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(event);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch event" });
+    }
+  });
+  
+  // Get iCalendar file for an event (public)
+  app.get("/api/events/:id/calendar", async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const reminderMinutes = req.query.reminders ? 
+        (req.query.reminders as string).split(',').map(r => parseInt(r.trim())) :
+        [15, 60, 1440]; // Default reminders: 15min, 1hr, 1day
+      
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Generate iCalendar content
+      const icsContent = await generateICalendar(event, reminderMinutes);
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/calendar');
+      res.setHeader('Content-Disposition', `attachment; filename="${event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics"`);
+      
+      // Send the file
+      res.send(icsContent);
+      
+      // Track calendar downloads
+      await storage.recordAnalyticEvent({
+        eventId: event.id,
+        metric: "calendar_download",
+        value: 1,
+        dimension: "reminder_count",
+        dimensionValue: reminderMinutes.length.toString(),
+      });
+    } catch (error: any) {
+      console.error("Error generating calendar file:", error);
+      res.status(500).json({ message: error.message || "Failed to generate calendar file" });
     }
   });
 
