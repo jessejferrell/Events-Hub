@@ -2037,6 +2037,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Export financial report (admin only)
+  app.get("/api/admin/financial-report", requireAdmin, async (req, res) => {
+    try {
+      const { eventId, startDate, endDate, reportType } = req.query;
+      
+      // Get the base transaction data
+      const results = await storage.exportTransactions({
+        eventId: eventId ? parseInt(eventId as string) : undefined,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      
+      if (results.length === 0) {
+        return res.status(404).json({ message: "No financial data found matching your criteria" });
+      }
+      
+      // Enhanced financial report data
+      const financialData = results.map(transaction => {
+        // Add financial-specific fields
+        return {
+          ...transaction,
+          revenueType: transaction.type,
+          taxAmount: 0, // If tax data is available, calculate it here
+          netAmount: transaction.amount,
+          paymentMethod: transaction.stripePaymentId ? 'Stripe' : 'Other',
+          reportingCategory: getReportingCategory(transaction.type),
+          fiscalQuarter: getFiscalQuarter(new Date(transaction.created_at)),
+          fiscalYear: new Date(transaction.created_at).getFullYear()
+        };
+      });
+      
+      // If summary report is requested, generate summary data
+      let exportData = financialData;
+      if (reportType === 'summary') {
+        // Group by category and sum amounts
+        const summaryData = [];
+        const categories = {};
+        
+        financialData.forEach(item => {
+          const category = item.reportingCategory;
+          if (!categories[category]) {
+            categories[category] = {
+              reportingCategory: category,
+              totalTransactions: 0,
+              totalAmount: 0,
+              startDate: startDate ? new Date(startDate as string).toLocaleDateString() : 'All time',
+              endDate: endDate ? new Date(endDate as string).toLocaleDateString() : 'Present',
+              eventTitle: item.eventTitle || 'All events'
+            };
+          }
+          
+          categories[category].totalTransactions++;
+          categories[category].totalAmount += parseFloat(item.amount);
+        });
+        
+        // Convert to array
+        for (const category in categories) {
+          categories[category].totalAmount = categories[category].totalAmount.toFixed(2);
+          summaryData.push(categories[category]);
+        }
+        
+        exportData = summaryData;
+      }
+      
+      // Convert data to CSV
+      const { createObjectCsvStringifier } = require('csv-writer');
+      
+      // Define CSV headers based on data fields
+      const headers = Object.keys(exportData[0]).map(key => ({
+        id: key,
+        title: key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, str => str.toUpperCase())
+          .trim()
+      }));
+      
+      const csvStringifier = createObjectCsvStringifier({
+        header: headers
+      });
+      
+      const csvString = csvStringifier.getHeaderString() + csvStringifier.stringifyRecords(exportData);
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=financial-report-${reportType || 'detailed'}-${new Date().toISOString().slice(0, 10)}.csv`);
+      
+      // Send CSV data
+      res.send(csvString);
+    } catch (error: any) {
+      console.error("Financial report export error:", error);
+      res.status(500).json({ message: error.message || "Failed to export financial report" });
+    }
+  });
+  
   // Get analytics (admin/event owner only)
   app.get("/api/analytics/:metric", requireAuth, async (req, res) => {
     try {
