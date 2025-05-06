@@ -25,7 +25,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Calendar, Clock, MapPin, Edit, Trash2, PlusCircle } from "lucide-react";
+import { Calendar, Clock, MapPin, Edit, Trash2, PlusCircle, Copy } from "lucide-react";
 import EventForm from "@/components/ui/event-form";
 import { format } from "date-fns";
 
@@ -81,6 +81,35 @@ export default function MyEventsPage() {
   const handleEditEvent = (event: Event) => {
     setSelectedEvent(event);
     setIsEditDialogOpen(true);
+  };
+
+  // Duplicate event mutation
+  const duplicateEventMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      const response = await apiRequest("POST", `/api/events/${eventId}/duplicate`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Event duplicated",
+        description: "Your event has been duplicated successfully. The new event is saved as a draft.",
+      });
+      // Refetch events after duplication
+      queryClient.invalidateQueries({ queryKey: ["/api/my-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to duplicate event",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle event duplication
+  const handleDuplicateEvent = (event: Event) => {
+    duplicateEventMutation.mutate(event.id);
   };
 
   // Handle dialog close after create/edit
@@ -162,6 +191,24 @@ export default function MyEventsPage() {
                     Edit
                   </Button>
                   <div className="flex space-x-2">
+                    <Button
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDuplicateEvent(event)}
+                      disabled={duplicateEventMutation.isPending}
+                    >
+                      {duplicateEventMutation.isPending ? (
+                        <>
+                          <div className="h-4 w-4 mr-1 animate-spin border-2 border-t-transparent border-primary rounded-full" />
+                          Duplicating...
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-1" />
+                          Duplicate
+                        </>
+                      )}
+                    </Button>
                     <Button
                       variant="destructive" 
                       size="sm"
