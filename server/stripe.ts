@@ -48,6 +48,10 @@ export function setupStripeRoutes(app: Express) {
         message: "Stripe Connect is not properly configured. Missing STRIPE_CLIENT_ID." 
       });
     }
+    
+    // Log the client ID (first 8 chars only for security)
+    const idPrefix = stripeClientId.substring(0, 8);
+    log(`Using Stripe Client ID starting with: ${idPrefix}...`, "stripe");
 
     // Use the correct domains as specified by the client
     const domain = "https://events.mosspointmainstreet.org";
@@ -74,6 +78,10 @@ export function setupStripeRoutes(app: Express) {
     oauthUrl.searchParams.append('response_type', 'code');
     oauthUrl.searchParams.append('client_id', stripeClientId);
     oauthUrl.searchParams.append('scope', 'read_write');
+    
+    // Add suggested params for Express accounts
+    oauthUrl.searchParams.append('stripe_user[business_type]', 'company');
+    oauthUrl.searchParams.append('stripe_user[country]', 'US');
     
     // Always include the redirect_uri parameter to ensure consistency
     oauthUrl.searchParams.append('redirect_uri', redirectUri);
