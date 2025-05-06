@@ -200,7 +200,18 @@ export default function PaymentConnectionsPage() {
             ) : isConnected ? (
               <div>
                 <div className="mb-4 p-4 bg-green-50 rounded-md border border-green-200">
-                  <h3 className="text-lg font-medium text-green-800 mb-2">Connection Details</h3>
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-lg font-medium text-green-800 mb-2">Connection Details</h3>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={handleManualRefresh} 
+                      className="text-green-700 hover:text-green-800 hover:bg-green-100"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Refresh
+                    </Button>
+                  </div>
                   <div className="space-y-2">
                     <div className="flex items-center">
                       <span className="text-sm font-medium text-green-700 w-40">Account ID:</span>
@@ -247,6 +258,42 @@ export default function PaymentConnectionsPage() {
                   By connecting with Stripe, you can accept credit and debit card payments directly to your bank account. 
                   Stripe charges standard processing fees of 2.9% + 30¢ per successful transaction.
                 </p>
+                
+                {/* Connection error alert */}
+                {window.location.search.includes('error=true') && (
+                  <div className="mb-4 p-4 bg-amber-50 rounded-md border border-amber-200">
+                    <h3 className="text-lg font-medium text-amber-800 mb-2 flex items-center">
+                      <AlertCircle className="h-5 w-5 mr-2" />
+                      Connection Issue
+                    </h3>
+                    <p className="text-sm text-amber-700 mb-2">
+                      We received an error message during the connection process, but this may be incorrect.
+                    </p>
+                    <ul className="text-sm text-amber-700 list-disc list-inside mb-3">
+                      <li>If you completed the Stripe authorization, click "Check Connection Status" below</li>
+                      <li>If you see "Connection Failed" but Stripe confirmed your account setup, this is likely a temporary session issue</li>
+                    </ul>
+                    <div className="flex space-x-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleManualRefresh}
+                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Check Connection Status
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.history.replaceState({}, document.title, window.location.pathname)}
+                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                      >
+                        Clear Message
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
