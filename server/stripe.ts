@@ -69,25 +69,15 @@ export function setupStripeRoutes(app: Express) {
     
     log(`Using redirect URI: ${redirectUri}`, "stripe");
     
-    // Build the OAuth URL - Use Standard flow instead of Express (which requires approval)
-    const oauthUrl = new URL('https://connect.stripe.com/oauth/authorize');
+    // Build the OAuth URL - Use Express flow as it's already activated on the account
+    const oauthUrl = new URL('https://connect.stripe.com/express/oauth/authorize');
     oauthUrl.searchParams.append('response_type', 'code');
     oauthUrl.searchParams.append('client_id', stripeClientId);
     oauthUrl.searchParams.append('scope', 'read_write');
     
-    // Determine if we're in development or production
-    const isDev = process.env.NODE_ENV === 'development';
-    
-    if (isDev) {
-      // In development, we can omit the redirect_uri parameter entirely
-      // This makes Stripe use the default redirect URI from the dashboard
-      // and eliminates the redirect URI mismatch error
-      log(`Development mode detected, omitting redirect_uri parameter`, "stripe");
-    } else {
-      // In production, use the specified redirect URI
-      oauthUrl.searchParams.append('redirect_uri', redirectUri);
-      log(`Production mode, using redirect URI: ${redirectUri}`, "stripe");
-    }
+    // Always include the redirect_uri parameter to ensure consistency
+    oauthUrl.searchParams.append('redirect_uri', redirectUri);
+    log(`Using redirect URI: ${redirectUri}`, "stripe");
     
     oauthUrl.searchParams.append('state', state);
     
