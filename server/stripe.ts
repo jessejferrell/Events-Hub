@@ -79,7 +79,8 @@ export function setupStripeRoutes(app: Express) {
     directConnectUrl.searchParams.append('response_type', 'code');
     directConnectUrl.searchParams.append('client_id', stripeClientId);
     
-    // Don't add any extra parameters that could cause issues
+    // Add the scope to request read_write permissions (required for payment processing)
+    directConnectUrl.searchParams.append('scope', 'read_write');
     
     // Always include the redirect_uri parameter to ensure consistency
     directConnectUrl.searchParams.append('redirect_uri', redirectUri);
