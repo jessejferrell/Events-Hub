@@ -58,6 +58,16 @@ export default function PaymentConnectionsPage() {
     },
     enabled: !!user,
   });
+  
+  // Recovery process - attempt to recover a pending Stripe connection from the session
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [recoveryResult, setRecoveryResult] = useState<{
+    recovered: boolean;
+    message: string;
+    accountId?: string;
+    alreadyConnected?: boolean;
+    error?: string;
+  } | null>(null);
 
   // Redirect to Stripe Connect flow
   const handleConnectStripe = () => {
@@ -160,6 +170,24 @@ export default function PaymentConnectionsPage() {
       });
     }
   }, [toast, connectionStatus?.connected]);
+  
+  // Automatically try recovery if there's an error in the URL parameters
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const error = searchParams.get("error");
+    
+    // If there's an error in the URL and we're not already connected,
+    // automatically attempt recovery once
+    if (error === "true" && !connectionStatus?.connected && !isRecovering) {
+      // Wait a moment to let things settle before trying recovery
+      const timer = setTimeout(() => {
+        console.log("Auto-attempting connection recovery...");
+        handleRecoverConnection();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [connectionStatus?.connected, window.location.search]);
 
   const isConnected = connectionStatus?.connected;
   
@@ -170,6 +198,57 @@ export default function PaymentConnectionsPage() {
       title: "Refreshing connection status",
       description: "Checking your Stripe account connection status...",
     });
+  };
+  
+  // Function to attempt recovering a Stripe connection
+  const handleRecoverConnection = async () => {
+    if (isRecovering) return;
+    
+    setIsRecovering(true);
+    setRecoveryResult(null);
+    
+    try {
+      const res = await fetch("/api/stripe/recover-connection");
+      
+      if (!res.ok) {
+        throw new Error("Failed to recover connection");
+      }
+      
+      const data = await res.json();
+      setRecoveryResult(data);
+      
+      if (data.recovered) {
+        toast({
+          title: "Connection recovered!",
+          description: "Successfully recovered your Stripe account connection.",
+        });
+        
+        // Refetch connection status after successful recovery
+        refetchStatus();
+        
+        // Clear URL params if any
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (data.alreadyConnected) {
+        toast({
+          title: "Already connected",
+          description: "Your account is already connected to Stripe.",
+        });
+        refetchStatus();
+      } else {
+        toast({
+          title: "Recovery not needed",
+          description: data.message || "No pending Stripe connection found.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Recovery failed",
+        description: error.message || "Failed to recover Stripe connection.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRecovering(false);
+    }
   };
 
   return (
@@ -270,10 +349,29 @@ export default function PaymentConnectionsPage() {
                       We received an error message during the connection process, but this may be incorrect.
                     </p>
                     <ul className="text-sm text-amber-700 list-disc list-inside mb-3">
-                      <li>If you completed the Stripe authorization, click "Check Connection Status" below</li>
-                      <li>If you see "Connection Failed" but Stripe confirmed your account setup, this is likely a temporary session issue</li>
+                      <li>If you completed the Stripe authorization, try the "Recover Connection" button</li>
+                      <li>If you see "Connection Failed" but Stripe confirmed your account setup, this is likely a session issue that can be fixed automatically</li>
                     </ul>
-                    <div className="flex space-x-3">
+                    <div className="flex flex-wrap gap-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleRecoverConnection}
+                        disabled={isRecovering}
+                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                      >
+                        {isRecovering ? (
+                          <>
+                            <div className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            Recovering...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Recover Connection
+                          </>
+                        )}
+                      </Button>
                       <Button 
                         variant="outline" 
                         size="sm" 
@@ -281,7 +379,7 @@ export default function PaymentConnectionsPage() {
                         className="text-amber-700 border-amber-300 hover:bg-amber-100"
                       >
                         <RefreshCw className="h-4 w-4 mr-1" />
-                        Check Connection Status
+                        Check Status
                       </Button>
                       <Button
                         variant="outline"
@@ -292,6 +390,24 @@ export default function PaymentConnectionsPage() {
                         Clear Message
                       </Button>
                     </div>
+                    
+                    {/* Show recovery result if available */}
+                    {recoveryResult && (
+                      <div className={`mt-3 p-3 rounded-md ${
+                        recoveryResult.recovered 
+                          ? "bg-green-100 border border-green-200 text-green-800"
+                          : "bg-amber-100 border border-amber-200 text-amber-800"
+                      }`}>
+                        <p className="text-sm font-medium">
+                          {recoveryResult.recovered 
+                            ? "Successfully recovered your Stripe connection!"
+                            : "Recovery not needed"}
+                        </p>
+                        <p className="text-xs mt-1">
+                          {recoveryResult.message}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
                 

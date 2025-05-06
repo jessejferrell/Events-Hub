@@ -302,6 +302,79 @@ export function setupStripeRoutes(app: Express) {
     }
   });
 
+  // Endpoint to check for and recover a pending Stripe account connection
+  app.get("/api/stripe/recover-connection", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    try {
+      const user = req.user;
+      
+      // Check if the user already has a connected account
+      if (user.stripeAccountId) {
+        return res.json({ 
+          recovered: false, 
+          message: "User already has a connected Stripe account", 
+          alreadyConnected: true 
+        });
+      }
+      
+      // Check if there's a pending account ID in the session
+      const pendingAccountId = (req.session as any).pendingStripeAccountId;
+      
+      if (!pendingAccountId) {
+        return res.json({ 
+          recovered: false, 
+          message: "No pending Stripe account found in session" 
+        });
+      }
+      
+      log(`Found pending Stripe account ${pendingAccountId} for user ${user.id}`, "stripe");
+      
+      // Verify the account exists and is valid
+      try {
+        const account = await stripe.accounts.retrieve(pendingAccountId);
+        
+        if (!account) {
+          return res.json({ 
+            recovered: false, 
+            message: "Pending account ID is invalid" 
+          });
+        }
+        
+        // The account exists, so save it to the user record
+        await storage.updateUserStripeAccount(user.id, pendingAccountId);
+        
+        // Clear the pending ID from the session
+        (req.session as any).pendingStripeAccountId = null;
+        await new Promise<void>((resolve) => {
+          req.session.save(() => resolve());
+        });
+        
+        return res.json({
+          recovered: true,
+          message: "Successfully recovered Stripe connection",
+          accountId: pendingAccountId
+        });
+      } catch (accountError: any) {
+        log(`Error retrieving pending account: ${accountError.message}`, "stripe");
+        return res.json({
+          recovered: false,
+          message: "Invalid pending account ID",
+          error: accountError.message
+        });
+      }
+    } catch (error: any) {
+      log(`Error recovering Stripe connection: ${error.message}`, "stripe");
+      return res.status(500).json({
+        recovered: false,
+        message: "Failed to recover Stripe connection",
+        error: error.message
+      });
+    }
+  });
+
   // Create a checkout session for ticket purchase
   app.post("/api/create-checkout-session", async (req, res) => {
     if (!req.isAuthenticated()) {
