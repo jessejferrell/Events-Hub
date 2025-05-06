@@ -136,6 +136,9 @@ export default function AdminDashboardPage() {
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [userNotes, setUserNotes] = useState<Array<{ id: number, note: string, adminId: number, createdAt: string }>>([]);
+  const [userOrders, setUserOrders] = useState<Array<any>>([]);
+  const [userVendorRegistrations, setUserVendorRegistrations] = useState<Array<any>>([]);
+  const [userVolunteerAssignments, setUserVolunteerAssignments] = useState<Array<any>>([]);
   const [showEditUserForm, setShowEditUserForm] = useState(false);
   const [editUserData, setEditUserData] = useState<{
     name: string | null;
