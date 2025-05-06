@@ -73,13 +73,13 @@ export function setupStripeRoutes(app: Express) {
     
     log(`Using redirect URI: ${redirectUri}`, "stripe");
     
-    // Build the OAuth URL - Use Express flow as it's already activated on the account
-    const oauthUrl = new URL('https://connect.stripe.com/express/oauth/authorize');
+    // Use standard OAuth flow with authorization code
+    const oauthUrl = new URL('https://connect.stripe.com/oauth/authorize');
     oauthUrl.searchParams.append('response_type', 'code');
     oauthUrl.searchParams.append('client_id', stripeClientId);
-    oauthUrl.searchParams.append('scope', 'read_write');
     
-    // Add suggested params for Express accounts
+    // Explicitly specify these parameters to work around the gated access error
+    oauthUrl.searchParams.append('scope', 'read_write');
     oauthUrl.searchParams.append('stripe_user[business_type]', 'company');
     oauthUrl.searchParams.append('stripe_user[country]', 'US');
     
