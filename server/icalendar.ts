@@ -1,17 +1,8 @@
-import { createEvent, EventAttributes } from 'ics';
+import { createEvents, EventAttributes } from 'ics';
 import { Event } from '@shared/schema';
 import { promisify } from 'util';
 
-// Promisify createEvent to make it easier to work with
-const createEventAsync = promisify<EventAttributes, string>((event, callback) => {
-  createEvent(event, (error, value) => {
-    if (error) {
-      callback(error, '');
-    } else {
-      callback(null, value);
-    }
-  });
-});
+const createEventsAsync = promisify(createEvents);
 
 /**
  * Generate an iCalendar file for an event
@@ -21,49 +12,60 @@ const createEventAsync = promisify<EventAttributes, string>((event, callback) =>
  * @returns iCalendar string
  */
 export async function generateICalendar(event: Event, reminderMinutes: number[] = [15, 60, 1440]): Promise<string> {
-  // Convert from Date to [YYYY, MM, DD, HH, MM] format for ics library
+  // Convert event start date to array format required by ics
+  // [year, month, day, hour, minute]
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
   
-  const start = [
+  const startArray = [
     startDate.getFullYear(),
-    startDate.getMonth() + 1, // Months are 0-indexed in JS
+    startDate.getMonth() + 1, // Months are 1-indexed in ics
     startDate.getDate(),
     startDate.getHours(),
     startDate.getMinutes()
   ];
   
-  const end = [
+  const endArray = [
     endDate.getFullYear(),
     endDate.getMonth() + 1,
     endDate.getDate(),
     endDate.getHours(),
     endDate.getMinutes()
   ];
-
-  // Create event data structure for ics
+  
+  // Format alarms based on provided reminder minutes
+  const alarms = reminderMinutes.map(minutes => ({
+    action: 'display',
+    trigger: { minutes, before: true },
+    description: `Reminder: ${event.title}`
+  }));
+  
+  // Construct event data for ics
   const eventData: EventAttributes = {
+    start: startArray as [number, number, number, number, number],
+    end: endArray as [number, number, number, number, number],
     title: event.title,
     description: event.description,
     location: event.location,
-    start: start as [number, number, number, number, number],
-    end: end as [number, number, number, number, number],
-    url: `${process.env.PUBLIC_URL || 'https://events.mosspointmainstreet.org'}/events/${event.id}`,
+    url: `${process.env.REPLIT_DOMAINS ? 'https://' + process.env.REPLIT_DOMAINS.split(',')[0] : ''}/events/${event.id}`,
     status: 'CONFIRMED',
     busyStatus: 'BUSY',
-    organizer: { name: 'Moss Point Main Street', email: 'director@mosspointmainstreet.org' },
-    alarms: reminderMinutes.map(minutes => ({
-      action: 'display',
-      description: `Reminder: ${event.title}`,
-      trigger: { minutes, before: true }
-    }))
+    organizer: { name: 'Moss Point Main Street', email: 'events@mosspointmainstreet.org' },
+    alarms: alarms
   };
-
+  
   try {
-    const icsContent = await createEventAsync(eventData);
-    return icsContent;
+    // Create iCalendar event
+    const { error, value } = await createEventsAsync({ events: [eventData] });
+    
+    if (error) {
+      console.error('Error creating iCalendar event:', error);
+      throw new Error(`Failed to generate calendar file: ${error}`);
+    }
+    
+    return value || '';
   } catch (error) {
-    console.error('Error generating iCalendar event:', error);
-    throw new Error('Failed to generate calendar event');
+    console.error('Error generating iCalendar:', error);
+    throw new Error('Failed to generate calendar file');
   }
 }
