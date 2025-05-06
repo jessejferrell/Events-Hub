@@ -452,6 +452,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message || "Failed to delete event" });
     }
   });
+  
+  // Duplicate event (protected, owner/admin only)
+  app.post("/api/events/:id/duplicate", requireAuth, async (req, res) => {
+    try {
+      const sourceEventId = parseInt(req.params.id);
+      const sourceEvent = await storage.getEvent(sourceEventId);
+      
+      if (!sourceEvent) {
+        return res.status(404).json({ message: "Source event not found" });
+      }
+      
+      // Check permissions
+      if (req.user.role !== "admin" && sourceEvent.ownerId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to duplicate this event" });
+      }
+
+      // Create new event based on the source event
+      const { id, createdAt, updatedAt, ...eventData } = sourceEvent;
+      
+      // Modify the title to indicate it's a copy
+      const newTitle = req.body.title || `${sourceEvent.title} (Copy)`;
+      
+      // Create the new event with default draft status
+      const newEvent = await storage.createEvent({
+        ...eventData,
+        title: newTitle,
+        status: "draft",
+        isActive: false,
+        ownerId: req.user.id,
+      });
+      
+      // Get products (tickets, merchandise, etc.) associated with the source event
+      const products = await storage.getProducts(sourceEventId);
+      
+      // Duplicate all products for the new event
+      for (const product of products) {
+        const { id, createdAt, updatedAt, eventId, ...productData } = product;
+        await storage.createProduct({
+          ...productData,
+          eventId: newEvent.id
+        });
+      }
+      
+      // Get vendor spots associated with the source event
+      const vendorSpots = await storage.getVendorSpots(sourceEventId);
+      
+      // Duplicate all vendor spots for the new event
+      for (const spot of vendorSpots) {
+        const { id, createdAt, updatedAt, eventId, ...spotData } = spot;
+        await storage.createVendorSpot({
+          ...spotData,
+          eventId: newEvent.id
+        });
+      }
+      
+      // Get volunteer shifts associated with the source event
+      const volunteerShifts = await storage.getVolunteerShifts(sourceEventId);
+      
+      // Duplicate all volunteer shifts for the new event
+      for (const shift of volunteerShifts) {
+        const { id, createdAt, updatedAt, eventId, ...shiftData } = shift;
+        await storage.createVolunteerShift({
+          ...shiftData,
+          eventId: newEvent.id
+        });
+      }
+      
+      // Record analytics for event duplication
+      await storage.recordAnalyticEvent({
+        eventId: newEvent.id,
+        metric: "event_duplication",
+        value: 1,
+        dimension: "source_event",
+        dimensionValue: sourceEventId.toString(),
+      });
+      
+      res.status(201).json(newEvent);
+    } catch (error: any) {
+      console.error("Error duplicating event:", error);
+      res.status(500).json({ message: error.message || "Failed to duplicate event" });
+    }
+  });
 
   // Get events by owner (protected)
   app.get("/api/my-events", requireAuth, async (req, res) => {
