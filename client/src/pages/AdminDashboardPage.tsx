@@ -2728,6 +2728,55 @@ export default function AdminDashboardPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Event Duplication Dialog */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Duplicate Event</DialogTitle>
+            <DialogDescription>
+              Create a copy of "{selectedEvent?.title}" with all its details, products, vendor spots, 
+              and volunteer shifts. The new event will be created as a draft.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="eventTitle">New Event Title</Label>
+              <Input 
+                id="eventTitle" 
+                value={duplicateTitle} 
+                onChange={(e) => setDuplicateTitle(e.target.value)}
+                placeholder="Enter title for the duplicated event"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (selectedEvent && duplicateTitle.trim()) {
+                  duplicateEventMutation.mutate({
+                    eventId: selectedEvent.id,
+                    title: duplicateTitle.trim()
+                  });
+                }
+              }}
+              disabled={!duplicateTitle.trim() || duplicateEventMutation.isPending}
+            >
+              {duplicateEventMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Duplicating...
+                </>
+              ) : "Duplicate Event"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
