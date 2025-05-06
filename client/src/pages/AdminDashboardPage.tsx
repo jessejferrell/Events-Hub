@@ -402,19 +402,37 @@ export default function AdminDashboardPage() {
   // Delete event mutation
   const deleteEventMutation = useMutation({
     mutationFn: async (eventId: number) => {
+      console.log(`Deleting event with ID: ${eventId}`);
+      
       const res = await fetch(`/api/events/${eventId}`, {
         method: 'DELETE',
       });
+      
       if (!res.ok) {
-        throw new Error('Failed to delete event');
+        const errorText = await res.text();
+        console.error(`Delete event error: ${errorText}`);
+        throw new Error(`Failed to delete event: ${errorText}`);
       }
+      
       return true;
     },
     onSuccess: () => {
+      toast({
+        title: "Event deleted",
+        description: `The event has been successfully deleted.`
+      });
       refetchEvents();
       setShowDeleteConfirm(false);
       setSelectedEvent(null);
     },
+    onError: (error) => {
+      toast({
+        title: "Delete failed",
+        description: error instanceof Error ? error.message : "An error occurred while deleting the event",
+        variant: "destructive"
+      });
+      console.error("Delete event error:", error);
+    }
   });
   
   // Toggle event status mutation
