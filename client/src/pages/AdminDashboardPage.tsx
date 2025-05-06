@@ -29,7 +29,8 @@ import {
   Plus,
   CalendarCheck,
   CheckCircle,
-  XCircle
+  XCircle,
+  Copy
 } from "lucide-react";
 import {
   BarChart,
@@ -482,6 +483,10 @@ export default function AdminDashboardPage() {
     },
   });
   
+  // Event duplication state
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateTitle, setDuplicateTitle] = useState("");
+  
   // Handle event actions
   const handleViewEvent = (eventId: number) => {
     window.open(`/events/${eventId}`, '_blank');
@@ -512,6 +517,49 @@ export default function AdminDashboardPage() {
       deleteEventMutation.mutate(selectedEvent.id);
     }
   };
+  
+  // Handle duplicate event
+  const handleDuplicateEvent = (event: Event) => {
+    setSelectedEvent(event);
+    setDuplicateTitle(`${event.title} (Copy)`);
+    setShowDuplicateDialog(true);
+  };
+  
+  // Duplicate event mutation
+  const duplicateEventMutation = useMutation({
+    mutationFn: async (data: { eventId: number, title?: string }) => {
+      const res = await fetch(`/api/events/${data.eventId}/duplicate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          title: data.title
+        }),
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to duplicate event');
+      }
+      
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Event Duplicated",
+        description: `"${data.title}" has been created as a draft`,
+      });
+      setShowDuplicateDialog(false);
+      refetchEvents();
+    },
+    onError: (error) => {
+      toast({
+        title: "Duplication Failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    }
+  });
 
   // User management handlers
   const fetchUserDetails = async (userId: number) => {
@@ -1716,6 +1764,14 @@ export default function AdminDashboardPage() {
                                           onClick={() => handleEditEvent(event.id)}
                                         >
                                           <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          title="Duplicate Event"
+                                          onClick={() => handleDuplicateEvent(event)}
+                                        >
+                                          <Copy className="h-4 w-4" />
                                         </Button>
                                         <Button 
                                           variant="ghost" 
