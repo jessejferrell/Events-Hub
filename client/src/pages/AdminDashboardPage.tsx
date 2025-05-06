@@ -1257,9 +1257,11 @@ export default function AdminDashboardPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all_roles">All Roles</SelectItem>
+                        <SelectItem value="super_admin">Super Administrators</SelectItem>
                         <SelectItem value="admin">Administrators</SelectItem>
-                        <SelectItem value="organizer">Event Organizers</SelectItem>
+                        <SelectItem value="event_owner">Event Organizers</SelectItem>
                         <SelectItem value="vendor">Vendors</SelectItem>
+                        <SelectItem value="volunteer">Volunteers</SelectItem>
                         <SelectItem value="user">Regular Users</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1320,9 +1322,10 @@ export default function AdminDashboardPage() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <Badge 
-                                variant={user.role === 'admin' ? 'destructive' : 
-                                         user.role === 'organizer' ? 'default' : 
-                                         'secondary'}
+                                variant={user.role === 'super_admin' ? 'destructive' :
+                                         user.role === 'admin' ? 'default' : 
+                                         user.role === 'event_owner' ? 'secondary' : 
+                                         'outline'}
                               >
                                 {user.role}
                               </Badge>
@@ -1348,8 +1351,8 @@ export default function AdminDashboardPage() {
                                 </Button>
                                 
                                 {/* Edit button - only visible if current user has permission */}
-                                {((currentUser?.email === 'jessejferrell@gmail.com') || 
-                                  (currentUserRole === 'admin' && user.role !== 'admin')) && (
+                                {((currentUserRole === 'super_admin') || 
+                                  (currentUserRole === 'admin' && user.role !== 'admin' && user.role !== 'super_admin')) && (
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
@@ -1473,7 +1476,15 @@ export default function AdminDashboardPage() {
                           </div>
                           <h3 className="text-lg font-medium mb-1">{selectedUser.username}</h3>
                           <p className="text-neutral-500 mb-2">{selectedUser.email}</p>
-                          <Badge variant="outline" className="mb-4">{selectedUser.role}</Badge>
+                          <Badge 
+                            variant={selectedUser.role === 'super_admin' ? 'destructive' :
+                                     selectedUser.role === 'admin' ? 'default' : 
+                                     selectedUser.role === 'event_owner' ? 'secondary' : 
+                                     'outline'} 
+                            className="mb-4"
+                          >
+                            {selectedUser.role}
+                          </Badge>
                           
                           <div className="text-sm text-neutral-600">
                             <p className="flex justify-between pt-2 border-t">
@@ -1495,21 +1506,35 @@ export default function AdminDashboardPage() {
                         <div className="border rounded-lg p-4">
                           <h4 className="font-medium mb-3">Role Management</h4>
                           <div className="space-y-3">
-                            <Select 
-                              value={selectedUser.role} 
-                              onValueChange={(value) => handleUpdateUserRole(selectedUser.id, value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select Role" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="admin">Administrator</SelectItem>
-                                <SelectItem value="organizer">Event Organizer</SelectItem>
-                                <SelectItem value="vendor">Vendor</SelectItem>
-                                <SelectItem value="user">Regular User</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            {/* Removed non-functional account activation button */}
+                            {/* Only show role selector if user has permission */}
+                            {((currentUserRole === 'super_admin') || 
+                              (currentUserRole === 'admin' && 
+                               selectedUser.role !== 'admin' && 
+                               selectedUser.role !== 'super_admin')) ? (
+                              <Select 
+                                value={selectedUser.role} 
+                                onValueChange={(value) => handleUpdateUserRole(selectedUser.id, value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {/* Only super_admin can create another super_admin */}
+                                  {currentUserRole === 'super_admin' && (
+                                    <SelectItem value="super_admin">Super Administrator</SelectItem>
+                                  )}
+                                  <SelectItem value="admin">Administrator</SelectItem>
+                                  <SelectItem value="event_owner">Event Organizer</SelectItem>
+                                  <SelectItem value="vendor">Vendor</SelectItem>
+                                  <SelectItem value="volunteer">Volunteer</SelectItem>
+                                  <SelectItem value="user">Regular User</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="text-neutral-500 text-sm italic">
+                                You don't have permission to modify this user's role.
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
