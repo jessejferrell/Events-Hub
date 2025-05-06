@@ -314,7 +314,7 @@ export function setupStripeRoutes(app: Express) {
         cancel_url: `${effectiveDomain}/events/${eventId}?cancelled=true`,
         // Send payment to the connected account
         payment_intent_data: {
-          application_fee_amount: Math.round(event.price * 100 * (quantity || 1) * 0.1), // 10% platform fee
+          application_fee_amount: 0, // No platform fee as per client directive
           transfer_data: {
             destination: owner.stripeAccountId,
           },
