@@ -2222,6 +2222,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Fetch user details for admin dashboard
+  app.get("/api/admin/users/:id/details", requireAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      res.status(500).json({ message: 'Failed to fetch user details' });
+    }
+  });
+  
+  // Fetch user orders
+  app.get("/api/admin/users/:id/orders", requireAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const orders = await storage.getOrdersByUser(userId);
+      
+      // Fetch event titles for each order
+      const ordersWithEventTitles = await Promise.all(orders.map(async (order) => {
+        let eventTitle = 'Unknown';
+        if (order.eventId) {
+          const event = await storage.getEvent(order.eventId);
+          if (event) {
+            eventTitle = event.title;
+          }
+        }
+        return { ...order, eventTitle };
+      }));
+      
+      res.json(ordersWithEventTitles);
+    } catch (error) {
+      console.error('Error fetching user orders:', error);
+      res.status(500).json({ message: 'Failed to fetch user orders' });
+    }
+  });
+  
+  // Fetch user vendor registrations
+  app.get("/api/admin/users/:id/vendor-registrations", requireAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const registrations = await storage.getVendorRegistrations({ userId });
+      
+      // Fetch event titles and spot names for each registration
+      const enhancedRegistrations = await Promise.all(registrations.map(async (registration) => {
+        let eventTitle = 'Unknown';
+        let spotName = 'Unknown';
+        
+        if (registration.eventId) {
+          const event = await storage.getEvent(registration.eventId);
+          if (event) {
+            eventTitle = event.title;
+          }
+        }
+        
+        if (registration.spotId) {
+          const spot = await storage.getVendorSpot(registration.spotId);
+          if (spot) {
+            spotName = spot.name;
+          }
+        }
+        
+        return { ...registration, eventTitle, spotName };
+      }));
+      
+      res.json(enhancedRegistrations);
+    } catch (error) {
+      console.error('Error fetching user vendor registrations:', error);
+      res.status(500).json({ message: 'Failed to fetch user vendor registrations' });
+    }
+  });
+  
+  // Fetch user volunteer assignments
+  app.get("/api/admin/users/:id/volunteer-assignments", requireAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const assignments = await storage.getVolunteerAssignments({ userId });
+      
+      // Fetch event titles and shift names for each assignment
+      const enhancedAssignments = await Promise.all(assignments.map(async (assignment) => {
+        let eventTitle = 'Unknown';
+        let shiftName = 'Unknown';
+        
+        if (assignment.eventId) {
+          const event = await storage.getEvent(assignment.eventId);
+          if (event) {
+            eventTitle = event.title;
+          }
+        }
+        
+        if (assignment.shiftId) {
+          const shift = await storage.getVolunteerShift(assignment.shiftId);
+          if (shift) {
+            shiftName = shift.name;
+          }
+        }
+        
+        return { ...assignment, eventTitle, shiftName };
+      }));
+      
+      res.json(enhancedAssignments);
+    } catch (error) {
+      console.error('Error fetching user volunteer assignments:', error);
+      res.status(500).json({ message: 'Failed to fetch user volunteer assignments' });
+    }
+  });
+  
   // Create HTTP server
   const httpServer = createServer(app);
   return httpServer;
