@@ -20,13 +20,31 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/hooks/use-cart";
 import { apiRequest } from "@/lib/queryClient";
-import { Calendar, Clock, MapPin, Tag, Users, DollarSign, ShoppingBag, HelpingHand, Store } from "lucide-react";
+import { Calendar, Clock, MapPin, Tag, Users, DollarSign, ShoppingBag, HelpingHand, Store, Share2 } from "lucide-react";
 import { format, isSameDay } from "date-fns";
+import { 
+  FacebookShareButton, 
+  TwitterShareButton, 
+  LinkedinShareButton, 
+  WhatsappShareButton, 
+  EmailShareButton, 
+  FacebookIcon, 
+  TwitterIcon, 
+  LinkedinIcon, 
+  WhatsappIcon, 
+  EmailIcon 
+} from "react-share";
 
 export default function EventDetailsPage() {
   const [match, params] = useRoute("/events/:id");
@@ -194,7 +212,46 @@ export default function EventDetailsPage() {
           <>
             {/* Event Header */}
             <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">{event.title}</h1>
+              <div className="flex justify-between items-start">
+                <h1 className="text-3xl font-bold mb-2">{event.title}</h1>
+                
+                {/* Share Event Button */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1">
+                      <Share2 className="h-4 w-4" />
+                      Share
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="p-3">
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm text-muted-foreground mb-1">Share this event:</p>
+                      <div className="flex justify-between gap-2">
+                        <FacebookShareButton url={window.location.href} quote={`Check out ${event.title}`}>
+                          <FacebookIcon size={32} round />
+                        </FacebookShareButton>
+                        
+                        <TwitterShareButton url={window.location.href} title={`Check out ${event.title}`}>
+                          <TwitterIcon size={32} round />
+                        </TwitterShareButton>
+                        
+                        <LinkedinShareButton url={window.location.href} title={event.title} summary={event.description.substring(0, 100)}>
+                          <LinkedinIcon size={32} round />
+                        </LinkedinShareButton>
+                        
+                        <WhatsappShareButton url={window.location.href} title={`Check out ${event.title}`}>
+                          <WhatsappIcon size={32} round />
+                        </WhatsappShareButton>
+                        
+                        <EmailShareButton url={window.location.href} subject={`Check out this event: ${event.title}`} body={`I found this event and thought you might be interested:\n\n${event.title}\n${event.description.substring(0, 150)}...\n\nLearn more here: ${window.location.href}`}>
+                          <EmailIcon size={32} round />
+                        </EmailShareButton>
+                      </div>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              
               <div className="flex flex-wrap gap-4 text-gray-600">
                 <div className="flex items-center">
                   <Calendar className="h-5 w-5 mr-1 text-gray-500" />
