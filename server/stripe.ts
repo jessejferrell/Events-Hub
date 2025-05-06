@@ -152,7 +152,6 @@ export function setupStripeRoutes(app: Express) {
       // Log authentication status and session info for debugging
       log(`Authentication Status: ${req.isAuthenticated()}`, "stripe");
       log(`Session ID: ${req.session.id}`, "stripe");
-      log(`Session Data: ${JSON.stringify(req.session)}`, "stripe");
       
       if (!code) {
         // If there's an error or denial, Stripe redirects with error information instead of a code
@@ -178,37 +177,62 @@ export function setupStripeRoutes(app: Express) {
       const connectedAccountId = response.stripe_user_id as string;
       log(`Connected Account ID: ${connectedAccountId}`, "stripe");
       
-      if (!req.isAuthenticated()) {
-        // If user's session expired during OAuth flow, store the account ID and redirect to login
-        log(`User not authenticated during OAuth callback - storing account ID in session`, "stripe");
-        // Store in session for later use
-        (req.session as any).stripeAccountId = connectedAccountId;
-        await new Promise<void>((resolve) => {
-          req.session.save(() => {
-            log(`Session saved with account ID`, "stripe");
-            resolve();
+      // THIS IS THE CRUCIAL CHANGE:
+      // Whether authenticated or not, store the Stripe account ID in the session
+      // This allows us to reconnect it later even if authentication is lost
+      (req.session as any).pendingStripeAccountId = connectedAccountId;
+      
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              log(`Error saving session: ${err.message}`, "stripe");
+              reject(err);
+            } else {
+              log(`Session saved with pending account ID`, "stripe");
+              resolve();
+            }
           });
         });
+      } catch (sessionError) {
+        log(`Error saving session, but will continue: ${sessionError.message}`, "stripe");
+      }
+      
+      // If not authenticated, redirect to login
+      if (!req.isAuthenticated()) {
+        log(`User not authenticated during OAuth callback - redirecting to login`, "stripe");
         return res.redirect('/auth?message=' + encodeURIComponent('Please login to complete Stripe connection'));
       }
       
-      log(`User is authenticated: ${req.user.id}, username: ${req.user.username}`, "stripe");
-      log(`Saving Stripe account ID ${connectedAccountId} for user ${req.user.id}`, "stripe");
-      
-      // Save the account ID to the user record
-      await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
-      
-      log(`Successfully connected Stripe account for user ${req.user.id}`, "stripe");
-      
-      // Redirect back to the payment connections page with success
-      res.redirect('/payment-connections?success=true');
+      try {
+        log(`User is authenticated: ${req.user.id}, username: ${req.user.username}`, "stripe");
+        log(`Saving Stripe account ID ${connectedAccountId} for user ${req.user.id}`, "stripe");
+        
+        // Save the account ID to the user record
+        await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
+        
+        log(`Successfully connected Stripe account for user ${req.user.id}`, "stripe");
+        
+        // Redirect back to the payment connections page with success
+        return res.redirect('/payment-connections?success=true');
+      } catch (dbError) {
+        log(`Error updating user record: ${dbError.message}`, "stripe");
+        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Database error. Please check connection status manually.'));
+      }
     } catch (error: any) {
       log(`OAuth callback error: ${error.message}`, "stripe");
       console.error("Full OAuth error:", error);
-      // Add more details about the error for better debugging
       const errorDetails = error.stack || JSON.stringify(error);
       log(`Error stack: ${errorDetails}`, "stripe");
-      res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(error.message || 'Failed to connect Stripe account'));
+      
+      // Special case for handling session errors more gracefully
+      if (error.message && error.message.includes('session')) {
+        return res.redirect('/payment-connections?warning=true&message=' + 
+          encodeURIComponent('Session error, but your Stripe account may still be connected. Please check status.'));
+      }
+      
+      return res.redirect('/payment-connections?error=true&message=' + 
+        encodeURIComponent(error.message || 'Failed to connect Stripe account'));
     }
   });
 

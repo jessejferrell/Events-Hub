@@ -168,8 +168,36 @@ export function setupAuth(app: Express) {
       if (!user) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
-      req.login(user, (loginErr) => {
+      req.login(user, async (loginErr) => {
         if (loginErr) return next(loginErr);
+        
+        // Check if there's a pending Stripe account ID in the session to apply
+        const pendingStripeAccountId = (req.session as any).pendingStripeAccountId;
+        if (pendingStripeAccountId) {
+          try {
+            // Update the user's account with the pending Stripe account ID
+            log(`Found pending Stripe account ID in session after login: ${pendingStripeAccountId}`, "auth");
+            await storage.updateUserStripeAccount(user.id, pendingStripeAccountId);
+            
+            // Clear the pending ID from the session
+            delete (req.session as any).pendingStripeAccountId;
+            await new Promise<void>((resolve) => {
+              req.session.save(() => {
+                log(`Applied pending Stripe account ID to user ${user.id}`, "auth");
+                resolve();
+              });
+            });
+            
+            // Get the updated user 
+            const updatedUser = await storage.getUser(user.id);
+            const { password, ...updatedUserWithoutPassword } = updatedUser;
+            return res.status(200).json(updatedUserWithoutPassword);
+          } catch (error: any) {
+            log(`Error applying pending Stripe account ID: ${error.message}`, "auth");
+            // Continue with the original user object if there was an error
+          }
+        }
+        
         // Remove password from response
         const { password, ...userWithoutPassword } = user;
         return res.status(200).json(userWithoutPassword);
@@ -186,10 +214,38 @@ export function setupAuth(app: Express) {
   });
 
   // Get current user endpoint
-  app.get("/api/user", (req, res) => {
+  app.get("/api/user", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+    
+    // Check if there's a pending Stripe account ID in the session
+    const pendingStripeAccountId = (req.session as any).pendingStripeAccountId;
+    if (pendingStripeAccountId) {
+      try {
+        // Update the user's account with the pending Stripe account ID
+        log(`Found pending Stripe account ID in session on /api/user: ${pendingStripeAccountId}`, "auth");
+        await storage.updateUserStripeAccount(req.user.id, pendingStripeAccountId);
+        
+        // Clear the pending ID from the session
+        delete (req.session as any).pendingStripeAccountId;
+        await new Promise<void>((resolve) => {
+          req.session.save(() => {
+            log(`Applied pending Stripe account ID to user ${req.user.id}`, "auth");
+            resolve();
+          });
+        });
+        
+        // Return the updated user
+        const updatedUser = await storage.getUser(req.user.id);
+        const { password, ...updatedUserWithoutPassword } = updatedUser;
+        return res.json(updatedUserWithoutPassword);
+      } catch (error: any) {
+        log(`Error applying pending Stripe account ID: ${error.message}`, "auth");
+        // Continue with the original user object if there was an error
+      }
+    }
+    
     // Remove password from response
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
