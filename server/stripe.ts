@@ -73,31 +73,28 @@ export function setupStripeRoutes(app: Express) {
     
     log(`Using redirect URI: ${redirectUri}`, "stripe");
     
-    // Use standard OAuth flow with authorization code
-    const oauthUrl = new URL('https://connect.stripe.com/oauth/authorize');
-    oauthUrl.searchParams.append('response_type', 'code');
-    oauthUrl.searchParams.append('client_id', stripeClientId);
+    // Create a direct Connect link with your Stripe client ID
+    const directConnectUrl = new URL('https://dashboard.stripe.com/oauth/authorize');
+    directConnectUrl.searchParams.append('response_type', 'code');
+    directConnectUrl.searchParams.append('client_id', stripeClientId);
     
-    // Explicitly specify these parameters to work around the gated access error
-    oauthUrl.searchParams.append('scope', 'read_write');
-    oauthUrl.searchParams.append('stripe_user[business_type]', 'company');
-    oauthUrl.searchParams.append('stripe_user[country]', 'US');
+    // Don't add any extra parameters that could cause issues
     
     // Always include the redirect_uri parameter to ensure consistency
-    oauthUrl.searchParams.append('redirect_uri', redirectUri);
+    directConnectUrl.searchParams.append('redirect_uri', redirectUri);
     log(`Using redirect URI: ${redirectUri}`, "stripe");
     
-    oauthUrl.searchParams.append('state', state);
+    directConnectUrl.searchParams.append('state', state);
     
     // Additional logging for debugging
-    log(`Final OAuth URL: ${oauthUrl.toString()}`, "stripe");
+    log(`Final OAuth URL: ${directConnectUrl.toString()}`, "stripe");
     
     // Store state for verification when user returns
     // This is optional but recommended for security
     // You could store this in the session if needed
 
     // Return the URL for frontend to redirect
-    res.json({ url: oauthUrl.toString() });
+    res.json({ url: directConnectUrl.toString() });
   });
   
   // Route for the simplified callback URL
