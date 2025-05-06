@@ -227,7 +227,7 @@ export default function EventDetailsPage() {
                     <div className="flex flex-col gap-3">
                       <p className="text-sm text-muted-foreground mb-1">Share this event:</p>
                       <div className="flex justify-between gap-2">
-                        <FacebookShareButton url={window.location.href} quote={`Check out ${event.title}`}>
+                        <FacebookShareButton url={window.location.href} hashtag="#events">
                           <FacebookIcon size={32} round />
                         </FacebookShareButton>
                         
@@ -639,11 +639,31 @@ export default function EventDetailsPage() {
                   </Tabs>
 
                   <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-500">
-                    <p className="flex items-center mb-1">
+                    <p className="flex items-center mb-2">
                       <Users className="h-4 w-4 mr-1" />
                       <span>Share this event with friends</span>
                     </p>
-                    {/* Social share buttons would go here */}
+                    <div className="flex gap-2 justify-start">
+                      <FacebookShareButton url={window.location.href} hashtag="#events">
+                        <FacebookIcon size={32} round />
+                      </FacebookShareButton>
+                      
+                      <TwitterShareButton url={window.location.href} title={`Check out ${event.title}`}>
+                        <TwitterIcon size={32} round />
+                      </TwitterShareButton>
+                      
+                      <LinkedinShareButton url={window.location.href} title={event.title} summary={event.description.substring(0, 100)}>
+                        <LinkedinIcon size={32} round />
+                      </LinkedinShareButton>
+                      
+                      <WhatsappShareButton url={window.location.href} title={`Check out ${event.title}`}>
+                        <WhatsappIcon size={32} round />
+                      </WhatsappShareButton>
+                      
+                      <EmailShareButton url={window.location.href} subject={`Check out this event: ${event.title}`} body={`I found this event and thought you might be interested:\n\n${event.title}\n${event.description.substring(0, 150)}...\n\nLearn more here: ${window.location.href}`}>
+                        <EmailIcon size={32} round />
+                      </EmailShareButton>
+                    </div>
                   </div>
                 </div>
               </div>
