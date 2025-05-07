@@ -174,6 +174,37 @@ export function setupStripeRoutes(app: Express) {
   app.get("/api/stripe/config", (req, res) => {
     res.json({ publishableKey: process.env.VITE_STRIPE_PUBLIC_KEY });
   });
+  
+  // Debug endpoint to check Stripe settings
+  app.get("/api/stripe/settings", (req, res) => {
+    // Return all the relevant settings for debugging
+    const clientId = process.env.STRIPE_CLIENT_ID || '';
+    const secretKey = process.env.STRIPE_SECRET_KEY || '';
+    
+    // Calculate the production and development domains
+    const productionDomain = "https://events.mosspointmainstreet.org";
+    const replitAppDomain = "https://events-manager.replit.app";
+    
+    // Calculate both callback URLs (exactly matching what's in the Stripe dashboard)
+    const prodCallbackUrl = `${productionDomain}/api/stripe/oauth/callback`;
+    const devCallbackUrl = `${replitAppDomain}/api/stripe/oauth/callback`;
+    
+    // Here are the EXACT URLs that must be registered in the Stripe Connect settings
+    const registeredRedirectUris = [
+      prodCallbackUrl,
+      devCallbackUrl
+    ];
+    
+    res.json({
+      clientId: clientId ? clientId.substring(0, 4) + '...' + clientId.substring(clientId.length - 4) : 'missing',
+      secretKey: secretKey ? secretKey.substring(0, 4) + '...' + secretKey.substring(secretKey.length - 4) : 'missing',
+      productionDomain,
+      replitAppDomain,
+      registeredRedirectUris,
+      stripeWebhookUrl: `${productionDomain}/api/stripe/webhook`,
+      replitWebhookUrl: `${replitAppDomain}/api/stripe/webhook`
+    });
+  });
 
   // Start Stripe Connect OAuth flow for event owners
   app.get("/api/stripe/connect", async (req, res) => {
