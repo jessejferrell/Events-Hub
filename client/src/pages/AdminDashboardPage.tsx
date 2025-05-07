@@ -1733,6 +1733,86 @@ export default function AdminDashboardPage() {
                               </div>
                             </div>
                             
+                            {/* Vendor Profile Section */}
+                            {selectedUser.vendorProfile && (
+                              <div className="pt-3 border-t">
+                                <h5 className="text-sm font-medium mb-2">Vendor Profile</h5>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  <div className="text-neutral-500">Business Name:</div>
+                                  <div>{selectedUser.vendorProfile.businessName || 'Not provided'}</div>
+                                  
+                                  <div className="text-neutral-500">Business Type:</div>
+                                  <div>{selectedUser.vendorProfile.businessType || 'Not provided'}</div>
+                                  
+                                  <div className="text-neutral-500">Phone Number:</div>
+                                  <div>{selectedUser.vendorProfile.phoneNumber || 'Not provided'}</div>
+                                  
+                                  <div className="text-neutral-500">Tax ID/EIN:</div>
+                                  <div>{selectedUser.vendorProfile.taxId || 'Not provided'}</div>
+                                  
+                                  <div className="text-neutral-500">Website:</div>
+                                  <div>{selectedUser.vendorProfile.website || 'Not provided'}</div>
+                                  
+                                  <div className="text-neutral-500">Product Categories:</div>
+                                  <div>
+                                    {selectedUser.vendorProfile.productCategories ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {Array.isArray(selectedUser.vendorProfile.productCategories) ? (
+                                          selectedUser.vendorProfile.productCategories.map((category, index) => (
+                                            <Badge key={index} variant="outline" className="text-xs">
+                                              {category}
+                                            </Badge>
+                                          ))
+                                        ) : (
+                                          <span>No categories</span>
+                                        )}
+                                      </div>
+                                    ) : 'None'}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Volunteer Profile Section */}
+                            {selectedUser.volunteerProfile && (
+                              <div className="pt-3 border-t">
+                                <h5 className="text-sm font-medium mb-2">Volunteer Profile</h5>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  <div className="text-neutral-500">Skills:</div>
+                                  <div>
+                                    {selectedUser.volunteerProfile.skills ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {Array.isArray(selectedUser.volunteerProfile.skills) ? (
+                                          selectedUser.volunteerProfile.skills.map((skill, index) => (
+                                            <Badge key={index} variant="outline" className="text-xs">
+                                              {skill}
+                                            </Badge>
+                                          ))
+                                        ) : (
+                                          <span>No skills listed</span>
+                                        )}
+                                      </div>
+                                    ) : 'None'}
+                                  </div>
+                                  
+                                  <div className="text-neutral-500">Experience:</div>
+                                  <div>{selectedUser.volunteerProfile.experience || 'Not provided'}</div>
+                                  
+                                  <div className="text-neutral-500">T-Shirt Size:</div>
+                                  <div>{selectedUser.volunteerProfile.tshirtSize || 'Not provided'}</div>
+                                  
+                                  <div className="text-neutral-500">Emergency Contact:</div>
+                                  <div>{selectedUser.volunteerProfile.emergencyContact || 'Not provided'}</div>
+                                  
+                                  <div className="text-neutral-500">Emergency Phone:</div>
+                                  <div>{selectedUser.volunteerProfile.emergencyPhone || 'Not provided'}</div>
+                                  
+                                  <div className="text-neutral-500">Dietary Restrictions:</div>
+                                  <div>{selectedUser.volunteerProfile.dietaryRestrictions || 'None'}</div>
+                                </div>
+                              </div>
+                            )}
+                            
                             <div className="pt-3 border-t">
                               <h5 className="text-sm font-medium mb-2">Last Activity</h5>
                               <div className="flex items-center gap-2 text-sm">

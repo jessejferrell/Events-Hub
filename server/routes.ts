@@ -2414,7 +2414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Fetch user details for admin dashboard
+  // Fetch comprehensive user details for admin dashboard
   app.get("/api/admin/users/:id/details", requireAdmin, async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
@@ -2424,7 +2424,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      res.json(user);
+      // Fetch vendor profile if exists
+      const vendorProfile = await storage.getVendorProfile(userId);
+      
+      // Fetch volunteer profile if exists
+      const volunteerProfile = await storage.getVolunteerProfile(userId);
+      
+      // Construct comprehensive user data
+      const userDetails = {
+        ...user,
+        vendorProfile: vendorProfile || null,
+        volunteerProfile: volunteerProfile || null
+      };
+      
+      res.json(userDetails);
     } catch (error) {
       console.error('Error fetching user details:', error);
       res.status(500).json({ message: 'Failed to fetch user details' });
