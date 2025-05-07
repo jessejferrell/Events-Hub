@@ -740,14 +740,18 @@ export default function AdminDashboardPage() {
     setSelectedTransaction(transaction);
     setConfirmDeleteTransaction(true);
   };
+
+
   
   // Transaction detail view handlers
   const handleViewEventTransactions = (eventId: number) => {
+    setSelectedEventForDetails(eventId);
     setDetailEventId(eventId);
     setShowEventTransactionDetails(true);
   };
   
   const handleViewUserTransactions = (userId: number) => {
+    setSelectedUserForDetails(userId);
     setDetailUserId(userId);
     setShowUserTransactionDetails(true);
   };
@@ -2815,6 +2819,30 @@ export default function AdminDashboardPage() {
           />
         )}
       </main>
+      
+      {/* Event Transaction Details */}
+      {showEventTransactionDetails && detailEventId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-6xl max-h-[90vh] overflow-auto">
+            <EventTransactionDetails
+              eventId={detailEventId}
+              onBack={handleCloseTransactionDetails}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* User Transaction Details */}
+      {showUserTransactionDetails && detailUserId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-6xl max-h-[90vh] overflow-auto">
+            <UserTransactionDetails
+              userId={detailUserId}
+              onBack={handleCloseTransactionDetails}
+            />
+          </div>
+        </div>
+      )}
       
       <Footer />
       
