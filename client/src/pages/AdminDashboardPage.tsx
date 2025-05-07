@@ -25,7 +25,7 @@ import {
   Filter,
   RefreshCw,
   FileText,
-  Trash,
+  Trash as TrashIcon,
   Edit,
   Eye,
   AlertTriangle,
@@ -33,7 +33,8 @@ import {
   CalendarCheck,
   CheckCircle,
   XCircle,
-  Copy
+  Copy,
+  Pencil as PencilIcon
 } from "lucide-react";
 import {
   BarChart,
@@ -1921,15 +1922,71 @@ export default function AdminDashboardPage() {
                             {userNotes && userNotes.length > 0 ? (
                               userNotes.map((note: { id: number, note: string, adminId: number, createdAt: string }, index: number) => (
                                 <div key={note.id || index} className="text-sm border-b pb-2">
-                                  <p className="text-neutral-800">{note.note}</p>
-                                  <div className="flex justify-between items-center mt-1">
-                                    <p className="text-neutral-500 text-xs">
-                                      By Admin #{note.adminId}
-                                    </p>
-                                    <p className="text-neutral-500 text-xs">
-                                      {new Date(note.createdAt).toLocaleString()}
-                                    </p>
-                                  </div>
+                                  {editingNoteId === note.id ? (
+                                    <div className="mb-2">
+                                      <Input 
+                                        value={editedNoteText}
+                                        onChange={(e) => setEditedNoteText(e.target.value)}
+                                        className="mb-2"
+                                      />
+                                      <div className="flex space-x-2 justify-end">
+                                        <Button 
+                                          size="sm" 
+                                          variant="outline" 
+                                          onClick={() => {
+                                            setEditingNoteId(null);
+                                            setEditedNoteText('');
+                                          }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button 
+                                          size="sm"
+                                          onClick={() => {
+                                            if (editedNoteText.trim()) {
+                                              updateUserNoteMutation.mutate({
+                                                noteId: note.id,
+                                                note: editedNoteText.trim()
+                                              });
+                                            }
+                                          }}
+                                        >
+                                          Save
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <p className="text-neutral-800">{note.note}</p>
+                                      <div className="flex justify-between items-center mt-1">
+                                        <p className="text-neutral-500 text-xs">
+                                          By Admin #{note.adminId}
+                                        </p>
+                                        <div className="flex items-center space-x-2">
+                                          <p className="text-neutral-500 text-xs">
+                                            {new Date(note.createdAt).toLocaleString()}
+                                          </p>
+                                          <button 
+                                            onClick={() => {
+                                              setEditingNoteId(note.id);
+                                              setEditedNoteText(note.note);
+                                            }}
+                                            className="text-blue-500 hover:text-blue-700"
+                                            title="Edit note"
+                                          >
+                                            <PencilIcon className="h-3 w-3" />
+                                          </button>
+                                          <button 
+                                            onClick={() => deleteUserNoteMutation.mutate(note.id)}
+                                            className="text-red-500 hover:text-red-700"
+                                            title="Delete note"
+                                          >
+                                            <TrashIcon className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               ))
                             ) : (
