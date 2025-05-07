@@ -138,6 +138,8 @@ export default function AdminDashboardPage() {
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [userNote, setUserNote] = useState('');
   const [userNotes, setUserNotes] = useState<Array<{ id: number, note: string, adminId: number, createdAt: string }>>([]);
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editedNoteText, setEditedNoteText] = useState('');
   const [userOrders, setUserOrders] = useState<Array<any>>([]);
   const [userVendorRegistrations, setUserVendorRegistrations] = useState<Array<any>>([]);
   const [userVolunteerAssignments, setUserVolunteerAssignments] = useState<Array<any>>([]);
@@ -494,12 +496,16 @@ export default function AdminDashboardPage() {
   // Add user note mutation
   const addUserNoteMutation = useMutation({
     mutationFn: async ({ userId, note }: { userId: number; note: string }) => {
-      const res = await fetch(`/api/admin/users/${userId}/notes`, {
+      const res = await fetch(`/api/admin/notes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ note }),
+        body: JSON.stringify({ 
+          targetType: 'user',
+          targetId: userId,
+          note 
+        }),
       });
       if (!res.ok) {
         throw new Error('Failed to add user note');
@@ -513,6 +519,75 @@ export default function AdminDashboardPage() {
         fetchUserDetails(selectedUser.id);
       }
     },
+  });
+  
+  // Update user note mutation
+  const updateUserNoteMutation = useMutation({
+    mutationFn: async ({ noteId, note }: { noteId: number; note: string }) => {
+      const res = await fetch(`/api/admin/notes/${noteId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ note }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update note');
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      setEditingNoteId(null);
+      setEditedNoteText('');
+      
+      // Refresh notes after update
+      if (selectedUser && showUserDetail) {
+        fetchUserDetails(selectedUser.id);
+      }
+      
+      toast({
+        title: "Note updated",
+        description: "User note has been updated successfully."
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update note",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Delete user note mutation
+  const deleteUserNoteMutation = useMutation({
+    mutationFn: async (noteId: number) => {
+      const res = await fetch(`/api/admin/notes/${noteId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error('Failed to delete note');
+      }
+      return noteId;
+    },
+    onSuccess: () => {
+      // Refresh notes after deletion
+      if (selectedUser && showUserDetail) {
+        fetchUserDetails(selectedUser.id);
+      }
+      
+      toast({
+        title: "Note deleted",
+        description: "User note has been deleted successfully."
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete note",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
   
   // Event duplication state
