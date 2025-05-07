@@ -42,6 +42,7 @@ export interface IStorage {
   updateUserStripeCustomer(userId: number, stripeCustomerId: string): Promise<User>;
   updateUserStripeSubscription(userId: number, stripeSubscriptionId: string): Promise<User>;
   updateUserProfile(userId: number, userData: Partial<InsertUser>): Promise<User>;
+  updateUserLastLogin(userId: number): Promise<User>;
   
   // Event operations
   getEvents(filters: { type?: string; location?: string; search?: string; sortBy?: string; isUpcoming?: boolean; status?: string }): Promise<Event[]>;
@@ -252,6 +253,20 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .update(users)
       .set({ ...userData, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    if (!result[0]) {
+      throw new Error(`User not found: ${userId}`);
+    }
+    
+    return result[0];
+  }
+  
+  async updateUserLastLogin(userId: number): Promise<User> {
+    const result = await db
+      .update(users)
+      .set({ lastLogin: new Date(), updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
     

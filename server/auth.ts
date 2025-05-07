@@ -171,6 +171,15 @@ export function setupAuth(app: Express) {
       req.login(user, async (loginErr) => {
         if (loginErr) return next(loginErr);
         
+        // Update last login timestamp
+        try {
+          await storage.updateUserLastLogin(user.id);
+          log(`Updated last login timestamp for user ${user.id}`, "auth");
+        } catch (updateErr) {
+          log(`Error updating last login timestamp: ${updateErr.message}`, "auth");
+          // Continue with login even if this fails
+        }
+        
         // PRIORITY 1: Check for a Stripe account ID cookie first (most reliable method)
         const stripeCookie = req.cookies?.stripe_account_id;
         if (stripeCookie && !user.stripeAccountId) {
@@ -286,6 +295,15 @@ export function setupAuth(app: Express) {
   app.get("/api/user", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    // Update last login timestamp
+    try {
+      await storage.updateUserLastLogin(req.user.id);
+      log(`Updated last login timestamp for user ${req.user.id} during /api/user call`, "auth");
+    } catch (updateErr) {
+      log(`Error updating last login timestamp: ${updateErr.message}`, "auth");
+      // Continue with request even if this fails
     }
     
     // PRIORITY 1: Check for a Stripe account ID cookie first (most reliable method)
