@@ -171,7 +171,41 @@ export function setupAuth(app: Express) {
       req.login(user, async (loginErr) => {
         if (loginErr) return next(loginErr);
         
-        // Check if there's a pending Stripe account ID in the session to apply
+        // PRIORITY 1: Check for a Stripe account ID cookie first (most reliable method)
+        const stripeCookie = req.cookies?.stripe_account_id;
+        if (stripeCookie && !user.stripeAccountId) {
+          try {
+            // Validate the Stripe account ID
+            if (stripeCookie.startsWith('acct_')) {
+              log(`Found Stripe account ID in cookie: ${stripeCookie}`, "auth");
+              
+              // Verify with Stripe
+              const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, {
+                apiVersion: "2023-10-16",
+              });
+              
+              await stripe.accounts.retrieve(stripeCookie);
+              
+              // Valid account ID, save it to the user
+              await storage.updateUserStripeAccount(user.id, stripeCookie);
+              
+              // Clear the cookie
+              res.clearCookie('stripe_account_id');
+              
+              log(`Successfully connected Stripe account from cookie for user ${user.id}`, "auth");
+              
+              // Get the updated user 
+              const updatedUser = await storage.getUser(user.id);
+              const { password, ...updatedUserWithoutPassword } = updatedUser;
+              return res.status(200).json(updatedUserWithoutPassword);
+            }
+          } catch (stripeErr) {
+            log(`Error connecting Stripe account from cookie: ${stripeErr.message}`, "auth");
+            // Continue with other methods if this one fails
+          }
+        }
+        
+        // PRIORITY 2: Check if there's a pending Stripe account ID in the session to apply
         const pendingStripeAccountId = (req.session as any).pendingStripeAccountId;
         if (pendingStripeAccountId) {
           try {
@@ -198,6 +232,41 @@ export function setupAuth(app: Express) {
           }
         }
         
+        // PRIORITY 3: Check for a recovery file as last resort
+        if (!user.stripeAccountId) {
+          try {
+            const fs = require('fs');
+            if (fs.existsSync('./recover-connection.txt')) {
+              const savedAccountId = fs.readFileSync('./recover-connection.txt', 'utf8').trim();
+              
+              if (savedAccountId && savedAccountId.startsWith('acct_')) {
+                log(`Found saved account ID in recovery file during login: ${savedAccountId}`, "auth");
+                
+                // Verify the account with Stripe
+                try {
+                  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, {
+                    apiVersion: "2023-10-16",
+                  });
+                  const account = await stripe.accounts.retrieve(savedAccountId);
+                  log(`Successfully verified account with Stripe: ${account.id}`, "auth");
+                  
+                  // Update the user's account with this ID
+                  await storage.updateUserStripeAccount(user.id, savedAccountId);
+                  
+                  // Get the updated user
+                  const updatedUser = await storage.getUser(user.id);
+                  const { password, ...updatedUserWithoutPassword } = updatedUser;
+                  return res.status(200).json(updatedUserWithoutPassword);
+                } catch (accountError: any) {
+                  log(`Error verifying account with Stripe: ${accountError.message}`, "auth");
+                }
+              }
+            }
+          } catch (fileError: any) {
+            log(`Error processing recovery file during login: ${fileError.message}`, "auth");
+          }
+        }
+        
         // Remove password from response
         const { password, ...userWithoutPassword } = user;
         return res.status(200).json(userWithoutPassword);
@@ -219,7 +288,41 @@ export function setupAuth(app: Express) {
       return res.status(401).json({ message: "Not authenticated" });
     }
     
-    // Check if there's a pending Stripe account ID in the session
+    // PRIORITY 1: Check for a Stripe account ID cookie first (most reliable method)
+    const stripeCookie = req.cookies?.stripe_account_id;
+    if (stripeCookie && !req.user.stripeAccountId) {
+      try {
+        // Validate the Stripe account ID
+        if (stripeCookie.startsWith('acct_')) {
+          log(`Found Stripe account ID in cookie during /api/user call: ${stripeCookie}`, "auth");
+          
+          // Verify with Stripe
+          const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, {
+            apiVersion: "2023-10-16",
+          });
+          
+          await stripe.accounts.retrieve(stripeCookie);
+          
+          // Valid account ID, save it to the user
+          await storage.updateUserStripeAccount(req.user.id, stripeCookie);
+          
+          // Clear the cookie
+          res.clearCookie('stripe_account_id');
+          
+          log(`Successfully connected Stripe account from cookie for user ${req.user.id}`, "auth");
+          
+          // Get the updated user 
+          const updatedUser = await storage.getUser(req.user.id);
+          const { password, ...updatedUserWithoutPassword } = updatedUser;
+          return res.json(updatedUserWithoutPassword);
+        }
+      } catch (stripeErr) {
+        log(`Error connecting Stripe account from cookie: ${stripeErr.message}`, "auth");
+        // Continue with other methods if this one fails
+      }
+    }
+    
+    // PRIORITY 2: Check if there's a pending Stripe account ID in the session
     const pendingStripeAccountId = (req.session as any).pendingStripeAccountId;
     if (pendingStripeAccountId) {
       try {
@@ -243,6 +346,41 @@ export function setupAuth(app: Express) {
       } catch (error: any) {
         log(`Error applying pending Stripe account ID: ${error.message}`, "auth");
         // Continue with the original user object if there was an error
+      }
+    }
+    
+    // PRIORITY 3: Check for a recovery file as last resort
+    if (!req.user.stripeAccountId) {
+      try {
+        const fs = require('fs');
+        if (fs.existsSync('./recover-connection.txt')) {
+          const savedAccountId = fs.readFileSync('./recover-connection.txt', 'utf8').trim();
+          
+          if (savedAccountId && savedAccountId.startsWith('acct_')) {
+            log(`Found saved account ID in recovery file during /api/user: ${savedAccountId}`, "auth");
+            
+            // Verify the account with Stripe
+            try {
+              const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, {
+                apiVersion: "2023-10-16",
+              });
+              const account = await stripe.accounts.retrieve(savedAccountId);
+              log(`Successfully verified account with Stripe: ${account.id}`, "auth");
+              
+              // Update the user's account with this ID
+              await storage.updateUserStripeAccount(req.user.id, savedAccountId);
+              
+              // Get the updated user
+              const updatedUser = await storage.getUser(req.user.id);
+              const { password, ...updatedUserWithoutPassword } = updatedUser;
+              return res.json(updatedUserWithoutPassword);
+            } catch (accountError: any) {
+              log(`Error verifying account with Stripe: ${accountError.message}`, "auth");
+            }
+          }
+        }
+      } catch (fileError: any) {
+        log(`Error processing recovery file during /api/user: ${fileError.message}`, "auth");
       }
     }
     

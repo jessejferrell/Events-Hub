@@ -148,116 +148,119 @@ export function setupStripeRoutes(app: Express) {
     }
   });
   
-  // Main Stripe OAuth callback endpoint
+  // Simplified Stripe OAuth callback endpoint
   app.get("/api/stripe/oauth/callback", async (req, res) => {
     try {
       log(`OAuth callback received: ${JSON.stringify(req.query)}`, "stripe");
       const { code, state } = req.query;
       
-      // Log authentication status
-      log(`Authentication Status: ${req.isAuthenticated()}`, "stripe");
-      
       if (!code) {
-        // If there's an error or denial, Stripe redirects with error information instead of a code
         const error = req.query.error;
         const errorDescription = req.query.error_description;
         log(`OAuth error: ${error} - ${errorDescription}`, "stripe");
-        
-        // Redirect to payment connections page with error
         return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(errorDescription as string || 'Authorization denied'));
       }
       
-      log(`Attempting to exchange authorization code for access token...`, "stripe");
+      log(`Exchanging authorization code for access token...`, "stripe");
       
-      // Exchange the authorization code for an access token
+      // Exchange the code for a Stripe account ID
       const response = await stripe.oauth.token({
         grant_type: 'authorization_code',
         code: code as string,
       });
       
-      log(`OAuth token response received successfully`, "stripe");
-      
       // Extract the connected account ID
       const connectedAccountId = response.stripe_user_id as string;
       log(`Connected Account ID: ${connectedAccountId}`, "stripe");
       
-      // Critical: Store this account ID to a file for recovery
-      try {
-        const fs = require('fs');
-        fs.writeFileSync('recover-connection.txt', connectedAccountId);
-        log(`Saved Stripe account ID to filesystem: ${connectedAccountId}`, "stripe");
-        
-        // Also try to recover user ID from the state parameter or file
-        let userId = null;
-        
-        // First try to parse user ID from state if available
-        if (state && typeof state === 'string') {
-          const stateStr = state as string;
-          const parts = stateStr.split('-');
-          if (parts.length >= 2) {
-            userId = parseInt(parts[0]);
-            log(`Recovered user ID from state: ${userId}`, "stripe");
-          }
-        }
-        
-        // If no user ID yet, try to read from file
-        if (!userId && fs.existsSync('stripe-connect-user.txt')) {
-          try {
-            userId = parseInt(fs.readFileSync('stripe-connect-user.txt', 'utf8').trim());
-            log(`Recovered user ID from file: ${userId}`, "stripe");
-          } catch (readErr) {
-            log(`Error reading user ID from file: ${readErr.message}`, "stripe");
-          }
-        }
-        
-        // If we found a user ID and it's not the same as the authenticated user (or no user authenticated),
-        // store it for later
-        if (userId) {
-          fs.writeFileSync('stripe-connect-user-id.txt', userId.toString());
-        }
-      } catch (fsErr) {
-        log(`Error saving account ID to file: ${fsErr.message}`, "stripe");
-        // Continue anyway, this is just a fallback
-      }
-      
-      // Also store in session as a backup
-      (req.session as any).pendingStripeAccountId = connectedAccountId;
-      req.session.save();
-      
-      // Handle the authentication scenarios
-      if (!req.isAuthenticated()) {
-        log(`User not authenticated during OAuth callback - redirecting to login`, "stripe");
-        return res.redirect('/auth?message=' + encodeURIComponent('Please login to complete Stripe connection'));
-      }
-      
-      // If we get here, user is authenticated, so save the account ID
-      try {
-        log(`User is authenticated: ${req.user.id}, username: ${req.user.username}`, "stripe");
-        log(`Saving Stripe account ID ${connectedAccountId} for user ${req.user.id}`, "stripe");
-        
-        // Save the account ID to the user record
-        await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
-        
-        log(`Successfully connected Stripe account for user ${req.user.id}`, "stripe");
-        
-        // Redirect back to the payment connections page with success
-        return res.redirect('/payment-connections?success=true');
-      } catch (error: any) {
-        log(`Error updating user record: ${error.message}`, "stripe");
-        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Database error. Please try the recovery option.'));
-      }
+      // Direct approach: use an HTML form that auto-submits to apply the connection
+      // This allows us to pass the Stripe account ID back to the client even if session is lost
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Completing Stripe Connection</title>
+          <style>
+            body { font-family: system-ui, sans-serif; text-align: center; padding-top: 50px; }
+            .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          </style>
+        </head>
+        <body>
+          <h2>Connecting your Stripe account...</h2>
+          <div class="loader"></div>
+          <p>Please don't close this window. You'll be redirected automatically.</p>
+          
+          <form id="connectionForm" method="POST" action="/api/stripe/manual-connect">
+            <input type="hidden" name="stripeAccountId" value="${connectedAccountId}">
+          </form>
+          
+          <script>
+            // Submit the form automatically
+            document.addEventListener('DOMContentLoaded', function() {
+              setTimeout(function() {
+                document.getElementById('connectionForm').submit();
+              }, 1000);
+            });
+          </script>
+        </body>
+        </html>
+      `);
     } catch (error: any) {
       log(`OAuth callback error: ${error.message}`, "stripe");
-      console.error("Full OAuth error:", error);
+      console.error("OAuth error details:", error);
+      return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Connection error. Please try connecting again.'));
+    }
+  });
+
+  // Direct endpoint for the form post from OAuth callback
+  app.post("/api/stripe/manual-connect", async (req, res) => {
+    try {
+      const { stripeAccountId } = req.body;
       
-      // Special case for handling session errors more gracefully
-      if (error.message && error.message.includes('session')) {
-        return res.redirect('/payment-connections?warning=true&message=' + 
-          encodeURIComponent('Session error occurred. Please try the recovery option.'));
+      if (!stripeAccountId || typeof stripeAccountId !== 'string' || !stripeAccountId.startsWith('acct_')) {
+        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Invalid Stripe account ID format'));
       }
       
-      return res.redirect('/payment-connections?error=true&message=' + 
-        encodeURIComponent('Connection error. Please try the recovery option.'));
+      // Validate the account ID with Stripe
+      try {
+        await stripe.accounts.retrieve(stripeAccountId);
+      } catch (error) {
+        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Invalid Stripe account ID. Please try again.'));
+      }
+      
+      // Store the account ID in a cookie that lasts 5 minutes
+      res.cookie('stripe_account_id', stripeAccountId, { 
+        maxAge: 5 * 60 * 1000, // 5 minutes
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax'
+      });
+      
+      // Also save to file for backup
+      try {
+        const fs = require('fs');
+        fs.writeFileSync('recover-connection.txt', stripeAccountId);
+      } catch (err) {
+        console.error("Failed to write to file:", err);
+        // Continue anyway
+      }
+      
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.redirect('/auth?message=' + encodeURIComponent('Please log in to complete your Stripe connection'));
+      }
+      
+      // User is authenticated, connect the account
+      await storage.updateUserStripeAccount(req.user.id, stripeAccountId);
+      
+      // Clear the cookie since we've stored the value
+      res.clearCookie('stripe_account_id');
+      
+      return res.redirect('/payment-connections?success=true');
+    } catch (error: any) {
+      log(`Error in manual connect: ${error.message}`, "stripe");
+      return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Error connecting Stripe account. Please try again.'));
     }
   });
 
