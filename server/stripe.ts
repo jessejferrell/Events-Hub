@@ -11,9 +11,17 @@ if (stripeSecretKey === "sk_test_example" || stripePublicKey === "pk_test_exampl
   log("Using test Stripe keys. Set STRIPE_SECRET_KEY and VITE_STRIPE_PUBLIC_KEY for production", "stripe");
 }
 
-const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2025-04-30.basil", // Updated to latest API version
-});
+// Create a function to get a Stripe instance with the latest key
+function getStripe() {
+  // Always use the current environment variable, not the cached value
+  const currentKey = process.env.STRIPE_SECRET_KEY || stripeSecretKey;
+  return new Stripe(currentKey, {
+    apiVersion: "2025-04-30.basil", // Updated to latest API version
+  });
+}
+
+// Create a singleton instance for regular use
+const stripe = getStripe();
 
 export function setupStripeRoutes(app: Express) {
   // Log all stripe routes being registered
@@ -576,6 +584,10 @@ export function setupStripeRoutes(app: Express) {
       console.error("Credentials OK, proceeding with token exchange");
       
       try {
+        // Get a fresh Stripe instance with the current key
+        const freshStripe = getStripe();
+        console.error("Created fresh Stripe instance for OAuth token exchange");
+        
         // MINIMAL DIRECT API CALL APPROACH
         const params = new URLSearchParams();
         params.append('grant_type', 'authorization_code');
@@ -585,6 +597,10 @@ export function setupStripeRoutes(app: Express) {
         
         console.error("Making token request with params (without secret):", 
           params.toString().replace(secretKey, '[REDACTED]'));
+        
+        // Debug log the key format to ensure we're using the right one
+        console.error("Using secret key format:", 
+          secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
         
         // For OAuth token exchange, Stripe expects the parameters in the body
         // The client ID should not be used as an API key for Basic Auth
