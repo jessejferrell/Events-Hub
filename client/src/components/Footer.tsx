@@ -21,13 +21,13 @@ export default function Footer() {
               Your one-stop platform for discovering, creating, and managing local events in your community.
             </p>
             <div className="flex space-x-4 mt-4">
-              <a href="https://www.facebook.com/MossPointMainStreet" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
+              <a href="https://www.facebook.com/ExperiencedResults" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="https://www.youtube.com/playlist?list=PLG5wmM4lFjDhQKrmpOYby8ulryk4yWWd6" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
+              <a href="https://www.youtube.com/ExperiencedResults" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
                 <Youtube className="h-5 w-5" />
               </a>
-              <a href="https://www.instagram.com/mpmainstreet/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
+              <a href="https://www.instagram.com/experiencedresults/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
                 <Instagram className="h-5 w-5" />
               </a>
             </div>
@@ -90,7 +90,7 @@ export default function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <a 
-                  href="https://mosspointmainstreet.org/contact-us/" 
+                  href="mailto:jj@expresults.com" 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className="text-gray-600 hover:text-primary transition-colors"
@@ -117,15 +117,11 @@ export default function Footer() {
             <div className="space-y-3 text-sm">
               <div className="flex items-start">
                 <MapPin className="h-5 w-5 text-primary mr-2 mt-0.5" />
-                <span className="text-gray-600">4836 Main Street Moss Point, MS 39563</span>
-              </div>
-              <div className="flex items-center">
-                <Phone className="h-5 w-5 text-primary mr-2" />
-                <span className="text-gray-600">(228) 217-3277</span>
+                <span className="text-gray-600">P.O. Box 1522, Escatawpa, MS 39552</span>
               </div>
               <div className="flex items-center">
                 <Mail className="h-5 w-5 text-primary mr-2" />
-                <span className="text-gray-600">director@mosspointmainstreet.org</span>
+                <span className="text-gray-600">jj@expresults.com</span>
               </div>
             </div>
           </div>
