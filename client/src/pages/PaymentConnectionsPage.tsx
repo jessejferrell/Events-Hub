@@ -115,17 +115,25 @@ export default function PaymentConnectionsPage() {
     const message = searchParams.get("message");
     const code = searchParams.get("code"); // This is the Stripe authorization code
     
-    console.log("Payment connection page loaded with params:", {
+    console.log("========= PAYMENT PAGE PARAMS =========");
+    console.log("URL:", window.location.href);
+    console.log("Query params:", {
       success, error, message, code: code ? "PRESENT" : "NONE"
     });
+    console.log("All params:", Object.fromEntries(searchParams.entries()));
+    console.log("=====================================");
+    
+    // TOAST INSPECTION - this is probably where the error toast is coming from!
+    // Add specific debugging for each toast call
     
     // If we have a code parameter, this indicates we've been redirected from Stripe
     // but somehow the backend didn't properly process it
     if (code && !success && !error) {
+      console.log("DETECTED: Code present without success/error flags");
       console.log("Found Stripe code in URL but no success/error parameters - attempting recovery");
       
       // Try to recover immediately
-      attemptRecovery();
+      handleRecoverConnection();
       
       // And clean the URL of the code parameter to prevent repeated attempts
       searchParams.delete("code");
@@ -138,6 +146,7 @@ export default function PaymentConnectionsPage() {
     }
     
     if (success === "true") {
+      console.log("SHOWING SUCCESS TOAST");
       toast({
         title: "Connection successful",
         description: "Your Stripe account has been connected.",
@@ -149,8 +158,12 @@ export default function PaymentConnectionsPage() {
     } else if (error === "true") {
       // If we get an error, let's try an immediate recovery just in case
       // the error is just a UI issue and the account was actually connected
+      console.log("SHOWING ERROR TOAST");
       console.log("Connection error detected - attempting recovery");
-      attemptRecovery();
+      console.log("Error message:", message);
+      
+      // Try the recover function
+      handleRecoverConnection();
       
       toast({
         title: "Connection failed",
@@ -160,7 +173,7 @@ export default function PaymentConnectionsPage() {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [toast, refetchStatus, attemptRecovery]);
+  }, [toast, refetchStatus, handleRecoverConnection]);
   
   // REMOVED auto-refresh which was running constantly and annoying users
   // Manual refresh is better and avoids confusion
