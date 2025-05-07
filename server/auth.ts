@@ -141,6 +141,33 @@ export function setupAuth(app: Express) {
       if (password.length < 8) {
         return res.status(400).json({ message: "Password must be at least 8 characters long" });
       }
+      
+      // Validate required contact fields
+      const { name, phoneNumber, address, city, state, zipCode } = req.body;
+      
+      if (!name || name.trim().length < 2) {
+        return res.status(400).json({ message: "Full name is required" });
+      }
+      
+      if (!phoneNumber || phoneNumber.trim().length < 10) {
+        return res.status(400).json({ message: "Valid phone number is required" });
+      }
+      
+      if (!address || address.trim().length < 3) {
+        return res.status(400).json({ message: "Street address is required" });
+      }
+      
+      if (!city || city.trim().length < 2) {
+        return res.status(400).json({ message: "City is required" });
+      }
+      
+      if (!state || state.trim().length < 2) {
+        return res.status(400).json({ message: "State is required" });
+      }
+      
+      if (!zipCode || zipCode.trim().length < 5) {
+        return res.status(400).json({ message: "Valid zip code is required" });
+      }
 
       // Hash password and create user
       const hashedPassword = await hashPassword(password);
