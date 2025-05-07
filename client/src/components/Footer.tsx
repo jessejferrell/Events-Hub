@@ -21,13 +21,13 @@ export default function Footer() {
               Your one-stop platform for discovering, creating, and managing local events in your community.
             </p>
             <div className="flex space-x-4 mt-4">
-              <a href="https://www.facebook.com/ExperiencedResults" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
+              <a href="https://www.facebook.com/MossPointMainStreet" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="https://www.youtube.com/ExperiencedResults" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
+              <a href="https://www.youtube.com/playlist?list=PLG5wmM4lFjDhQKrmpOYby8ulryk4yWWd6" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
                 <Youtube className="h-5 w-5" />
               </a>
-              <a href="https://www.instagram.com/experiencedresults/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
+              <a href="https://www.instagram.com/mpmainstreet/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
                 <Instagram className="h-5 w-5" />
               </a>
             </div>
