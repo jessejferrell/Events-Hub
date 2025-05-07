@@ -6,6 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StatCard from "@/components/admin/StatCard";
+import { EventTransactionDetails } from "@/components/admin/EventTransactionDetails";
+import { UserTransactionDetails } from "@/components/admin/UserTransactionDetails";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   User as UserIcon, 
@@ -157,6 +159,12 @@ export default function AdminDashboardPage() {
     'pending', 'completed', 'cancelled', 'refunded', 'failed', 'processing'
   ]);
   const [confirmDeleteTransaction, setConfirmDeleteTransaction] = useState(false);
+  
+  // Transaction detail view state
+  const [showEventTransactionDetails, setShowEventTransactionDetails] = useState(false);
+  const [showUserTransactionDetails, setShowUserTransactionDetails] = useState(false);
+  const [detailEventId, setDetailEventId] = useState<number | null>(null);
+  const [detailUserId, setDetailUserId] = useState<number | null>(null);
   
   // Analytics state
   const [analyticsTimeframe, setAnalyticsTimeframe] = useState<string>("month");
@@ -729,6 +737,24 @@ export default function AdminDashboardPage() {
   const handleDeleteTransaction = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
     setConfirmDeleteTransaction(true);
+  };
+  
+  // Transaction detail view handlers
+  const handleViewEventTransactions = (eventId: number) => {
+    setDetailEventId(eventId);
+    setShowEventTransactionDetails(true);
+  };
+  
+  const handleViewUserTransactions = (userId: number) => {
+    setDetailUserId(userId);
+    setShowUserTransactionDetails(true);
+  };
+  
+  const handleCloseTransactionDetails = () => {
+    setShowEventTransactionDetails(false);
+    setShowUserTransactionDetails(false);
+    setDetailEventId(null);
+    setDetailUserId(null);
   };
   
   // Refresh analytics data
