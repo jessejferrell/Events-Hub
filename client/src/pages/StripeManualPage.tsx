@@ -16,17 +16,26 @@ export default function StripeManualPage() {
   const [error, setError] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<string | null>(null);
 
-  // Function to generate Stripe OAuth URL
-  const getStripeOAuthUrl = () => {
-    // Get client_id and redirect_uri from environment
-    const clientId = import.meta.env.VITE_STRIPE_CLIENT_ID || "";
-    
-    const params = new URLSearchParams({
-      response_type: "code",
-      client_id: clientId,
-      scope: "read_write",
-      redirect_uri: window.location.origin + "/api/stripe/oauth/callback"
-    });
+  // Function to generate Stripe OAuth URL - use the server-generated URL
+  const getStripeOAuthUrl = async () => {
+    try {
+      // Let the server generate the proper URL with all the right parameters
+      const response = await fetch("/api/stripe/connect");
+      const data = await response.json();
+      
+      if (data.url) {
+        return data.url;
+      } else if (data.connected) {
+        setError("You already have a Stripe account connected.");
+        return null;
+      } else {
+        setError(data.message || "Failed to generate Stripe OAuth URL");
+        return null;
+      }
+    } catch (err: any) {
+      setError("Error generating OAuth URL: " + err.message);
+      return null;
+    }
     
     return `https://connect.stripe.com/oauth/authorize?${params.toString()}`;
   };
