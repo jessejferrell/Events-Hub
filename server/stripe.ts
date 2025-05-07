@@ -213,11 +213,11 @@ export function setupStripeRoutes(app: Express) {
       
       // In development on Replit, use events-manager.replit.app
       if (process.env.NODE_ENV !== 'production') {
-        registeredRedirectUri = "https://events-manager.replit.app/api/stripe/webhook";
+        registeredRedirectUri = "https://events-manager.replit.app/api/stripe/oauth/callback";
         log(`Using Replit app redirect URI: ${registeredRedirectUri}`, "stripe");
       } else {
         // In production, use the production domain
-        registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/webhook";
+        registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/oauth/callback";
         log(`Using production redirect URI: ${registeredRedirectUri}`, "stripe");
       }
       
@@ -481,7 +481,8 @@ export function setupStripeRoutes(app: Express) {
   });
   
   // DIRECT APPROACH: Ultra-simplified Stripe OAuth callback endpoint
-  app.get("/api/stripe/webhook", async (req, res) => {
+  // OAuth callback handler
+  app.get("/api/stripe/oauth/callback", async (req, res) => {
     // First, write everything to a file to ensure we capture it
     log(`STRIPE OAUTH CALLBACK RECEIVED: ${new Date().toISOString()}`, "stripe");
     
