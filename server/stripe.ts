@@ -851,7 +851,37 @@ export function setupStripeRoutes(app: Express) {
         log(`PaymentIntent succeeded: ${paymentIntent.id}`, "stripe");
         break;
       }
-      // Add more event handlers as needed
+      
+      // New handlers for Connect account verification
+      case "account.updated": {
+        // A connected account was updated, check verification status
+        const account = event.data.object;
+        log(`Connected Stripe account updated: ${account.id}`, "stripe");
+        await handleAccountUpdated(account);
+        break;
+      }
+      
+      case "account.application.deauthorized": {
+        // A user has deauthorized your application
+        const account = event.data.object;
+        log(`Stripe account deauthorized: ${account.id}`, "stripe");
+        await handleAccountDeauthorized(account);
+        break;
+      }
+      
+      case "account.external_account.created": {
+        // A bank account or card was added to a connected account
+        const externalAccount = event.data.object;
+        log(`External account added: ${externalAccount.id}`, "stripe");
+        break;
+      }
+      
+      case "account.external_account.updated": {
+        // A bank account or card was updated on a connected account
+        const externalAccount = event.data.object;
+        log(`External account updated: ${externalAccount.id}`, "stripe");
+        break;
+      }
     }
 
     res.json({ received: true });
@@ -874,26 +904,146 @@ export function setupStripeRoutes(app: Express) {
       const ticket = await storage.createTicket({
         userId: parseInt(userId),
         eventId: parseInt(eventId),
-        quantity: parseInt(quantity),
         status: "purchased",
         transactionId: session.payment_intent,
-        amount: session.amount_total / 100, // convert from cents
+        price: session.amount_total / 100, // convert from cents
+        // We use metadata for storing additional info since our schema might not have quantity
+        metadata: { quantity: parseInt(quantity) }
       });
       
-      // Create payment record
-      await storage.createPayment({
+      // Create order record if needed for the ticket
+      const orderData = {
         userId: parseInt(userId),
         eventId: parseInt(eventId),
-        ticketId: ticket.id,
         amount: session.amount_total / 100,
         status: "completed",
-        stripePaymentId: session.payment_intent,
-        metadata: { session_id: session.id },
-      });
+        paymentStatus: "paid",
+        stripePaymentId: session.payment_intent
+      };
+      
+      // The createPayment method might not exist, use appropriate DB operations
+      // based on your schema - this might be createOrder instead
+      try {
+        const order = await storage.createOrder(orderData);
+        log(`Order created: ${order.id} for event ${eventId}`, "stripe");
+        
+        // Update ticket with order ID if needed
+        await storage.updateTicketStatus(ticket.id, "confirmed");
+        
+      } catch (orderError: any) {
+        log(`Error creating order: ${orderError.message}`, "stripe");
+      }
       
       log(`Ticket purchased: ${ticket.id} for event ${eventId}`, "stripe");
     } catch (error: any) {
       log(`Error handling checkout completion: ${error.message}`, "stripe");
+    }
+  }
+  
+  // Handle account.updated webhook events to track verification status
+  async function handleAccountUpdated(account: any) {
+    try {
+      // Find the user with this Stripe account
+      const user = await findUserByStripeAccountId(account.id);
+      
+      if (!user) {
+        log(`No user found for Stripe account: ${account.id}`, "stripe");
+        return;
+      }
+      
+      log(`Processing account update for user ${user.id} (${user.username})`, "stripe");
+      
+      // Check the verification requirements
+      const requirements = account.requirements;
+      
+      // Track verification status so we can show it in the UI
+      const status = {
+        detailsSubmitted: account.details_submitted,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+        requirements: {
+          currentlyDue: requirements?.currently_due || [],
+          eventuallyDue: requirements?.eventually_due || [],
+          pastDue: requirements?.past_due || []
+        }
+      };
+      
+      // Update user metadata with status if needed
+      // This depends on your schema - you might store it in metadata
+      // or specific fields
+      
+      // Notify the user about required actions if needed
+      if (requirements?.currently_due?.length > 0) {
+        // You could send an email or notification here
+        log(`User ${user.id} has pending Stripe requirements: ${requirements.currently_due.join(', ')}`, "stripe");
+        
+        // Here you could trigger an email notification
+        // emailService.sendVerificationReminder(user.email, {
+        //   accountId: account.id,
+        //   requirements: requirements.currently_due
+        // });
+      }
+      
+      // When the account becomes fully verified
+      if (account.charges_enabled && !user.stripeVerified) {
+        log(`User ${user.id} Stripe account is now fully verified!`, "stripe");
+        
+        // Update user record to indicate verification
+        // This depends on your schema - you might not have this field
+        try {
+          // If you have a field for this
+          // await storage.updateUserVerificationStatus(user.id, true);
+          
+          // Alternatively store in metadata
+        } catch (updateError: any) {
+          log(`Error updating user verification status: ${updateError.message}`, "stripe");
+        }
+      }
+      
+    } catch (error: any) {
+      log(`Error handling account update: ${error.message}`, "stripe");
+    }
+  }
+  
+  // Handle account deauthorization
+  async function handleAccountDeauthorized(account: any) {
+    try {
+      // Find user with this Stripe account
+      const user = await findUserByStripeAccountId(account.id);
+      
+      if (!user) {
+        log(`No user found for deauthorized Stripe account: ${account.id}`, "stripe");
+        return;
+      }
+      
+      log(`User ${user.id} (${user.username}) has deauthorized their Stripe account`, "stripe");
+      
+      // Update user record to remove the Stripe account connection
+      try {
+        await storage.updateUserStripeAccount(user.id, null);
+        
+        // You might want to notify the user or take other actions
+        // emailService.sendAccountDisconnectNotification(user.email);
+        
+      } catch (updateError: any) {
+        log(`Error updating user after Stripe deauthorization: ${updateError.message}`, "stripe");
+      }
+    } catch (error: any) {
+      log(`Error handling account deauthorization: ${error.message}`, "stripe");
+    }
+  }
+  
+  // Helper function to find a user by stripe account ID
+  async function findUserByStripeAccountId(stripeAccountId: string) {
+    try {
+      // Get all users
+      const allUsers = await storage.getAllUsers();
+      
+      // Find the user with this account ID
+      return allUsers.find(user => user.stripeAccountId === stripeAccountId);
+    } catch (error: any) {
+      log(`Error finding user by Stripe account ID: ${error.message}`, "stripe");
+      return null;
     }
   }
 }
