@@ -940,20 +940,21 @@ export function setupStripeRoutes(app: Express) {
             await storage.recordAnalyticEvent({
               metric: "payment_success",
               value: paymentIntent.amount / 100, // Convert from cents
-              userId,
               eventId,
               dimension: "payment_type",
               dimensionValue: metadata.paymentType || "standard",
               metadata: {
+                userId, // Store userId in metadata as it's not in the schema
                 paymentId: paymentIntent.id,
-                paymentMethod: paymentIntent.payment_method_type,
+                paymentMethod: paymentIntent.payment_method_types?.[0] || "card",
                 currency: paymentIntent.currency,
-                amountRefunded: paymentIntent.amount_refunded / 100,
-                receiptEmail: paymentIntent.receipt_email,
-                description: paymentIntent.description,
+                // PaymentIntent type doesn't have amount_refunded, use 0 as default
+                amountRefunded: 0,
+                receiptEmail: paymentIntent.receipt_email || null,
+                description: paymentIntent.description || null,
                 status: paymentIntent.status,
-                timestamp: new Date().toISOString(),
-                fullData: paymentIntent // Store entire object for complete records
+                timestamp: new Date().toISOString()
+                // Don't store fullData to avoid bloating the database
               }
             });
             
@@ -961,11 +962,10 @@ export function setupStripeRoutes(app: Express) {
             
             // Create admin note about payment
             await storage.createAdminNote({
+              adminId: 1, // System admin ID
               targetType: "event",
               targetId: eventId,
-              note: `Payment of ${(paymentIntent.amount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()} received from user #${userId}`,
-              createdBy: 0, // System
-              importance: "medium"
+              note: `Payment of ${(paymentIntent.amount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()} received from user #${userId}`
             });
           } else {
             log(`PaymentIntent ${paymentIntent.id} has no user/event metadata, can't associate with records`, "stripe");
@@ -1123,10 +1123,12 @@ export function setupStripeRoutes(app: Express) {
           metric: "stripe_account_update",
           value: 1,
           eventId: null, // Not tied to a specific event
-          userId: user.id, // But tied to a specific user
           dimension: "account_status",
           dimensionValue: account.charges_enabled ? "verified" : "pending",
-          metadata: status // Store the full status object
+          metadata: {
+            userId: user.id, // Store userId in metadata since it's not in schema
+            ...status // Store the full status object
+          }
         });
         
         // Update user record with latest verification status
@@ -1166,8 +1168,8 @@ export function setupStripeRoutes(app: Express) {
       }
       
       // When the account becomes fully verified
-      if (account.charges_enabled && !user.stripeVerified) {
-        log(`User ${user.id} Stripe account is now fully verified!`, "stripe");
+      if (account.charges_enabled) {
+        log(`User ${user.id} Stripe account is now fully verified and can process payments`, "stripe");
         
         try {
           // Create admin note about verification
