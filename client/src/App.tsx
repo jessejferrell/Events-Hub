@@ -18,6 +18,7 @@ import VolunteerRegistrationPage from "@/pages/VolunteerRegistrationPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 
 import PaymentConnectionsPage from "@/pages/PaymentConnectionsPage";
+import StripeManualPage from "@/pages/StripeManualPage";
 import UserProfilePage from "@/pages/UserProfilePage";
 import EmailNotificationsPage from "@/pages/EmailNotificationsPage";
 import PrivacyPolicyPage from "@/pages/PrivacyPolicyPage";
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfServicePage} />
       <Route path="/cookies" component={CookiesPage} />
+      <Route path="/stripe-manual" component={StripeManualPage} />
       
       {/* Basic user features - any logged in user */}
       <ProtectedRoute path="/profile" component={UserProfilePage} />
