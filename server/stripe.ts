@@ -94,6 +94,23 @@ export function setupStripeRoutes(app: Express) {
       directConnectUrl.searchParams.append('redirect_uri', redirectUri);
       directConnectUrl.searchParams.append('state', stateValue);
       
+      // Store state in the session as well
+      (req.session as any).stripeConnectState = stateValue;
+      await new Promise<void>((resolve) => {
+        req.session.save(() => {
+          log(`Saved Stripe connect state to session: ${stateValue}`, "stripe");
+          resolve();
+        });
+      });
+      
+      // Also store in a cookie (backup method, 10 minute expiry)
+      res.cookie('stripe_connect_state', stateValue, {
+        maxAge: 10 * 60 * 1000, // 10 minutes
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+      });
+      
       log(`Final OAuth URL: ${directConnectUrl.toString()}`, "stripe");
       
       // Return the URL for frontend to redirect
@@ -116,20 +133,119 @@ export function setupStripeRoutes(app: Express) {
         return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Authorization failed or was denied'));
       }
       
-      // Exchange the authorization code for an access token
-      const response = await stripe.oauth.token({
-        grant_type: 'authorization_code',
-        code: code as string,
-      });
+      // Validate state parameter if provided for CSRF protection
+      if (state) {
+        // Try multiple methods to retrieve the original state
+        let originalState = null;
+        
+        // 1. First check session (primary storage)
+        const sessionState = (req.session as any).stripeConnectState;
+        if (sessionState) {
+          log(`Found state in session: ${sessionState}`, "stripe");
+          originalState = sessionState;
+        }
+        
+        // 2. Next check cookie (secondary storage)
+        if (!originalState) {
+          const cookieState = req.cookies?.stripe_connect_state;
+          if (cookieState) {
+            log(`Found state in cookie: ${cookieState}`, "stripe");
+            originalState = cookieState;
+          }
+        }
+        
+        // 3. Finally check file (tertiary backup)
+        if (!originalState) {
+          try {
+            const fs = require('fs');
+            if (fs.existsSync('./stripe-connect-state.txt')) {
+              originalState = fs.readFileSync('./stripe-connect-state.txt', 'utf8').trim();
+              log(`Found state in filesystem: ${originalState}`, "stripe");
+            }
+          } catch (err) {
+            log(`Error reading state from file: ${err.message}`, "stripe");
+          }
+        }
+        
+        // If we have original state and it doesn't match, reject the request
+        if (originalState && originalState !== state) {
+          log(`State validation failed. Expected: ${originalState}, Received: ${state}`, "stripe");
+          return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Security verification failed. Please try again.'));
+        }
+        
+        // Clean up state from storage
+        if (sessionState) {
+          delete (req.session as any).stripeConnectState;
+          req.session.save();
+        }
+        
+        if (req.cookies?.stripe_connect_state) {
+          res.clearCookie('stripe_connect_state');
+        }
+        
+        try {
+          const fs = require('fs');
+          if (fs.existsSync('./stripe-connect-state.txt')) {
+            fs.unlinkSync('./stripe-connect-state.txt');
+          }
+        } catch (err) {
+          // Ignore file deletion errors
+        }
+      }
+      
+      // Exchange the authorization code for an access token with proper error handling
+      let response;
+      try {
+        response = await stripe.oauth.token({
+          grant_type: 'authorization_code',
+          code: code as string,
+          client_secret: process.env.STRIPE_SECRET_KEY // Explicitly include client_secret
+        });
+      } catch (exchangeError: any) {
+        log(`Token exchange error: ${exchangeError.message}`, "stripe");
+        
+        // Check for specific error types
+        if (exchangeError.type === 'invalid_request_error') {
+          return res.redirect('/payment-connections?error=true&message=' + 
+            encodeURIComponent('Invalid request. The authorization code may have expired. Please try again.'));
+        }
+        
+        if (exchangeError.type === 'invalid_client') {
+          return res.redirect('/payment-connections?error=true&message=' + 
+            encodeURIComponent('Authentication failed. Please contact support.'));
+        }
+        
+        // Generic error
+        return res.redirect('/payment-connections?error=true&message=' + 
+          encodeURIComponent('Failed to complete Stripe connection: ' + exchangeError.message));
+      }
       
       log(`OAuth token response: ${JSON.stringify(response)}`, "stripe");
       
       // Extract the connected account ID
       const connectedAccountId = response.stripe_user_id as string;
       
-      // Store the connected account ID in the session temporarily
-      // This way we can retrieve it even if the user needs to log in again
+      // Store the account ID in multiple places for greater reliability
+      
+      // 1. Session storage (primary)
       (req.session as any).stripeAccountId = connectedAccountId;
+      req.session.save();
+      
+      // 2. Cookie (backup)
+      res.cookie('stripe_account_id', connectedAccountId, { 
+        maxAge: 5 * 60 * 1000, // 5 minutes
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+      });
+      
+      // 3. File system (tertiary backup)
+      try {
+        const fs = require('fs');
+        fs.writeFileSync('recover-connection.txt', connectedAccountId);
+      } catch (err) {
+        // Ignore file write errors
+      }
       
       if (!req.isAuthenticated()) {
         // If user needs to log in, store the account ID in session and redirect to login
@@ -148,12 +264,13 @@ export function setupStripeRoutes(app: Express) {
     }
   });
   
-  // Simplified Stripe OAuth callback endpoint
+  // Enhanced Stripe OAuth callback endpoint with state validation
   app.get("/api/stripe/oauth/callback", async (req, res) => {
     try {
       log(`OAuth callback received: ${JSON.stringify(req.query)}`, "stripe");
       const { code, state } = req.query;
       
+      // First, validate if there's any error from Stripe
       if (!code) {
         const error = req.query.error;
         const errorDescription = req.query.error_description;
@@ -161,13 +278,92 @@ export function setupStripeRoutes(app: Express) {
         return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(errorDescription as string || 'Authorization denied'));
       }
       
-      log(`Exchanging authorization code for access token...`, "stripe");
+      // CRITICAL: Validate the state parameter (CSRF protection)
+      // Try multiple methods to retrieve the original state
+      let originalState = null;
       
-      // Exchange the code for a Stripe account ID
-      const response = await stripe.oauth.token({
-        grant_type: 'authorization_code',
-        code: code as string,
-      });
+      // 1. First check session (primary storage)
+      const sessionState = (req.session as any).stripeConnectState;
+      if (sessionState) {
+        log(`Found state in session: ${sessionState}`, "stripe");
+        originalState = sessionState;
+      }
+      
+      // 2. Next check cookie (secondary storage)
+      if (!originalState) {
+        const cookieState = req.cookies?.stripe_connect_state;
+        if (cookieState) {
+          log(`Found state in cookie: ${cookieState}`, "stripe");
+          originalState = cookieState;
+        }
+      }
+      
+      // 3. Finally check file (tertiary backup)
+      if (!originalState) {
+        try {
+          const fs = require('fs');
+          if (fs.existsSync('./stripe-connect-state.txt')) {
+            originalState = fs.readFileSync('./stripe-connect-state.txt', 'utf8').trim();
+            log(`Found state in filesystem: ${originalState}`, "stripe");
+          }
+        } catch (err) {
+          log(`Error reading state from file: ${err.message}`, "stripe");
+        }
+      }
+      
+      // If we have original state and it doesn't match, reject the request
+      if (originalState && originalState !== state) {
+        log(`State validation failed. Expected: ${originalState}, Received: ${state}`, "stripe");
+        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Security verification failed. Please try again.'));
+      }
+      
+      // Clean up state from storage
+      if (sessionState) {
+        delete (req.session as any).stripeConnectState;
+        req.session.save();
+      }
+      
+      if (req.cookies?.stripe_connect_state) {
+        res.clearCookie('stripe_connect_state');
+      }
+      
+      try {
+        const fs = require('fs');
+        if (fs.existsSync('./stripe-connect-state.txt')) {
+          fs.unlinkSync('./stripe-connect-state.txt');
+        }
+      } catch (err) {
+        // Ignore file deletion errors
+      }
+      
+      log(`State verified, exchanging authorization code for access token...`, "stripe");
+      
+      // Exchange the code for a Stripe account ID with proper error handling
+      let response;
+      try {
+        response = await stripe.oauth.token({
+          grant_type: 'authorization_code',
+          code: code as string,
+          client_secret: process.env.STRIPE_SECRET_KEY // Explicitly include client_secret
+        });
+      } catch (exchangeError: any) {
+        log(`Token exchange error: ${exchangeError.message}`, "stripe");
+        
+        // Check for specific error types
+        if (exchangeError.type === 'invalid_request_error') {
+          return res.redirect('/payment-connections?error=true&message=' + 
+            encodeURIComponent('Invalid request. The authorization code may have expired. Please try again.'));
+        }
+        
+        if (exchangeError.type === 'invalid_client') {
+          return res.redirect('/payment-connections?error=true&message=' + 
+            encodeURIComponent('Authentication failed. Please contact support.'));
+        }
+        
+        // Generic error
+        return res.redirect('/payment-connections?error=true&message=' + 
+          encodeURIComponent('Failed to complete Stripe connection: ' + exchangeError.message));
+      }
       
       // Extract the connected account ID
       const connectedAccountId = response.stripe_user_id as string;
