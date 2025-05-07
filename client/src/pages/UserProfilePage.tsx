@@ -50,6 +50,9 @@ const profileSchema = z.object({
   email: z.string().email("Please enter a valid email"),
   phoneNumber: z.string().optional(),
   address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
 });
 
 // Password form schema
@@ -90,6 +93,9 @@ export default function UserProfilePage() {
       email: user?.email || "",
       phoneNumber: user?.phoneNumber || "",
       address: user?.address || "",
+      city: user?.city || "",
+      state: user?.state || "",
+      zipCode: user?.zipCode || "",
     },
   });
 
@@ -241,14 +247,58 @@ export default function UserProfilePage() {
                         name="address"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Address</FormLabel>
+                            <FormLabel>Street Address</FormLabel>
                             <FormControl>
-                              <Input placeholder="Your address" {...field} />
+                              <Input placeholder="Your street address" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <FormField
+                          control={profileForm.control}
+                          name="city"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>City</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Your city" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={profileForm.control}
+                          name="state"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>State</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Your state" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={profileForm.control}
+                          name="zipCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Zip Code</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Your zip code" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                       
                       <Button 
                         type="submit" 
