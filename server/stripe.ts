@@ -95,9 +95,18 @@ export function setupStripeRoutes(app: Express) {
       const idPrefix = stripeClientId.substring(0, 8);
       log(`Using Stripe Client ID starting with: ${idPrefix}...`, "stripe");
 
-      // IMPORTANT: Use only the EXACT redirect URI registered in the Stripe Dashboard
-      // For this app, we've registered https://events.mosspointmainstreet.org/api/stripe/oauth/callback
-      const registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/oauth/callback";
+      // Use the exact URIs registered in the Stripe Dashboard
+      let registeredRedirectUri;
+      
+      // In development on Replit, use events-manager.replit.app
+      if (process.env.NODE_ENV !== 'production') {
+        registeredRedirectUri = "https://events-manager.replit.app/api/stripe/oauth/callback";
+        log(`Using Replit app redirect URI: ${registeredRedirectUri}`, "stripe");
+      } else {
+        // In production, use the production domain
+        registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/oauth/callback";
+        log(`Using production redirect URI: ${registeredRedirectUri}`, "stripe");
+      }
       
       // Generate a unique identifier based on user ID and timestamp
       // This will be stored to disk as a fallback mechanism
@@ -119,10 +128,9 @@ export function setupStripeRoutes(app: Express) {
         // Continue anyway as this is just a backup
       }
       
-      // Always use the exact redirect URI registered in Stripe Dashboard
+      // Use the calculated redirect URI
       const redirectUri = registeredRedirectUri;
-      log(`Using FIXED redirect URI: ${redirectUri}`, "stripe");
-      log(`Using redirect URI: ${redirectUri}`, "stripe");
+      log(`Final redirect URI: ${redirectUri}`, "stripe");
       
       // Create a direct Connect link with your Stripe client ID
       const directConnectUrl = new URL('https://dashboard.stripe.com/oauth/authorize');
@@ -374,17 +382,31 @@ export function setupStripeRoutes(app: Express) {
   // DIRECT APPROACH: Ultra-simplified Stripe OAuth callback endpoint
   app.get("/api/stripe/oauth/callback", async (req, res) => {
     // First, write everything to a file to ensure we capture it
+    log(`STRIPE OAUTH CALLBACK RECEIVED: ${new Date().toISOString()}`, "stripe");
+    
     try {
+      // Write to multiple logs to ensure we catch this
+      console.log("STRIPE OAUTH CALLBACK RECEIVED");
+      console.error("STRIPE OAUTH CALLBACK RECEIVED");
+      
       const fs = require('fs');
       fs.writeFileSync('stripe-callback-debug.txt', 
         `TIME: ${new Date().toISOString()}\n` +
         `QUERY: ${JSON.stringify(req.query)}\n` +
         `SESSION: ${req.sessionID}\n` +
         `AUTH: ${req.isAuthenticated()}\n` +
-        `HEADERS: ${JSON.stringify(req.headers)}\n`
+        `USER: ${req.isAuthenticated() ? JSON.stringify(req.user.id) : 'not-authenticated'}\n` +
+        `HEADERS: ${JSON.stringify(req.headers)}\n` +
+        `PATH: ${req.path}\n` +
+        `URL: ${req.url}\n` +
+        `PROTOCOL: ${req.protocol}\n` +
+        `HOSTNAME: ${req.hostname}\n`
       );
+      
+      log(`Stripe callback debug info written to file`, "stripe");
     } catch (logErr) {
       // Continue even if logging fails
+      log(`Error writing callback debug info: ${logErr}`, "stripe");
     }
   
     try {
