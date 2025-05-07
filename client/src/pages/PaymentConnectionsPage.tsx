@@ -113,6 +113,29 @@ export default function PaymentConnectionsPage() {
     const success = searchParams.get("success");
     const error = searchParams.get("error");
     const message = searchParams.get("message");
+    const code = searchParams.get("code"); // This is the Stripe authorization code
+    
+    console.log("Payment connection page loaded with params:", {
+      success, error, message, code: code ? "PRESENT" : "NONE"
+    });
+    
+    // If we have a code parameter, this indicates we've been redirected from Stripe
+    // but somehow the backend didn't properly process it
+    if (code && !success && !error) {
+      console.log("Found Stripe code in URL but no success/error parameters - attempting recovery");
+      
+      // Try to recover immediately
+      attemptRecovery();
+      
+      // And clean the URL of the code parameter to prevent repeated attempts
+      searchParams.delete("code");
+      window.history.replaceState(
+        {}, 
+        document.title, 
+        window.location.pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "")
+      );
+      return;
+    }
     
     if (success === "true") {
       toast({
@@ -124,6 +147,11 @@ export default function PaymentConnectionsPage() {
       // Refetch account status
       refetchStatus();
     } else if (error === "true") {
+      // If we get an error, let's try an immediate recovery just in case
+      // the error is just a UI issue and the account was actually connected
+      console.log("Connection error detected - attempting recovery");
+      attemptRecovery();
+      
       toast({
         title: "Connection failed",
         description: message || "Failed to connect Stripe account. Please try again.",
@@ -132,7 +160,7 @@ export default function PaymentConnectionsPage() {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [toast, refetchStatus]);
+  }, [toast, refetchStatus, attemptRecovery]);
   
   // REMOVED auto-refresh which was running constantly and annoying users
   // Manual refresh is better and avoids confusion
