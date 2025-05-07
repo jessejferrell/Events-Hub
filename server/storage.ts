@@ -111,6 +111,8 @@ export interface IStorage {
   // Admin note operations
   createAdminNote(note: InsertAdminNote): Promise<AdminNote>;
   getAdminNotesByTarget(targetType: string, targetId: number): Promise<AdminNote[]>;
+  updateAdminNote(id: number, note: string): Promise<AdminNote>;
+  deleteAdminNote(id: number): Promise<void>;
   
   // Analytics operations
   recordAnalyticEvent(data: InsertAnalytics): Promise<Analytics>;
@@ -805,6 +807,34 @@ export class DatabaseStorage implements IStorage {
           eq(adminNotes.targetId, targetId)
         )
       );
+  }
+  
+  async updateAdminNote(id: number, note: string): Promise<AdminNote> {
+    const result = await db
+      .update(adminNotes)
+      .set({ 
+        note,
+        updatedAt: new Date()
+      })
+      .where(eq(adminNotes.id, id))
+      .returning();
+    
+    if (!result[0]) {
+      throw new Error(`Admin note not found: ${id}`);
+    }
+    
+    return result[0];
+  }
+  
+  async deleteAdminNote(id: number): Promise<void> {
+    const result = await db
+      .delete(adminNotes)
+      .where(eq(adminNotes.id, id))
+      .returning({ id: adminNotes.id });
+      
+    if (result.length === 0) {
+      throw new Error(`Admin note not found: ${id}`);
+    }
   }
 
   // === ANALYTICS OPERATIONS ===

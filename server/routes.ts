@@ -1490,6 +1490,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message || "Failed to fetch admin notes" });
     }
   });
+  
+  // Update admin note (admin only)
+  app.put("/api/admin/notes/:id", requireAdmin, async (req, res) => {
+    try {
+      const noteId = parseInt(req.params.id);
+      const { note } = req.body;
+      
+      if (!note || typeof note !== 'string' || note.trim() === '') {
+        return res.status(400).json({ message: "Note cannot be empty" });
+      }
+      
+      const updatedNote = await storage.updateAdminNote(noteId, note.trim());
+      res.json(updatedNote);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to update note" });
+    }
+  });
+  
+  // Delete admin note (admin only)
+  app.delete("/api/admin/notes/:id", requireAdmin, async (req, res) => {
+    try {
+      const noteId = parseInt(req.params.id);
+      await storage.deleteAdminNote(noteId);
+      res.status(204).end();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to delete note" });
+    }
+  });
 
   // Get all users (admin only)
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
