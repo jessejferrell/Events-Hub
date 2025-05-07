@@ -86,8 +86,30 @@ export function setupStripeRoutes(app: Express) {
       console.log("Client ID format:", clientId.substring(0, 6) + "..." + clientId.substring(clientId.length - 4));
       console.log("Secret key format:", secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
       
-      // Try direct token endpoint call with just client_id (no auth code)
-      // This should fail, but with a specific error about missing code, not auth
+      // TEST APPROACH 1: Using Stripe SDK directly
+      try {
+        console.log("TEST 1: Using Stripe SDK directly");
+        const stripeTest = new Stripe(secretKey, {
+          apiVersion: "2025-04-30.basil",
+        });
+        
+        // Try to do a token exchange with a fake code
+        try {
+          const tokenResult = await stripeTest.oauth.token({
+            grant_type: 'authorization_code',
+            code: 'fake_code_for_testing',
+          });
+          console.log("Unexpectedly got success response from SDK:", tokenResult);
+        } catch (sdkError) {
+          // Should fail with invalid_grant error which is expected and correct
+          console.log("SDK test got expected error:", sdkError.message);
+        }
+      } catch (stripeInitError) {
+        console.error("Failed to initialize Stripe:", stripeInitError);
+      }
+      
+      // TEST APPROACH 2: Using URLSearchParams + fetch (original approach)
+      console.log("TEST 2: Using URLSearchParams + fetch");
       const params = new URLSearchParams();
       params.append('grant_type', 'authorization_code');
       params.append('code', 'fake_code_for_testing');
@@ -114,26 +136,28 @@ export function setupStripeRoutes(app: Express) {
         parsedBody = { unparseable: responseBody };
       }
       
-      const responseData = {
-        status: tokenResponse.status,
-        statusText: tokenResponse.statusText,
-        body: parsedBody,
-        headers: Object.fromEntries([...tokenResponse.headers.entries()].map(([k,v]) => [k,v]))
-      };
-      
-      // Return full test results for debugging
+      // Return detailed test results
       return res.json({
         success: true,
-        directTokenExchange: responseData,
-        clientIdFormat: {
-          prefix: clientId.substring(0, 6),
-          suffix: clientId.substring(clientId.length - 4),
-          length: clientId.length
+        tests: {
+          sdkTest: "See server logs for details",
+          directFetchTest: {
+            status: tokenResponse.status,
+            statusText: tokenResponse.statusText,
+            body: parsedBody
+          }
         },
-        secretKeyFormat: {
-          prefix: secretKey.substring(0, 6),
-          suffix: secretKey.substring(secretKey.length - 4),
-          length: secretKey.length
+        credentials: {
+          clientId: {
+            prefix: clientId.substring(0, 6),
+            suffix: clientId.substring(clientId.length - 4),
+            length: clientId.length
+          },
+          secretKey: {
+            prefix: secretKey.substring(0, 6),
+            suffix: secretKey.substring(secretKey.length - 4),
+            length: secretKey.length
+          }
         }
       });
     } catch (error) {
@@ -584,60 +608,38 @@ export function setupStripeRoutes(app: Express) {
       console.error("Credentials OK, proceeding with token exchange");
       
       try {
-        // Get a fresh Stripe instance with the current key
-        const freshStripe = getStripe();
-        console.error("Created fresh Stripe instance for OAuth token exchange");
-        
-        // MINIMAL DIRECT API CALL APPROACH
-        const params = new URLSearchParams();
-        params.append('grant_type', 'authorization_code');
-        params.append('code', code as string);
-        params.append('client_id', clientId);
-        params.append('client_secret', secretKey);
-        
-        console.error("Making token request with params (without secret):", 
-          params.toString().replace(secretKey, '[REDACTED]'));
-        
-        // Debug log the key format to ensure we're using the right one
-        console.error("Using secret key format:", 
-          secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
-        
-        // For OAuth token exchange, Stripe expects the parameters in the body
-        // The client ID should not be used as an API key for Basic Auth
-        // According to OAuth spec, client_id and client_secret should be in the body
-        const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: params.toString()
+        // Get a completely fresh Stripe instance with the latest key
+        const freshStripe = new Stripe(secretKey, {
+          apiVersion: "2025-04-30.basil",
         });
         
-        console.error("Response status:", tokenResponse.status);
+        console.error("Created fresh Stripe instance with key format:", 
+          secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
         
-        const responseText = await tokenResponse.text();
-        console.error("FULL RESPONSE TEXT:", responseText);
+        // IMPORTANT: Use the Stripe SDK directly for OAuth token exchange
+        // This bypasses any issues with fetch and ensures the correct authentication method
+        console.error("Making token request using Stripe SDK directly");
         
-        // Try to parse JSON response
-        let responseData;
-        try {
-          responseData = JSON.parse(responseText);
-          console.error("Parsed response data:", JSON.stringify(responseData, null, 2));
-        } catch (parseError) {
-          console.error("Failed to parse response as JSON:", parseError);
-          return res.redirect('/payment-connections?error=true&message=Invalid+response+from+Stripe');
-        }
+        // Use the SDK's OAuth.token method to get the connected account ID
+        const tokenResponse = await freshStripe.oauth.token({
+          grant_type: 'authorization_code',
+          code: code as string,
+        });
         
-        // Check for error response
-        if (responseData.error) {
-          console.error("Stripe API returned an error:", responseData.error);
-          return res.redirect(`/payment-connections?error=true&message=${encodeURIComponent(responseData.error_description || 'Error connecting with Stripe')}`);
-        }
+        console.error("OAuth token response received:", JSON.stringify(tokenResponse, null, 2));
         
-        // Extract account ID
-        const connectedAccountId = responseData.stripe_user_id;
+        // The Stripe SDK response is different from the direct API:
+        // - direct API (fetch): responseData.stripe_user_id
+        // - SDK: responseData.stripe_user_id OR responseData.access_token depending on response
+        
+        // Stripe SDK handles parsing, errors and retries automatically
+        
+        // Extract account ID - could be in either stripe_user_id or access_token fields
+        const connectedAccountId = tokenResponse.stripe_user_id || 
+                                  (tokenResponse.access_token?.startsWith('sk_') ? tokenResponse.stripe_user_id : null);
+        
         if (!connectedAccountId) {
-          console.error("No account ID in response");
+          console.error("No account ID in response:", tokenResponse);
           return res.redirect('/payment-connections?error=true&message=Missing+account+ID+in+Stripe+response');
         }
         
