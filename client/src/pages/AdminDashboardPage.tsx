@@ -2777,6 +2777,21 @@ export default function AdminDashboardPage() {
           
 
         </Tabs>
+        
+        {/* Transaction detail views */}
+        {showEventTransactionDetails && detailEventId && (
+          <EventTransactionDetails 
+            eventId={detailEventId} 
+            onBack={handleCloseTransactionDetails} 
+          />
+        )}
+        
+        {showUserTransactionDetails && detailUserId && (
+          <UserTransactionDetails 
+            userId={detailUserId} 
+            onBack={handleCloseTransactionDetails} 
+          />
+        )}
       </main>
       
       <Footer />

@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Table, 
   TableBody, 
-  TableCaption, 
   TableCell, 
   TableHead, 
   TableHeader, 
@@ -21,29 +20,26 @@ import {
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { 
   AlertCircle, 
   ArrowLeft, 
-  BarChart, 
-  Check,
+  Calendar, 
+  CircleDollarSign, 
   Download, 
-  FileText, 
+  Map, 
   ShoppingBag, 
-  Tag, 
+  Store, 
   Ticket, 
-  Users 
+  Users
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 // Interface for event transaction details
 interface EventTransactionData {
-  orders: any[];
-  tickets: any[];
-  vendorRegistrations: any[];
-  volunteerAssignments: any[];
-  analytics: any[];
   eventDetails: {
     id: number;
     title: string;
@@ -51,7 +47,17 @@ interface EventTransactionData {
     endDate: string;
     location: string;
     status: string;
+    capacity: number | null;
+    ticketsSold: number;
+    revenue: number;
+    description: string;
+    imageUrl: string | null;
   };
+  orders: any[];
+  tickets: any[];
+  vendorRegistrations: any[];
+  volunteerAssignments: any[];
+  analytics: any[];
 }
 
 interface EventTransactionDetailsProps {
@@ -73,29 +79,44 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
     }
   });
   
-  // Generate summary metrics if data is available
-  const summary = React.useMemo(() => {
+  // Calculate metrics if data is available
+  const metrics = React.useMemo(() => {
     if (!data) return null;
     
-    const totalOrders = data.orders.length;
     const totalRevenue = data.orders.reduce((sum, o) => sum + (o.totalAmount || o.amount || 0), 0);
-    const ticketsSold = data.tickets.length;
     const ticketRevenue = data.tickets.reduce((sum, t) => sum + (t.price || 0), 0);
-    const vendorRegistrations = data.vendorRegistrations.length;
     const vendorRevenue = data.vendorRegistrations.reduce(
       (sum, v) => sum + (v.totalAmount || v.amount || 0), 
       0
     );
+    const ticketCount = data.tickets.length;
+    const vendorCount = data.vendorRegistrations.length;
     const volunteerCount = data.volunteerAssignments.length;
     
+    let attendance = 0;
+    const ticketsByType: Record<string, number> = {};
+    const ticketRevenueByType: Record<string, number> = {};
+    
+    data.tickets.forEach(ticket => {
+      if (ticket.status === 'checked_in') {
+        attendance++;
+      }
+      
+      const type = ticket.ticketType || 'Standard';
+      ticketsByType[type] = (ticketsByType[type] || 0) + 1;
+      ticketRevenueByType[type] = (ticketRevenueByType[type] || 0) + (ticket.price || 0);
+    });
+    
     return {
-      totalOrders,
       totalRevenue,
-      ticketsSold,
       ticketRevenue,
-      vendorRegistrations,
       vendorRevenue,
-      volunteerCount
+      ticketCount,
+      vendorCount,
+      volunteerCount,
+      attendance,
+      ticketsByType,
+      ticketRevenueByType
     };
   }, [data]);
   
@@ -120,8 +141,8 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
           <Skeleton className="h-4 w-1/2" />
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            {[1, 2, 3, 4].map(i => (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {[1, 2, 3].map(i => (
               <Card key={i}>
                 <CardContent className="p-4">
                   <Skeleton className="h-4 w-1/2 mb-2" />
@@ -164,6 +185,8 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
   }
   
   const { eventDetails } = data;
+  const attendancePercentage = eventDetails.capacity ? 
+    (metrics?.attendance || 0) / eventDetails.capacity * 100 : 0;
   
   return (
     <Card>
@@ -176,42 +199,45 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Transactions
         </Button>
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between flex-col md:flex-row">
           <div>
             <CardTitle className="text-xl">{eventDetails.title}</CardTitle>
-            <CardDescription>
-              {formatDate(new Date(eventDetails.startDate))} to {formatDate(new Date(eventDetails.endDate))}
-              {' • '}{eventDetails.location}
+            <CardDescription className="flex items-center gap-2">
+              <Calendar className="h-3 w-3" />
+              {formatDate(new Date(eventDetails.startDate), 'MMM d, yyyy')}
+              {' - '}
+              {formatDate(new Date(eventDetails.endDate), 'MMM d, yyyy')}
+              <span className="mx-1">•</span>
+              <Map className="h-3 w-3" />
+              {eventDetails.location}
             </CardDescription>
           </div>
-          <Badge 
-            variant={
-              eventDetails.status === 'active' ? 'default' :
-              eventDetails.status === 'upcoming' ? 'outline' :
-              eventDetails.status === 'completed' ? 'secondary' :
-              'destructive'
-            }
-          >
+          <Badge variant={
+            eventDetails.status === 'active' ? 'default' :
+            eventDetails.status === 'upcoming' ? 'outline' :
+            eventDetails.status === 'completed' ? 'secondary' :
+            'destructive'
+          }>
             {eventDetails.status}
           </Badge>
         </div>
       </CardHeader>
       
       <CardContent>
-        {summary && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        {metrics && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
                 <p className="text-sm text-neutral-500">Total Revenue</p>
-                <h3 className="text-2xl font-bold mt-1">{formatCurrency(summary.totalRevenue)}</h3>
+                <h3 className="text-2xl font-bold mt-1">{formatCurrency(metrics.totalRevenue)}</h3>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <p className="text-sm text-neutral-500">Tickets Sold</p>
                 <h3 className="text-2xl font-bold mt-1">
-                  {summary.ticketsSold} <span className="text-sm font-normal text-neutral-500">
-                    ({formatCurrency(summary.ticketRevenue)})
+                  {metrics.ticketCount} <span className="text-sm font-normal text-neutral-500">
+                    ({formatCurrency(metrics.ticketRevenue)})
                   </span>
                 </h3>
               </CardContent>
@@ -220,16 +246,10 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
               <CardContent className="p-4">
                 <p className="text-sm text-neutral-500">Vendor Registrations</p>
                 <h3 className="text-2xl font-bold mt-1">
-                  {summary.vendorRegistrations} <span className="text-sm font-normal text-neutral-500">
-                    ({formatCurrency(summary.vendorRevenue)})
+                  {metrics.vendorCount} <span className="text-sm font-normal text-neutral-500">
+                    ({formatCurrency(metrics.vendorRevenue)})
                   </span>
                 </h3>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm text-neutral-500">Volunteers</p>
-                <h3 className="text-2xl font-bold mt-1">{summary.volunteerCount}</h3>
               </CardContent>
             </Card>
           </div>
@@ -238,8 +258,8 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-5 mb-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="tickets">Tickets</TabsTrigger>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="vendors">Vendors</TabsTrigger>
             <TabsTrigger value="volunteers">Volunteers</TabsTrigger>
           </TabsList>
@@ -249,107 +269,117 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center">
-                    <BarChart className="mr-2 h-5 w-5" />
-                    Recent Transactions
+                    <Calendar className="mr-2 h-5 w-5" />
+                    Event Details
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.orders.slice(0, 5).map((order) => (
-                        <TableRow key={`order-${order.id}`}>
-                          <TableCell className="flex items-center">
-                            <ShoppingBag className="mr-2 h-4 w-4 text-blue-500" />
-                            Order
-                          </TableCell>
-                          <TableCell>{formatCurrency(order.totalAmount || order.amount)}</TableCell>
-                          <TableCell>
-                            <Badge variant={order.status === 'completed' ? 'default' : 'outline'}>
-                              {order.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{formatDate(new Date(order.createdAt))}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <dl className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <dt className="text-sm font-medium text-neutral-500">Event Status</dt>
+                        <dd className="mt-1">
+                          <Badge variant={
+                            eventDetails.status === 'active' ? 'default' :
+                            eventDetails.status === 'upcoming' ? 'outline' :
+                            eventDetails.status === 'completed' ? 'secondary' :
+                            'destructive'
+                          }>
+                            {eventDetails.status}
+                          </Badge>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-neutral-500">Event ID</dt>
+                        <dd className="mt-1">#{eventDetails.id}</dd>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <dt className="text-sm font-medium text-neutral-500">Attendance</dt>
+                      <dd className="mt-1">
+                        <div className="flex justify-between mb-1 text-sm">
+                          <span>{metrics?.attendance || 0} checked in</span>
+                          <span>{eventDetails.capacity || 'Unlimited'} capacity</span>
+                        </div>
+                        <Progress
+                          value={attendancePercentage}
+                          className="h-2"
+                        />
+                      </dd>
+                    </div>
+                    
+                    <div>
+                      <dt className="text-sm font-medium text-neutral-500">Description</dt>
+                      <dd className="mt-1 text-sm">{eventDetails.description}</dd>
+                    </div>
+                  </dl>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center">
-                    <FileText className="mr-2 h-5 w-5" />
-                    Event Stats
+                    <CircleDollarSign className="mr-2 h-5 w-5" />
+                    Revenue Breakdown
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-sm font-medium text-neutral-500">Revenue Breakdown</h4>
-                      <ul className="mt-2 space-y-2">
-                        <li className="flex justify-between">
-                          <span className="text-sm">Tickets</span>
-                          <span className="font-medium">{formatCurrency(summary?.ticketRevenue || 0)}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span className="text-sm">Vendor Registrations</span>
-                          <span className="font-medium">{formatCurrency(summary?.vendorRevenue || 0)}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span className="text-sm">Other</span>
-                          <span className="font-medium">{formatCurrency((summary?.totalRevenue || 0) - 
-                            (summary?.ticketRevenue || 0) - (summary?.vendorRevenue || 0))}</span>
-                        </li>
-                      </ul>
+                      <p className="text-sm font-medium text-neutral-500 mb-2">Ticket Revenue by Type</p>
+                      <div className="space-y-2">
+                        {metrics && Object.entries(metrics.ticketRevenueByType).map(([type, amount]) => (
+                          <div key={type} className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <Ticket className="h-4 w-4 mr-2 text-blue-500" />
+                              <span>{type}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <span className="font-medium">{formatCurrency(amount)}</span>
+                              <span className="text-xs text-neutral-500 ml-2">
+                                ({metrics.ticketsByType[type] || 0} tickets)
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                    
                     <Separator />
+                    
                     <div>
-                      <h4 className="text-sm font-medium text-neutral-500">Status Summary</h4>
-                      <div className="grid grid-cols-2 gap-4 mt-2">
-                        <div>
-                          <p className="text-sm">Ticket Status</p>
-                          <ul className="mt-1 space-y-1 text-sm">
-                            <li className="flex justify-between">
-                              <span>Confirmed</span>
-                              <Badge variant="outline" className="ml-2">
-                                {data.tickets.filter(t => t.status === 'confirmed').length}
-                              </Badge>
-                            </li>
-                            <li className="flex justify-between">
-                              <span>Checked In</span>
-                              <Badge variant="outline" className="ml-2">
-                                {data.tickets.filter(t => t.status === 'checked_in').length}
-                              </Badge>
-                            </li>
-                          </ul>
+                      <p className="text-sm font-medium text-neutral-500 mb-2">Revenue Sources</p>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <Ticket className="h-4 w-4 mr-2 text-blue-500" />
+                            <span>Tickets</span>
+                          </div>
+                          <span className="font-medium">{formatCurrency(metrics?.ticketRevenue || 0)}</span>
                         </div>
-                        <div>
-                          <p className="text-sm">Vendor Status</p>
-                          <ul className="mt-1 space-y-1 text-sm">
-                            <li className="flex justify-between">
-                              <span>Approved</span>
-                              <Badge variant="outline" className="ml-2">
-                                {data.vendorRegistrations.filter(v => v.status === 'approved').length}
-                              </Badge>
-                            </li>
-                            <li className="flex justify-between">
-                              <span>Pending</span>
-                              <Badge variant="outline" className="ml-2">
-                                {data.vendorRegistrations.filter(v => v.status === 'pending').length}
-                              </Badge>
-                            </li>
-                          </ul>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <Store className="h-4 w-4 mr-2 text-green-500" />
+                            <span>Vendor Fees</span>
+                          </div>
+                          <span className="font-medium">{formatCurrency(metrics?.vendorRevenue || 0)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <ShoppingBag className="h-4 w-4 mr-2 text-purple-500" />
+                            <span>Merchandise</span>
+                          </div>
+                          <span className="font-medium">{formatCurrency(0)}</span>
                         </div>
                       </div>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="font-medium">Total Revenue</span>
+                      <span className="text-lg font-bold">{formatCurrency(metrics?.totalRevenue || 0)}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -357,75 +387,15 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
             </div>
           </TabsContent>
           
-          <TabsContent value="orders">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center">
-                  <ShoppingBag className="mr-2 h-5 w-5" />
-                  Order History
-                </CardTitle>
-                <CardDescription>
-                  Detailed history of all orders for this event.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order #</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Payment Status</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.orders.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4 text-neutral-500">
-                          No orders found for this event
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      data.orders.map((order) => (
-                        <TableRow key={`order-${order.id}`}>
-                          <TableCell>{order.orderNumber || `#${order.id}`}</TableCell>
-                          <TableCell>{order.userName || `User #${order.userId}`}</TableCell>
-                          <TableCell>{formatCurrency(order.totalAmount || order.amount)}</TableCell>
-                          <TableCell>
-                            <Badge variant={order.status === 'completed' ? 'default' : 'outline'}>
-                              {order.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={
-                              order.paymentStatus === 'paid' ? 'default' :
-                              order.paymentStatus === 'pending' ? 'outline' :
-                              'destructive'
-                            }>
-                              {order.paymentStatus}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{formatDate(new Date(order.createdAt))}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
           <TabsContent value="tickets">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
                   <Ticket className="mr-2 h-5 w-5" />
-                  Ticket Purchases
+                  Ticket Sales
                 </CardTitle>
                 <CardDescription>
-                  All ticket purchases for this event.
+                  All tickets sold for this event.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -433,25 +403,32 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
                   <TableHeader>
                     <TableRow>
                       <TableHead>Ticket #</TableHead>
-                      <TableHead>User</TableHead>
+                      <TableHead>Customer</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Price</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead>Purchase Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.tickets.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-4 text-neutral-500">
-                          No tickets found for this event
+                          No tickets sold for this event yet
                         </TableCell>
                       </TableRow>
                     ) : (
                       data.tickets.map((ticket) => (
                         <TableRow key={`ticket-${ticket.id}`}>
                           <TableCell>{ticket.ticketNumber || `#${ticket.id}`}</TableCell>
-                          <TableCell>{ticket.userName || `User #${ticket.userId}`}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Avatar className="h-6 w-6 mr-2">
+                                <AvatarFallback>{ticket.userName?.substring(0, 2).toUpperCase() || 'GU'}</AvatarFallback>
+                              </Avatar>
+                              <span>{ticket.userName || 'Guest User'}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>{ticket.ticketType || 'Standard'}</TableCell>
                           <TableCell>{formatCurrency(ticket.price)}</TableCell>
                           <TableCell>
@@ -473,11 +450,76 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
             </Card>
           </TabsContent>
           
+          <TabsContent value="orders">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <ShoppingBag className="mr-2 h-5 w-5" />
+                  Order History
+                </CardTitle>
+                <CardDescription>
+                  All purchase orders for this event.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order #</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.orders.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-4 text-neutral-500">
+                          No orders found for this event
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      data.orders.map((order) => (
+                        <TableRow key={`order-${order.id}`}>
+                          <TableCell>{order.orderNumber || `#${order.id}`}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Avatar className="h-6 w-6 mr-2">
+                                <AvatarFallback>{order.userName?.substring(0, 2).toUpperCase() || 'GU'}</AvatarFallback>
+                              </Avatar>
+                              <span>{order.userName || `User #${order.userId}`}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {order.itemCount || (order.items ? order.items.length : '1')} items
+                          </TableCell>
+                          <TableCell>{formatCurrency(order.totalAmount || order.amount)}</TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              order.paymentStatus === 'paid' ? 'default' :
+                              order.paymentStatus === 'pending' ? 'outline' :
+                              'destructive'
+                            }>
+                              {order.paymentStatus || order.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(new Date(order.createdAt))}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
           <TabsContent value="vendors">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <Tag className="mr-2 h-5 w-5" />
+                  <Store className="mr-2 h-5 w-5" />
                   Vendor Registrations
                 </CardTitle>
                 <CardDescription>
@@ -488,38 +530,45 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Registration #</TableHead>
                       <TableHead>Vendor</TableHead>
-                      <TableHead>Spot</TableHead>
-                      <TableHead>Price</TableHead>
+                      <TableHead>Booth/Spot</TableHead>
+                      <TableHead>Fee</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Review Date</TableHead>
-                      <TableHead>Approved By</TableHead>
+                      <TableHead>Registration Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.vendorRegistrations.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-4 text-neutral-500">
-                          No vendor registrations found for this event
+                          No vendor registrations for this event
                         </TableCell>
                       </TableRow>
                     ) : (
-                      data.vendorRegistrations.map((registration) => (
-                        <TableRow key={`vendor-${registration.id}`}>
-                          <TableCell>{registration.vendorName || `Vendor #${registration.vendorProfileId}`}</TableCell>
-                          <TableCell>{registration.spotName || `Spot #${registration.vendorSpotId}`}</TableCell>
-                          <TableCell>{formatCurrency(registration.totalAmount || registration.amount || 0)}</TableCell>
+                      data.vendorRegistrations.map((reg) => (
+                        <TableRow key={`vendor-reg-${reg.id}`}>
+                          <TableCell>{`#${reg.id}`}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Avatar className="h-6 w-6 mr-2">
+                                <AvatarFallback>{reg.businessName?.substring(0, 2).toUpperCase() || reg.userName?.substring(0, 2).toUpperCase() || 'VN'}</AvatarFallback>
+                              </Avatar>
+                              <span>{reg.businessName || reg.userName || `Vendor #${reg.vendorProfileId}`}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{reg.spotName || `Spot #${reg.vendorSpotId}`}</TableCell>
+                          <TableCell>{formatCurrency(reg.totalAmount || reg.amount || 0)}</TableCell>
                           <TableCell>
                             <Badge variant={
-                              registration.status === 'approved' ? 'default' :
-                              registration.status === 'pending' ? 'outline' :
+                              reg.status === 'approved' ? 'default' :
+                              reg.status === 'pending' ? 'outline' :
                               'destructive'
                             }>
-                              {registration.status}
+                              {reg.status}
                             </Badge>
                           </TableCell>
-                          <TableCell>{registration.reviewDate ? formatDate(new Date(registration.reviewDate)) : 'N/A'}</TableCell>
-                          <TableCell>{registration.reviewedByName || (registration.reviewedBy ? `Admin #${registration.reviewedBy}` : 'N/A')}</TableCell>
+                          <TableCell>{formatDate(new Date(reg.createdAt))}</TableCell>
                         </TableRow>
                       ))
                     )}
@@ -544,25 +593,39 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Assignment #</TableHead>
                       <TableHead>Volunteer</TableHead>
                       <TableHead>Shift</TableHead>
-                      <TableHead>Status</TableHead>
                       <TableHead>Time Slot</TableHead>
-                      <TableHead>Approved By</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Assigned Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.volunteerAssignments.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-4 text-neutral-500">
-                          No volunteer assignments found for this event
+                        <TableCell colSpan={6} className="text-center py-4 text-neutral-500">
+                          No volunteer assignments for this event
                         </TableCell>
                       </TableRow>
                     ) : (
                       data.volunteerAssignments.map((assignment) => (
                         <TableRow key={`volunteer-${assignment.id}`}>
-                          <TableCell>{assignment.volunteerName || `Volunteer #${assignment.volunteerProfileId}`}</TableCell>
+                          <TableCell>{`#${assignment.id}`}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Avatar className="h-6 w-6 mr-2">
+                                <AvatarFallback>{assignment.userName?.substring(0, 2).toUpperCase() || 'VL'}</AvatarFallback>
+                              </Avatar>
+                              <span>{assignment.userName || `Volunteer #${assignment.volunteerProfileId}`}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>{assignment.shiftName || `Shift #${assignment.volunteerShiftId}`}</TableCell>
+                          <TableCell>
+                            {assignment.startTime ? 
+                              `${new Date(assignment.startTime).toLocaleTimeString()} - ${new Date(assignment.endTime).toLocaleTimeString()}` 
+                              : 'N/A'}
+                          </TableCell>
                           <TableCell>
                             <Badge variant={
                               assignment.status === 'confirmed' ? 'default' :
@@ -573,12 +636,7 @@ export function EventTransactionDetails({ eventId, onBack }: EventTransactionDet
                               {assignment.status}
                             </Badge>
                           </TableCell>
-                          <TableCell>
-                            {assignment.startTime ? 
-                              `${new Date(assignment.startTime).toLocaleTimeString()} - ${new Date(assignment.endTime).toLocaleTimeString()}` 
-                              : 'N/A'}
-                          </TableCell>
-                          <TableCell>{assignment.reviewedByName || (assignment.reviewedBy ? `Admin #${assignment.reviewedBy}` : 'N/A')}</TableCell>
+                          <TableCell>{formatDate(new Date(assignment.createdAt))}</TableCell>
                         </TableRow>
                       ))
                     )}
