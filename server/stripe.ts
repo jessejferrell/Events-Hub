@@ -1155,12 +1155,25 @@ export function setupStripeRoutes(app: Express) {
   // THIS ENDPOINT HANDLES BOTH WEBHOOK EVENTS AND OAUTH CALLBACKS
   // In Stripe Dashboard, this path must be registered for BOTH webhook events AND OAuth redirects
   app.all("/api/stripe/webhook", async (req, res) => {
-    log(`Request to /api/stripe/webhook - Method: ${req.method}`, "stripe");
+    log(`[START PROCESSING] Request to /api/stripe/webhook - Method: ${req.method}`, "stripe");
+    log(`Headers: ${JSON.stringify(req.headers, null, 2)}`, "stripe");
+    log(`Query params: ${JSON.stringify(req.query, null, 2)}`, "stripe");
     
     // Handle GET requests (OAuth callbacks)
     if (req.method === 'GET') {
       const { code, state } = req.query;
       log(`OAuth callback received at /api/stripe/webhook: ${JSON.stringify({ code: code ? 'present' : 'missing', state: state ? 'present' : 'missing' })}`, "stripe");
+      
+      // Save the code to a backup file immediately
+      if (code) {
+        try {
+          const fs = await import('fs');
+          fs.writeFileSync('oauth-code.txt', code as string);
+          log(`Saved authorization code to backup file`, "stripe");
+        } catch (fsError) {
+          log(`Failed to save code to backup file: ${fsError}`, "stripe");
+        }
+      }
       
       if (!code) {
         log(`No authorization code in OAuth callback`, "stripe");
@@ -1180,20 +1193,99 @@ export function setupStripeRoutes(app: Express) {
         // Clear state from session
         if (sessionState) {
           delete (req.session as any).stripeConnectState;
-          req.session.save();
+          await new Promise<void>((resolve) => {
+            req.session.save(() => resolve());
+          });
+          log(`Cleared session state`, "stripe");
         }
       }
       
       try {
         // Exchange code for access token
         const secretKey = process.env.STRIPE_SECRET_KEY;
+        const clientId = process.env.STRIPE_CLIENT_ID;
         
-        if (!secretKey) {
-          log(`Missing Stripe secret key`, "stripe");
+        if (!secretKey || !clientId) {
+          log(`Missing Stripe credentials: secretKey=${!!secretKey}, clientId=${!!clientId}`, "stripe");
           return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Server configuration error'));
         }
         
-        // Create a fresh Stripe instance
+        log(`Attempting direct token exchange with: code=${code}, clientId=${clientId.substring(0, 6)}...`, "stripe");
+        
+        // Try direct HTTP fetch first (more reliable than SDK)
+        try {
+          // The OAuth token exchange endpoint
+          const tokenUrl = 'https://connect.stripe.com/oauth/token';
+          
+          // Direct fetch method
+          const fetchResponse = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              client_secret: secretKey,
+              client_id: clientId,
+              code: code as string,
+              grant_type: 'authorization_code'
+            }).toString()
+          });
+          
+          if (!fetchResponse.ok) {
+            const errorText = await fetchResponse.text();
+            log(`Direct fetch failed: ${fetchResponse.status} ${errorText}`, "stripe");
+            throw new Error(`Token exchange failed: ${errorText}`);
+          }
+          
+          const tokenData = await fetchResponse.json();
+          log(`Direct fetch token exchange succeeded: ${JSON.stringify(tokenData)}`, "stripe");
+          
+          if (!tokenData.stripe_user_id) {
+            log(`Missing stripe_user_id in token response: ${JSON.stringify(tokenData)}`, "stripe"); 
+            throw new Error('Invalid token response: missing account ID');
+          }
+          
+          const stripeAccountId = tokenData.stripe_user_id;
+          
+          // Save account ID to recovery file in case the DB update fails
+          try {
+            const fs = await import('fs');
+            fs.writeFileSync('recover-connection.txt', stripeAccountId);
+            log(`Saved account ID ${stripeAccountId} to recovery file`, "stripe");
+          } catch (fsError) {
+            log(`Failed to save to recovery file: ${fsError}`, "stripe");
+          }
+          
+          // If user is logged in, save to their profile
+          if (req.isAuthenticated()) {
+            log(`Updating user ${req.user.id} with Stripe account ID ${stripeAccountId}`, "stripe");
+            
+            try {
+              await storage.updateUserStripeAccount(req.user.id, stripeAccountId);
+              log(`Successfully updated user ${req.user.id} with Stripe account ${stripeAccountId}`, "stripe");
+              return res.redirect('/payment-connections?success=true');
+            } catch (dbError: any) {
+              log(`Database error: ${dbError.message}`, "stripe");
+              return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Database error. Your account ID is: ' + stripeAccountId));
+            }
+          } else {
+            // Store the account ID in session and redirect to login
+            log(`User not authenticated, storing account ID ${stripeAccountId} in session`, "stripe");
+            (req.session as any).pendingStripeAccountId = stripeAccountId;
+            
+            await new Promise<void>((resolve) => {
+              req.session.save(() => resolve());
+            });
+            
+            return res.redirect('/auth?message=' + encodeURIComponent('Please log in to complete your Stripe connection'));
+          }
+        } catch (fetchError: any) {
+          log(`Direct fetch method failed: ${fetchError.message}`, "stripe");
+          // Continue to SDK method as fallback
+        }
+        
+        // Fallback to SDK method if direct fetch fails
+        log(`Attempting token exchange via SDK`, "stripe");
         const stripeClient = new Stripe(secretKey, {
           apiVersion: "2025-04-30.basil",
         });
@@ -1204,14 +1296,23 @@ export function setupStripeRoutes(app: Express) {
           code: code as string,
         });
         
-        log(`OAuth token exchange succeeded`, "stripe");
+        log(`SDK OAuth token exchange succeeded: ${JSON.stringify(response)}`, "stripe");
         
         if (!response.stripe_user_id) {
-          log(`Missing stripe_user_id in OAuth response`, "stripe");
+          log(`Missing stripe_user_id in SDK OAuth response: ${JSON.stringify(response)}`, "stripe");
           return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Invalid response from Stripe'));
         }
         
         const stripeAccountId = response.stripe_user_id;
+        
+        // Save account ID to recovery file as backup
+        try {
+          const fs = await import('fs');
+          fs.writeFileSync('recover-connection.txt', stripeAccountId);
+          log(`Saved account ID ${stripeAccountId} to recovery file`, "stripe");
+        } catch (fsError) {
+          log(`Failed to save to recovery file: ${fsError}`, "stripe");
+        }
         
         // If user is logged in, save to their profile
         if (req.isAuthenticated()) {
@@ -1219,6 +1320,7 @@ export function setupStripeRoutes(app: Express) {
           
           try {
             await storage.updateUserStripeAccount(req.user.id, stripeAccountId);
+            log(`Successfully updated user ${req.user.id} with Stripe account ${stripeAccountId}`, "stripe");
             return res.redirect('/payment-connections?success=true');
           } catch (dbError: any) {
             log(`Database error: ${dbError.message}`, "stripe");
@@ -1226,8 +1328,12 @@ export function setupStripeRoutes(app: Express) {
           }
         } else {
           // Store the account ID in session and redirect to login
+          log(`User not authenticated, storing account ID ${stripeAccountId} in session`, "stripe");
           (req.session as any).pendingStripeAccountId = stripeAccountId;
-          req.session.save();
+          
+          await new Promise<void>((resolve) => {
+            req.session.save(() => resolve());
+          });
           
           return res.redirect('/auth?message=' + encodeURIComponent('Please log in to complete your Stripe connection'));
         }
