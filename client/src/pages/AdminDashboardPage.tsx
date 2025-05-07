@@ -1248,6 +1248,26 @@ export default function AdminDashboardPage() {
                             <td className="py-4 px-4">
                               <div className="flex items-center space-x-2">
                                 <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  className="text-blue-600 hover:text-blue-800"
+                                  onClick={() => handleViewEventTransactions(transaction.eventId)}
+                                  title="View event details"
+                                >
+                                  <Calendar className="h-3.5 w-3.5 mr-1" />
+                                  Event
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  className="text-green-600 hover:text-green-800"
+                                  onClick={() => handleViewUserTransactions(transaction.userId)}
+                                  title="View user details"
+                                >
+                                  <User className="h-3.5 w-3.5 mr-1" />
+                                  User
+                                </Button>
+                                <Button 
                                   variant="outline" 
                                   size="sm"
                                   onClick={() => handleEditTransaction(transaction)}
