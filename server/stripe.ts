@@ -1054,13 +1054,15 @@ export function setupStripeRoutes(app: Express) {
         // Update ticket with order ID if needed
         await storage.updateTicketStatus(ticket.id, "confirmed");
         
-      } catch (orderError: any) {
-        log(`Error creating order: ${orderError.message}`, "stripe");
+      } catch (orderError: unknown) {
+        const errorMessage = orderError instanceof Error ? orderError.message : String(orderError);
+        log(`Error creating order: ${errorMessage}`, "stripe");
       }
       
       log(`Ticket purchased: ${ticket.id} for event ${eventId}`, "stripe");
-    } catch (error: any) {
-      log(`Error handling checkout completion: ${error.message}`, "stripe");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Error handling checkout completion: ${errorMessage}`, "stripe");
     }
   }
   
@@ -1179,8 +1181,9 @@ export function setupStripeRoutes(app: Express) {
         }
       }
       
-    } catch (error: any) {
-      log(`Error handling account update: ${error.message}`, "stripe");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Error handling account update: ${errorMessage}`, "stripe");
     }
   }
   
