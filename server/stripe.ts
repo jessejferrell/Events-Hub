@@ -203,19 +203,13 @@ export function setupStripeRoutes(app: Express) {
         log(`Directly exchanging authorization code for access token...`, "stripe");
         
         // Construct the request body according to Stripe's API specification
+        // Construct the request body according to Stripe's API specification
         const params = new URLSearchParams();
-        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
-        params.append('client_id', clientId);
-        params.append('client_secret', secretKey);
-        params.append('grant_type', 'authorization_code');
-        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
-        params.append('client_id', clientId);
-        params.append('client_secret', secretKey);
-        params.append('code', code as string);
-        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
-        params.append('client_id', clientId);
-        params.append('client_secret', secretKey);
-        
+        params.append("grant_type", "authorization_code");
+        params.append("code", code as string);
+        // For API version 2019-02-19, client_id and client_secret should be in the body
+        params.append("client_id", clientId);
+        params.append("client_secret", secretKey);
         // These are the required parameters for Stripe Connect token exchange
         const clientId = process.env.STRIPE_CLIENT_ID;
         const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -403,23 +397,17 @@ export function setupStripeRoutes(app: Express) {
         // Use fetch API for direct control over the request
         log(`Directly exchanging authorization code for access token...`, "stripe");
         
-        // Construct the request body according to Stripe's API specification
-        const params = new URLSearchParams();
-        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
-        params.append('client_id', clientId);
-        params.append('client_secret', secretKey);
-        params.append('grant_type', 'authorization_code');
-        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
-        params.append('client_id', clientId);
-        params.append('client_secret', secretKey);
-        params.append('code', code as string);
-        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
-        params.append('client_id', clientId);
-        params.append('client_secret', secretKey);
-        
         // These are the required parameters for Stripe Connect token exchange
         const clientId = process.env.STRIPE_CLIENT_ID;
         const secretKey = process.env.STRIPE_SECRET_KEY;
+        
+        // Construct the request body according to Stripe's API specification
+        const params = new URLSearchParams();
+        params.append('grant_type', 'authorization_code');
+        params.append('code', code as string);
+        // For API version 2019-02-19, client_id and client_secret should be in the body
+        params.append('client_id', clientId);
+        params.append('client_secret', secretKey);
         
         if (!clientId || !secretKey) {
           log(`Missing required Stripe credentials`, "stripe");
@@ -432,15 +420,18 @@ export function setupStripeRoutes(app: Express) {
         log(`Using Stripe secret_key starting with: ${secretKey.substring(0, 8)}...`, "stripe");
         
         // Make direct request to Stripe's OAuth token endpoint
-        const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
-          method: 'POST',
+        // For API version 2019-02-19, client_id and client_secret should be in the body, not Authorization header
+        params.append("client_id", clientId);
+        params.append("client_secret", secretKey);
+        
+        // Make direct request to Stripe's OAuth token endpoint
+        const tokenResponse = await fetch("https://connect.stripe.com/oauth/token", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': `Bearer ${secretKey}`
+            "Content-Type": "application/x-www-form-urlencoded"
           },
           body: params.toString()
         });
-        
         // Parse the response
         const responseData = await tokenResponse.json();
         
