@@ -202,17 +202,17 @@ export function setupStripeRoutes(app: Express) {
         // Use fetch API for direct control over the request
         log(`Directly exchanging authorization code for access token...`, "stripe");
         
-        // Construct the request body according to Stripe's API specification
+        // Get credentials
+        const clientId = process.env.STRIPE_CLIENT_ID;
+        const secretKey = process.env.STRIPE_SECRET_KEY;
+        
         // Construct the request body according to Stripe's API specification
         const params = new URLSearchParams();
         params.append("grant_type", "authorization_code");
         params.append("code", code as string);
         // For API version 2019-02-19, client_id and client_secret should be in the body
-        params.append("client_id", clientId);
-        params.append("client_secret", secretKey);
-        // These are the required parameters for Stripe Connect token exchange
-        const clientId = process.env.STRIPE_CLIENT_ID;
-        const secretKey = process.env.STRIPE_SECRET_KEY;
+        params.append("client_id", clientId || "");
+        params.append("client_secret", secretKey || "");
         
         if (!clientId || !secretKey) {
           log(`Missing required Stripe credentials`, "stripe");
@@ -224,9 +224,7 @@ export function setupStripeRoutes(app: Express) {
         log(`Using Stripe client_id starting with: ${clientId.substring(0, 8)}...`, "stripe");
         log(`Using Stripe secret_key starting with: ${secretKey.substring(0, 8)}...`, "stripe");
         
-        // For API version 2019-02-19, client_id and client_secret should be in the body, not Authorization header
-        params.append("client_id", clientId);
-        params.append("client_secret", secretKey);
+        // NOTE: We already added these to the params above, don't add them twice
         
         // Make direct request to Stripe's OAuth token endpoint
         const tokenResponse = await fetch("https://connect.stripe.com/oauth/token", {
@@ -317,41 +315,74 @@ export function setupStripeRoutes(app: Express) {
   // DIRECT APPROACH: Ultra-simplified Stripe OAuth callback endpoint
   app.get("/api/stripe/oauth/callback", async (req, res) => {
     try {
-      console.log("====== STRIPE OAUTH CALLBACK ======");
-      console.log("Query params:", JSON.stringify(req.query, null, 2));
-      console.log("Headers:", JSON.stringify(req.headers["host"], null, 2));
-      console.log("Authenticated:", req.isAuthenticated());
+      // Use console.error to ensure messages appear in logs
+      console.error("====== STRIPE OAUTH CALLBACK ======");
+      console.error("Query params:", JSON.stringify(req.query, null, 2));
+      console.error("Headers host:", JSON.stringify(req.headers["host"], null, 2));
+      console.error("Headers origin:", JSON.stringify(req.headers["origin"], null, 2));
+      console.error("Headers referer:", JSON.stringify(req.headers["referer"], null, 2));
+      console.error("Authenticated:", req.isAuthenticated());
+      console.error("Session ID:", req.sessionID);
       if (req.isAuthenticated()) {
-        console.log("User ID:", req.user.id);
-        console.log("User role:", req.user.role);
+        console.error("User ID:", req.user.id);
+        console.error("User role:", req.user.role);
+      } else {
+        console.error("WARNING: USER NOT AUTHENTICATED DURING CALLBACK");
       }
-      console.log("================================");
+      console.error("================================");
       
-      const { code, error, error_description } = req.query;
+      const { code, error, error_description, state } = req.query;
       
       // Handle Stripe errors
       if (error) {
-        console.log("ERROR FROM STRIPE:", error, error_description);
+        console.error("ERROR FROM STRIPE:", error, error_description);
         return res.redirect(`/payment-connections?error=true&message=${encodeURIComponent(error_description as string || 'Stripe authorization was denied')}`);
       }
       
       if (!code) {
-        console.log("NO CODE PROVIDED");
+        console.error("NO CODE PROVIDED");
         return res.redirect('/payment-connections?error=true&message=Missing+authorization+code');
       }
       
-      console.log("Got code:", code);
+      console.error("Got code:", code);
+      console.error("Got state:", state);
+      
+      // Try to recover user ID from state if user is not authenticated
+      let userId = null;
+      if (!req.isAuthenticated()) {
+        try {
+          // Parse state parameter which has format userId-timestamp-randomsuffix
+          if (state && typeof state === 'string') {
+            const stateparts = state.split('-');
+            if (stateparts.length >= 3) {
+              userId = parseInt(stateparts[0]);
+              console.error("RECOVERED USER ID FROM STATE:", userId);
+            }
+          }
+          
+          // Check file system backup
+          if (!userId) {
+            const fs = require('fs');
+            if (fs.existsSync('./stripe-connect-user.txt')) {
+              userId = parseInt(fs.readFileSync('./stripe-connect-user.txt', 'utf8').trim());
+              console.error("RECOVERED USER ID FROM FILE:", userId);
+            }
+          }
+        } catch (stateError) {
+          console.error("Failed to recover user ID:", stateError);
+        }
+      }
       
       // Get credentials for API call
       const clientId = process.env.STRIPE_CLIENT_ID;
       const secretKey = process.env.STRIPE_SECRET_KEY;
       
       if (!clientId || !secretKey) {
-        console.log("MISSING CREDENTIALS");
+        console.error("MISSING CREDENTIALS");
         return res.redirect('/payment-connections?error=true&message=Server+configuration+error');
       }
       
-      console.log("Credentials OK, proceeding with token exchange");
+      console.error("Credentials OK, proceeding with token exchange");
       
       try {
         // MINIMAL DIRECT API CALL APPROACH
@@ -361,7 +392,8 @@ export function setupStripeRoutes(app: Express) {
         params.append('client_id', clientId);
         params.append('client_secret', secretKey);
         
-        console.log("Making token request with params:", params.toString());
+        console.error("Making token request with params (without secret):", 
+          params.toString().replace(secretKey, '[REDACTED]'));
         
         const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
           method: 'POST',
@@ -369,16 +401,16 @@ export function setupStripeRoutes(app: Express) {
           body: params.toString()
         });
         
-        console.log("Response status:", tokenResponse.status);
+        console.error("Response status:", tokenResponse.status);
         
         const responseText = await tokenResponse.text();
-        console.log("FULL RESPONSE TEXT:", responseText);
+        console.error("FULL RESPONSE TEXT:", responseText);
         
         // Try to parse JSON response
         let responseData;
         try {
           responseData = JSON.parse(responseText);
-          console.log("Parsed response data:", JSON.stringify(responseData, null, 2));
+          console.error("Parsed response data:", JSON.stringify(responseData, null, 2));
         } catch (parseError) {
           console.error("Failed to parse response as JSON:", parseError);
           return res.redirect('/payment-connections?error=true&message=Invalid+response+from+Stripe');
