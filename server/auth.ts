@@ -49,14 +49,14 @@ export function setupAuth(app: Express) {
 
   const sessionSettings: session.SessionOptions = {
     secret: sessionSecret,
-    resave: false,
-    saveUninitialized: false,
+    resave: true, // Changed to true to ensure session is saved
+    saveUninitialized: true, // Changed to true to save uninitialized sessions
     store: storage.sessionStore,
     cookie: {
       httpOnly: true,
       secure: app.get("env") === "production",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
-      sameSite: 'none', // Allow cross-site requests
+      sameSite: app.get("env") === "production" ? 'none' : 'lax', // More compatible sameSite setting
     },
   };
 
