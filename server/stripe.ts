@@ -683,21 +683,93 @@ export function setupStripeRoutes(app: Express) {
       }
       console.log("**************************");
       
-      const { stripeAccountId } = req.body;
+      // Allow two ways: either direct account ID or authorization code
+      const { stripeAccountId, authCode } = req.body;
       
-      if (!stripeAccountId || typeof stripeAccountId !== 'string' || !stripeAccountId.startsWith('acct_')) {
-        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Invalid Stripe account ID format'));
+      // APPROACH 1: Direct account ID
+      if (stripeAccountId) {
+        if (!stripeAccountId.startsWith('acct_')) {
+          return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Invalid Stripe account ID format'));
+        }
+        
+        // Validate the account ID with Stripe
+        try {
+          await stripe.accounts.retrieve(stripeAccountId);
+        } catch (error) {
+          return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Invalid Stripe account ID. Please try again.'));
+        }
+        
+        // Account ID is valid, proceed to save it
+        console.log("Valid Stripe account ID:", stripeAccountId);
+      }
+      // APPROACH 2: Authorization code
+      else if (authCode) {
+        console.log("Authorization code provided, attempting to exchange...");
+        
+        try {
+          // Get a completely fresh Stripe instance with the latest key
+          const secretKey = process.env.STRIPE_SECRET_KEY;
+          if (!secretKey) {
+            return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Missing Stripe secret key'));
+          }
+          
+          console.log("Using key format:", secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
+          
+          const freshStripe = new Stripe(secretKey, {
+            apiVersion: "2025-04-30.basil",
+          });
+          
+          // Exchange the code for an account ID
+          console.log("Exchanging code using Stripe SDK...");
+          const tokenResponse = await freshStripe.oauth.token({
+            grant_type: 'authorization_code',
+            code: authCode,
+          });
+          
+          console.log("Token response:", JSON.stringify(tokenResponse));
+          
+          // Extract the account ID from the response
+          if (!tokenResponse.stripe_user_id) {
+            console.error("No stripe_user_id in response:", tokenResponse);
+            return res.status(400).json({
+              success: false,
+              error: "Missing account ID in token response"
+            });
+          }
+          
+          // We got the account ID! Set it for further processing
+          const connectedAccountId = tokenResponse.stripe_user_id;
+          console.log("Successfully exchanged code for account ID:", connectedAccountId);
+          
+          // Update req.body for the rest of the function to use
+          req.body.stripeAccountId = connectedAccountId;
+        } catch (exchangeError) {
+          console.error("Error exchanging code:", exchangeError);
+          return res.status(400).json({
+            success: false,
+            error: exchangeError.message || "Failed to exchange code for token"
+          });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: "Either stripeAccountId or authCode must be provided"
+        });
       }
       
-      // Validate the account ID with Stripe
-      try {
-        await stripe.accounts.retrieve(stripeAccountId);
-      } catch (error) {
-        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Invalid Stripe account ID. Please try again.'));
+      // At this point, req.body.stripeAccountId should be set
+      // Either it was provided directly or we got it from the code exchange
+      const finalAccountId = req.body.stripeAccountId;
+      
+      if (!finalAccountId) {
+        return res.status(500).json({
+          success: false,
+          error: "No account ID available after processing" 
+        });
       }
       
       // Store the account ID in a cookie that lasts 5 minutes
-      res.cookie('stripe_account_id', stripeAccountId, { 
+      res.cookie('stripe_account_id', finalAccountId, { 
         maxAge: 5 * 60 * 1000, // 5 minutes
         httpOnly: true,
         secure: true,
@@ -708,7 +780,7 @@ export function setupStripeRoutes(app: Express) {
       try {
         // Don't use require in async contexts, it causes issues
         const { writeFileSync } = await import('fs');
-        writeFileSync('recover-connection.txt', stripeAccountId);
+        writeFileSync('recover-connection.txt', finalAccountId);
       } catch (err) {
         console.error("Failed to write to file:", err);
         // Continue anyway
@@ -720,14 +792,34 @@ export function setupStripeRoutes(app: Express) {
       }
       
       // User is authenticated, connect the account
-      await storage.updateUserStripeAccount(req.user.id, stripeAccountId);
+      await storage.updateUserStripeAccount(req.user.id, finalAccountId);
       
       // Clear the cookie since we've stored the value
       res.clearCookie('stripe_account_id');
       
+      // If this was a JSON request, return JSON
+      if (req.headers['content-type']?.includes('application/json')) {
+        return res.json({
+          success: true,
+          accountId: finalAccountId,
+          message: "Successfully connected Stripe account"
+        });
+      }
+      
+      // Otherwise redirect
       return res.redirect('/payment-connections?success=true');
     } catch (error: any) {
       log(`Error in manual connect: ${error.message}`, "stripe");
+      
+      // If this was a JSON request, return JSON error
+      if (req.headers['content-type']?.includes('application/json')) {
+        return res.status(500).json({
+          success: false,
+          error: error.message || "Unknown error"
+        });
+      }
+      
+      // Otherwise redirect with error
       return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Error connecting Stripe account. Please try again.'));
     }
   });
