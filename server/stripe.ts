@@ -317,7 +317,13 @@ export function setupStripeRoutes(app: Express) {
   // Enhanced Stripe OAuth callback endpoint with state validation
   app.get("/api/stripe/oauth/callback", async (req, res) => {
     try {
-      log(`OAuth callback received: ${JSON.stringify(req.query)}`, "stripe");
+      console.log("**************************");
+      console.log("STRIPE OAUTH CALLBACK RECEIVED");
+      console.log("Query params:", JSON.stringify(req.query));
+      console.log("Headers:", JSON.stringify(req.headers, null, 2));
+      console.log("User authenticated:", req.isAuthenticated());
+      console.log("**************************");
+      
       const { code, state } = req.query;
       
       // First, validate if there's any error from Stripe
@@ -401,6 +407,12 @@ export function setupStripeRoutes(app: Express) {
         const clientId = process.env.STRIPE_CLIENT_ID;
         const secretKey = process.env.STRIPE_SECRET_KEY;
         
+        if (!clientId || !secretKey) {
+          log(`Missing required Stripe credentials`, "stripe");
+          return res.redirect('/payment-connections?error=true&message=' + 
+            encodeURIComponent('Server configuration error. Please contact support.'));
+        }
+        
         // Construct the request body according to Stripe's API specification
         const params = new URLSearchParams();
         params.append('grant_type', 'authorization_code');
@@ -409,20 +421,11 @@ export function setupStripeRoutes(app: Express) {
         params.append('client_id', clientId);
         params.append('client_secret', secretKey);
         
-        if (!clientId || !secretKey) {
-          log(`Missing required Stripe credentials`, "stripe");
-          return res.redirect('/payment-connections?error=true&message=' + 
-            encodeURIComponent('Server configuration error. Please contact support.'));
-        }
-        
-        // Log some diagnostic information (first few characters only)
+        // Log some diagnostic information (first few characters only) 
         log(`Using Stripe client_id starting with: ${clientId.substring(0, 8)}...`, "stripe");
         log(`Using Stripe secret_key starting with: ${secretKey.substring(0, 8)}...`, "stripe");
         
-        // Make direct request to Stripe's OAuth token endpoint
-        // For API version 2019-02-19, client_id and client_secret should be in the body, not Authorization header
-        params.append("client_id", clientId);
-        params.append("client_secret", secretKey);
+        console.log("STRIPE DEBUG: Sending OAuth token request with params:", params.toString());
         
         // Make direct request to Stripe's OAuth token endpoint
         const tokenResponse = await fetch("https://connect.stripe.com/oauth/token", {
@@ -432,8 +435,19 @@ export function setupStripeRoutes(app: Express) {
           },
           body: params.toString()
         });
-        // Parse the response
-        const responseData = await tokenResponse.json();
+        
+        // Get the full response text for debugging
+        const responseText = await tokenResponse.text();
+        console.log("STRIPE DEBUG: Raw response from Stripe:", responseText);
+        
+        // Parse the response JSON (re-parse from text)
+        let responseData;
+        try {
+            responseData = JSON.parse(responseText);
+        } catch (e) {
+            console.error("STRIPE DEBUG: Failed to parse JSON response:", e);
+            throw new Error("Invalid response from Stripe: " + responseText);
+        }
         
         // Check if the response contains an error
         if (!tokenResponse.ok) {
@@ -510,6 +524,16 @@ export function setupStripeRoutes(app: Express) {
   // Direct endpoint for the form post from OAuth callback
   app.post("/api/stripe/manual-connect", async (req, res) => {
     try {
+      console.log("**************************");
+      console.log("STRIPE MANUAL CONNECT ENDPOINT HIT");
+      console.log("Request body:", JSON.stringify(req.body));
+      console.log("Headers:", JSON.stringify(req.headers, null, 2));
+      console.log("User authenticated:", req.isAuthenticated());
+      if (req.isAuthenticated()) {
+        console.log("User ID:", req.user.id);
+      }
+      console.log("**************************");
+      
       const { stripeAccountId } = req.body;
       
       if (!stripeAccountId || typeof stripeAccountId !== 'string' || !stripeAccountId.startsWith('acct_')) {
