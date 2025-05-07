@@ -48,6 +48,7 @@ import {
   insertAdminNoteSchema, 
   insertProductSchema,
   insertOrderSchema,
+  insertUserOnboardingSchema,
   insertOrderItemSchema,
   insertVendorProfileSchema,
   insertVendorSpotSchema,
@@ -258,6 +259,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to update profile" });
+    }
+  });
+  
+  // === ONBOARDING API ===
+  
+  // Get user onboarding data (protected)
+  app.get("/api/onboarding", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      let onboarding = await storage.getUserOnboarding(userId);
+      
+      // If no onboarding record exists, create one
+      if (!onboarding) {
+        onboarding = await storage.createUserOnboarding(userId);
+      }
+      
+      res.json(onboarding);
+    } catch (error: any) {
+      console.error("Error fetching onboarding data:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch onboarding data" });
+    }
+  });
+  
+  // Update user onboarding data (protected)
+  app.patch("/api/onboarding", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      
+      // Use zod to validate the user input
+      const validatedData = insertUserOnboardingSchema.partial().parse(req.body);
+      
+      const updatedOnboarding = await storage.updateUserOnboarding(userId, validatedData);
+      res.json(updatedOnboarding);
+    } catch (error: any) {
+      console.error("Error updating onboarding data:", error);
+      res.status(500).json({ message: error.message || "Failed to update onboarding data" });
+    }
+  });
+  
+  // Reset user onboarding (protected)
+  app.post("/api/onboarding/reset", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      
+      const resetData = {
+        completedSteps: {},
+        dismissedTooltips: {},
+        onboardingComplete: false,
+        lastStep: null,
+      };
+      
+      const updatedOnboarding = await storage.updateUserOnboarding(userId, resetData);
+      res.json(updatedOnboarding);
+    } catch (error: any) {
+      console.error("Error resetting onboarding data:", error);
+      res.status(500).json({ message: error.message || "Failed to reset onboarding data" });
     }
   });
 

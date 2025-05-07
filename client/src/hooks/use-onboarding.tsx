@@ -91,7 +91,7 @@ interface OnboardingContextType {
 export const OnboardingContext = createContext<OnboardingContextType | null>(null);
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({});
@@ -101,7 +101,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   // Fetch user onboarding data if authenticated
   const { data: onboardingData } = useQuery<UserOnboarding>({
     queryKey: ["/api/onboarding"],
-    enabled: isAuthenticated,
+    enabled: !!user, // Use !!user instead of isAuthenticated
   });
 
   // Update onboarding mutation
@@ -137,7 +137,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setIsOnboardingComplete(false);
     showTooltip(ONBOARDING_STEPS[0].id);
     
-    if (isAuthenticated) {
+    if (user) {
       updateOnboardingMutation.mutate({
         onboardingComplete: false,
         lastStep: ONBOARDING_STEPS[0].id,
@@ -150,7 +150,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setActiveTooltip(null);
     setIsOnboardingComplete(true);
     
-    if (isAuthenticated) {
+    if (user) {
       updateOnboardingMutation.mutate({
         onboardingComplete: true,
       });
@@ -169,7 +169,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       const nextStepId = ONBOARDING_STEPS[nextStep].id;
       showTooltip(nextStepId);
       
-      if (isAuthenticated) {
+      if (user) {
         updateOnboardingMutation.mutate({
           lastStep: nextStepId,
         });
@@ -188,7 +188,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       const prevStepId = ONBOARDING_STEPS[prevStep].id;
       showTooltip(prevStepId);
       
-      if (isAuthenticated) {
+      if (user) {
         updateOnboardingMutation.mutate({
           lastStep: prevStepId,
         });
@@ -201,7 +201,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setActiveTooltip(null);
     setDismissedTooltips(prev => ({ ...prev, [stepId]: true }));
     
-    if (isAuthenticated) {
+    if (user) {
       updateOnboardingMutation.mutate({
         dismissedTooltips: { ...dismissedTooltips, [stepId]: true },
       });
@@ -212,7 +212,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const markStepComplete = (stepId: string) => {
     setCompletedSteps(prev => ({ ...prev, [stepId]: true }));
     
-    if (isAuthenticated) {
+    if (user) {
       updateOnboardingMutation.mutate({
         completedSteps: { ...completedSteps, [stepId]: true },
       });
@@ -227,7 +227,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setDismissedTooltips({});
     setIsOnboardingComplete(false);
     
-    if (isAuthenticated) {
+    if (user) {
       updateOnboardingMutation.mutate({
         completedSteps: {},
         dismissedTooltips: {},
@@ -253,7 +253,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     const step = ONBOARDING_STEPS[stepIndex];
     
     // Check if the step requires auth
-    if (step.requiresAuth && !isAuthenticated) {
+    if (step.requiresAuth && !user) {
       return;
     }
     
@@ -265,7 +265,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setCurrentStep(stepIndex);
     setActiveTooltip(stepId);
     
-    if (isAuthenticated) {
+    if (user) {
       updateOnboardingMutation.mutate({
         lastStep: stepId,
       });
