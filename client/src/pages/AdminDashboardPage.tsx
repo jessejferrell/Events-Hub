@@ -163,6 +163,8 @@ export default function AdminDashboardPage() {
   // Transaction detail view state
   const [showEventTransactionDetails, setShowEventTransactionDetails] = useState(false);
   const [showUserTransactionDetails, setShowUserTransactionDetails] = useState(false);
+  const [selectedEventForDetails, setSelectedEventForDetails] = useState<number | null>(null);
+  const [selectedUserForDetails, setSelectedUserForDetails] = useState<number | null>(null);
   const [detailEventId, setDetailEventId] = useState<number | null>(null);
   const [detailUserId, setDetailUserId] = useState<number | null>(null);
   
@@ -1264,7 +1266,7 @@ export default function AdminDashboardPage() {
                                   onClick={() => handleViewUserTransactions(transaction.userId)}
                                   title="View user details"
                                 >
-                                  <User className="h-3.5 w-3.5 mr-1" />
+                                  <UserIcon className="h-3.5 w-3.5 mr-1" />
                                   User
                                 </Button>
                                 <Button 
