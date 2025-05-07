@@ -271,16 +271,15 @@ export function setupStripeRoutes(app: Express) {
         
         // NOTE: We already added these to the params above, don't add them twice
         
-        // With the newer API version, try using Authorization header instead of body params
-        // Create Basic auth token from client ID and secret
-        const authToken = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+        // For OAuth token exchange, Stripe expects the parameters in the body
+        // The client ID should not be used as an API key for Basic Auth
+        // According to OAuth spec, client_id and client_secret should be in the body
         
         // Make direct request to Stripe's OAuth token endpoint
         const tokenResponse = await fetch("https://connect.stripe.com/oauth/token", {
           method: "POST",
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": `Basic ${authToken}`
+            "Content-Type": "application/x-www-form-urlencoded"
           },
           body: params.toString()
         });
@@ -506,15 +505,13 @@ export function setupStripeRoutes(app: Express) {
         console.error("Making token request with params (without secret):", 
           params.toString().replace(secretKey, '[REDACTED]'));
         
-        // With the newer API version, try using Authorization header instead of body params
-        // Create Basic auth token from client ID and secret
-        const authToken = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
-        
+        // For OAuth token exchange, Stripe expects the parameters in the body
+        // The client ID should not be used as an API key for Basic Auth
+        // According to OAuth spec, client_id and client_secret should be in the body
         const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
           method: 'POST',
           headers: { 
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': `Basic ${authToken}`
+            'Content-Type': 'application/x-www-form-urlencoded'
           },
           body: params.toString()
         });
