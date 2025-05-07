@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Mail, Phone, MapPin, Facebook, Instagram, Youtube } from "lucide-react";
+import { Mail, Facebook, Instagram, Youtube } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function Footer() {
@@ -13,7 +13,7 @@ export default function Footer() {
     <footer className="mt-auto bg-gradient-to-r from-primary/5 to-secondary/5">
       {/* Main Footer */}
       <div className="container mx-auto px-4 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Company Info */}
           <div className="md:col-span-1">
             <h3 className="text-lg font-bold text-primary mb-4">City Event Hub</h3>
@@ -84,44 +84,13 @@ export default function Footer() {
             </ul>
           </div>
           
-          {/* Support */}
-          <div className="md:col-span-1">
-            <h3 className="text-lg font-bold text-primary mb-4">Support</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <a 
-                  href="mailto:jj@expresults.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-gray-600 hover:text-primary transition-colors"
-                >
-                  Contact Us
-                </a>
-              </li>
-              <li>
-                <Link href="/privacy" className="text-gray-600 hover:text-primary transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="text-gray-600 hover:text-primary transition-colors">
-                  Terms of Service
-                </Link>
-              </li>
-            </ul>
-          </div>
-          
           {/* Contact */}
           <div className="md:col-span-1">
             <h3 className="text-lg font-bold text-primary mb-4">Contact Us</h3>
             <div className="space-y-3 text-sm">
-              <div className="flex items-start">
-                <MapPin className="h-5 w-5 text-primary mr-2 mt-0.5" />
-                <span className="text-gray-600">P.O. Box 1522, Escatawpa, MS 39552</span>
-              </div>
               <div className="flex items-center">
                 <Mail className="h-5 w-5 text-primary mr-2" />
-                <span className="text-gray-600">jj@expresults.com</span>
+                <span className="text-gray-600">events@mosspointmainstreet.org</span>
               </div>
             </div>
           </div>
