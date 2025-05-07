@@ -12,7 +12,7 @@ if (stripeSecretKey === "sk_test_example" || stripePublicKey === "pk_test_exampl
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2023-10-16",
+  apiVersion: "2023-10-16" as "2023-10-16",
 });
 
 export function setupStripeRoutes(app: Express) {
@@ -77,8 +77,9 @@ export function setupStripeRoutes(app: Express) {
         fs.writeFileSync('stripe-connect-state.txt', stateValue);
         fs.writeFileSync('stripe-connect-user.txt', userId.toString());
         log(`Backed up connection state to filesystem for user ${userId}`, "stripe");
-      } catch (fsErr) {
-        log(`Warning: Failed to back up state to filesystem: ${fsErr.message}`, "stripe");
+      } catch (fsErr: unknown) {
+        const errorMessage = fsErr instanceof Error ? fsErr.message : String(fsErr);
+        log(`Warning: Failed to back up state to filesystem: ${errorMessage}`, "stripe");
         // Continue anyway as this is just a backup
       }
       
@@ -115,8 +116,9 @@ export function setupStripeRoutes(app: Express) {
       
       // Return the URL for frontend to redirect
       res.json({ url: directConnectUrl.toString() });
-    } catch (error) {
-      log(`Error generating Stripe OAuth URL: ${error.message}`, "stripe");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Error generating Stripe OAuth URL: ${errorMessage}`, "stripe");
       res.status(500).json({ message: "Failed to initiate Stripe connection" });
     }
   });
@@ -162,8 +164,9 @@ export function setupStripeRoutes(app: Express) {
               originalState = fs.readFileSync('./stripe-connect-state.txt', 'utf8').trim();
               log(`Found state in filesystem: ${originalState}`, "stripe");
             }
-          } catch (err) {
-            log(`Error reading state from file: ${err.message}`, "stripe");
+          } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            log(`Error reading state from file: ${errorMessage}`, "stripe");
           }
         }
         
@@ -348,8 +351,9 @@ export function setupStripeRoutes(app: Express) {
             originalState = readFileSync('./stripe-connect-state.txt', 'utf8').trim();
             log(`Found state in filesystem: ${originalState}`, "stripe");
           }
-        } catch (err) {
-          log(`Error reading state from file: ${err.message}`, "stripe");
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          log(`Error reading state from file: ${errorMessage}`, "stripe");
         }
       }
       
