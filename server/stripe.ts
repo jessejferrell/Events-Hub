@@ -185,24 +185,22 @@ export function setupStripeRoutes(app: Express) {
     const productionDomain = "https://events.mosspointmainstreet.org";
     const replitAppDomain = "https://events-manager.replit.app";
     
-    // Calculate both callback URLs (exactly matching what's in the Stripe dashboard)
-    const prodCallbackUrl = `${productionDomain}/api/stripe/oauth/callback`;
-    const devCallbackUrl = `${replitAppDomain}/api/stripe/oauth/callback`;
-    
-    // Here are the EXACT URLs that must be registered in the Stripe Connect settings
-    const registeredRedirectUris = [
-      prodCallbackUrl,
-      devCallbackUrl
-    ];
+    // THESE ARE THE EXACT WEBHOOK URLS THAT MUST BE REGISTERED IN STRIPE DASHBOARD
+    const prodWebhookUrl = `${productionDomain}/api/stripe/webhook`;
+    const devWebhookUrl = `${replitAppDomain}/api/stripe/webhook`;
     
     res.json({
       clientId: clientId ? clientId.substring(0, 4) + '...' + clientId.substring(clientId.length - 4) : 'missing',
       secretKey: secretKey ? secretKey.substring(0, 4) + '...' + secretKey.substring(secretKey.length - 4) : 'missing',
       productionDomain,
       replitAppDomain,
-      registeredRedirectUris,
-      stripeWebhookUrl: `${productionDomain}/api/stripe/webhook`,
-      replitWebhookUrl: `${replitAppDomain}/api/stripe/webhook`
+      currentDomain: req.protocol + '://' + req.get('host'),
+      replit_domains: process.env.REPLIT_DOMAINS || '',
+      // The EXACT webhook URLs to register in Stripe Dashboard
+      webhookUrls: [
+        prodWebhookUrl,
+        devWebhookUrl
+      ]
     });
   });
 
@@ -239,18 +237,18 @@ export function setupStripeRoutes(app: Express) {
       const idPrefix = stripeClientId.substring(0, 8);
       log(`Using Stripe Client ID starting with: ${idPrefix}...`, "stripe");
 
-      // Use the exact URIs registered in the Stripe Dashboard
+      // USING EXACTLY THE SAME URLs THAT ARE REGISTERED IN STRIPE DASHBOARD
       let registeredRedirectUri;
       
       // In development on Replit, use events-manager.replit.app
       if (process.env.NODE_ENV !== 'production') {
-        // Using the EXACT Replit domain and path registered in Stripe Connect dashboard
-        registeredRedirectUri = "https://events-manager.replit.app/api/stripe/oauth/callback";
-        log(`Using Replit app redirect URI: ${registeredRedirectUri}`, "stripe");
+        // USING THE EXACT REGISTERED URL FROM STRIPE DASHBOARD
+        registeredRedirectUri = "https://events-manager.replit.app/api/stripe/webhook";
+        log(`Using EXACT REGISTERED webhook URL: ${registeredRedirectUri}`, "stripe");
       } else {
-        // In production, use the EXACT production domain path registered in Stripe Connect
-        registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/oauth/callback";
-        log(`Using production redirect URI: ${registeredRedirectUri}`, "stripe");
+        // In production, use the EXACT REGISTERED URL FROM STRIPE DASHBOARD
+        registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/webhook";
+        log(`Using EXACT REGISTERED webhook URL: ${registeredRedirectUri}`, "stripe");
       }
       
       // Generate a unique identifier based on user ID and timestamp
