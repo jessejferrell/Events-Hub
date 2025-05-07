@@ -831,6 +831,14 @@ export function setupStripeRoutes(app: Express) {
     const mainWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET; // Primary domain (mosspointmainstreet.org)
     const replitWebhookSecret = process.env.STRIPE_REPLIT_WEBHOOK_SECRET; // Replit domain
     
+    if (!mainWebhookSecret || !replitWebhookSecret) {
+      log(`Missing webhook secrets. Main: ${Boolean(mainWebhookSecret)}, Replit: ${Boolean(replitWebhookSecret)}`, "stripe");
+      return res.status(500).json({ 
+        success: false,
+        error: "Server configuration error: Missing webhook secrets"
+      });
+    }
+    
     // Determine which secret to use based on the host header or Forwarded header
     const host = req.get('host') || '';
     const forwardedHost = req.get('X-Forwarded-Host') || '';
@@ -840,28 +848,73 @@ export function setupStripeRoutes(app: Express) {
     
     // Select the appropriate webhook secret
     let webhookSecret = mainWebhookSecret;
-    if (effectiveHost.includes('replit.app')) {
-      log(`Using Replit-specific webhook secret`, "stripe");
+    const isReplitDomain = effectiveHost.includes('replit.app');
+    
+    if (isReplitDomain) {
+      log(`Using Replit-specific webhook secret for domain: ${effectiveHost}`, "stripe");
       webhookSecret = replitWebhookSecret;
     } else {
-      log(`Using main domain webhook secret`, "stripe");
+      log(`Using main domain webhook secret for domain: ${effectiveHost}`, "stripe");
     }
 
     let event;
 
     try {
       // Verify webhook signature with the appropriate secret
-      if (webhookSecret) {
-        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-        log(`Webhook verified with secret: ${webhookSecret.substring(0, 5)}...`, "stripe");
-      } else {
-        // For development, just parse the JSON (not recommended for production)
-        event = req.body;
-        log(`WARNING: Webhook received without verification - no webhook secret found.`, "stripe");
+      if (!sig) {
+        log(`Missing Stripe signature in webhook request`, "stripe");
+        return res.status(400).json({
+          received: false,
+          error: "Missing Stripe signature",
+          domain: effectiveHost
+        });
       }
-    } catch (err: any) {
-      log(`Webhook signature verification failed: ${err.message}`, "stripe");
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+
+      if (webhookSecret) {
+        try {
+          // First try with the primary secret (selected based on domain)
+          event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+          log(`Webhook verified with primary secret for domain: ${effectiveHost}`, "stripe");
+        } catch (primaryErr: unknown) {
+          const primaryErrorMessage = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+          log(`Primary webhook verification failed: ${primaryErrorMessage}`, "stripe");
+          
+          // Try the alternative secret as a fallback
+          const fallbackSecret = isReplitDomain ? mainWebhookSecret : replitWebhookSecret;
+          
+          try {
+            log(`Attempting verification with fallback webhook secret...`, "stripe");
+            event = stripe.webhooks.constructEvent(req.body, sig, fallbackSecret);
+            log(`Fallback webhook verification succeeded!`, "stripe");
+          } catch (fallbackErr: unknown) {
+            const fallbackErrorMessage = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+            log(`Fallback webhook verification also failed: ${fallbackErrorMessage}`, "stripe");
+            return res.status(400).json({
+              received: false,
+              error: "Webhook signature verification failed with both secrets",
+              primaryError: primaryErrorMessage,
+              fallbackError: fallbackErrorMessage,
+              domain: effectiveHost
+            });
+          }
+        }
+      } else {
+        // This should never happen due to our earlier check, but just in case
+        log(`ERROR: No webhook secret available for verification`, "stripe");
+        return res.status(500).json({ 
+          received: false,
+          error: "Server configuration error: No webhook secret available",
+          domain: effectiveHost
+        });
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      log(`Unexpected error during webhook processing: ${errorMessage}`, "stripe");
+      return res.status(500).json({
+        received: false, 
+        error: `Webhook processing error: ${errorMessage}`,
+        domain: effectiveHost
+      });
     }
 
     // Handle specific event types
@@ -1074,8 +1127,9 @@ export function setupStripeRoutes(app: Express) {
         );
         
         log(`Updated Stripe account status for user ${user.id}`, "stripe");
-      } catch (dbError: any) {
-        log(`Error storing account status: ${dbError.message}`, "stripe");
+      } catch (dbError: unknown) {
+        const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
+        log(`Error storing account status: ${errorMessage}`, "stripe");
       }
       
       // Notify the user about required actions if needed
@@ -1097,8 +1151,9 @@ export function setupStripeRoutes(app: Express) {
           //   accountId: account.id,
           //   requirements: requirements.currently_due
           // });
-        } catch (noteError: any) {
-          log(`Error creating admin note: ${noteError.message}`, "stripe");
+        } catch (noteError: unknown) {
+          const errorMessage = noteError instanceof Error ? noteError.message : String(noteError);
+          log(`Error creating admin note: ${errorMessage}`, "stripe");
         }
       }
       
@@ -1118,8 +1173,9 @@ export function setupStripeRoutes(app: Express) {
           
           // Update user verification status if we have such a field
           // await storage.updateUserVerificationStatus(user.id, true);
-        } catch (updateError: any) {
-          log(`Error updating verification status: ${updateError.message}`, "stripe");
+        } catch (updateError: unknown) {
+          const errorMessage = updateError instanceof Error ? updateError.message : String(updateError);
+          log(`Error updating verification status: ${errorMessage}`, "stripe");
         }
       }
       
@@ -1143,16 +1199,20 @@ export function setupStripeRoutes(app: Express) {
       
       // Update user record to remove the Stripe account connection
       try {
-        await storage.updateUserStripeAccount(user.id, null);
+        // Passing empty string instead of null to avoid TypeScript error
+        // The type expects a string, but the database can handle empty string as disconnected
+        await storage.updateUserStripeAccount(user.id, "");
         
         // You might want to notify the user or take other actions
         // emailService.sendAccountDisconnectNotification(user.email);
         
-      } catch (updateError: any) {
-        log(`Error updating user after Stripe deauthorization: ${updateError.message}`, "stripe");
+      } catch (updateError: unknown) {
+        const errorMessage = updateError instanceof Error ? updateError.message : String(updateError);
+        log(`Error updating user after Stripe deauthorization: ${errorMessage}`, "stripe");
       }
-    } catch (error: any) {
-      log(`Error handling account deauthorization: ${error.message}`, "stripe");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Error handling account deauthorization: ${errorMessage}`, "stripe");
     }
   }
   
@@ -1164,8 +1224,9 @@ export function setupStripeRoutes(app: Express) {
       
       // Find the user with this account ID
       return allUsers.find(user => user.stripeAccountId === stripeAccountId);
-    } catch (error: any) {
-      log(`Error finding user by Stripe account ID: ${error.message}`, "stripe");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Error finding user by Stripe account ID: ${errorMessage}`, "stripe");
       return null;
     }
   }
