@@ -54,14 +54,9 @@ export function setupStripeRoutes(app: Express) {
       const idPrefix = stripeClientId.substring(0, 8);
       log(`Using Stripe Client ID starting with: ${idPrefix}...`, "stripe");
 
-      // Use the verified domains as specified by the client
-      const domain = "https://events.mosspointmainstreet.org";
-      const replitAppDomain = "https://events-manager.replit.app";
-      
-      // Use the appropriate domain based on the request origin
-      const effectiveDomain = req.headers.origin ? 
-                              req.headers.origin.replace(/\/$/, '') : 
-                              (process.env.NODE_ENV === 'production' ? domain : replitAppDomain);
+      // IMPORTANT: Use only the EXACT redirect URI registered in the Stripe Dashboard
+      // For this app, we've registered https://events.mosspointmainstreet.org/api/stripe/oauth/callback
+      const registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/oauth/callback";
       
       // Generate a unique identifier based on user ID and timestamp
       // This will be stored to disk as a fallback mechanism
@@ -83,8 +78,9 @@ export function setupStripeRoutes(app: Express) {
         // Continue anyway as this is just a backup
       }
       
-      // Use the exact redirect URI that is configured in Stripe Dashboard
-      const redirectUri = `${effectiveDomain}/api/stripe/oauth/callback`;
+      // Always use the exact redirect URI registered in Stripe Dashboard
+      const redirectUri = registeredRedirectUri;
+      log(`Using FIXED redirect URI: ${redirectUri}`, "stripe");
       log(`Using redirect URI: ${redirectUri}`, "stripe");
       
       // Create a direct Connect link with your Stripe client ID
@@ -266,16 +262,26 @@ export function setupStripeRoutes(app: Express) {
           encodeURIComponent('Network error when connecting to Stripe. Please try again.'));
       }
       
-      log(`OAuth token response: ${JSON.stringify(response)}`, "stripe");
+      console.error(`OAuth token response: ${JSON.stringify(response)}`);
+      log(`OAuth token response received`, "stripe");
+      
+      // Important: Verify we actually have a Stripe user ID in the response
+      if (!response.stripe_user_id) {
+        console.error("Missing stripe_user_id in OAuth response:", response);
+        return res.redirect('/payment-connections?error=true&message=' + 
+          encodeURIComponent('Invalid response from Stripe. The account ID was missing.'));
+      }
       
       // Extract the connected account ID
       const connectedAccountId = response.stripe_user_id as string;
+      console.error(`Connected account ID: ${connectedAccountId}`);
       
       // Store the account ID in multiple places for greater reliability
       
       // 1. Session storage (primary)
       (req.session as any).stripeAccountId = connectedAccountId;
       req.session.save();
+      console.error(`Saved account ID to session: ${connectedAccountId}`);
       
       // 2. Cookie (backup)
       res.cookie('stripe_account_id', connectedAccountId, { 
@@ -284,12 +290,14 @@ export function setupStripeRoutes(app: Express) {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax'
       });
+      console.error(`Saved account ID to cookie: ${connectedAccountId}`);
       
       // 3. File system (tertiary backup)
       try {
         // Don't use require in async contexts, it causes issues
         const { writeFileSync } = await import('fs');
         writeFileSync('recover-connection.txt', connectedAccountId);
+        console.error(`Saved account ID to file: ${connectedAccountId}`);
       } catch (err) {
         // Ignore file write errors
         console.error("Could not write recovery file:", err);
@@ -297,14 +305,24 @@ export function setupStripeRoutes(app: Express) {
       
       if (!req.isAuthenticated()) {
         // If user needs to log in, store the account ID in session and redirect to login
+        console.error("User not authenticated, redirecting to login");
         return res.redirect('/auth?message=' + encodeURIComponent('Please login to complete Stripe connection'));
       }
       
-      // Save the account ID to the user's record
-      await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
+      console.error(`User authenticated, updating Stripe account for user ${req.user.id}`);
       
-      // Redirect back to payment connections page with success
-      res.redirect('/payment-connections?success=true');
+      try {
+        // Save the account ID to the user's record
+        await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
+        console.error(`Successfully updated user record with Stripe account ID`);
+        
+        // Redirect back to payment connections page with success
+        res.redirect('/payment-connections?success=true');
+      } catch (dbError: any) {
+        console.error("Database error saving Stripe account:", dbError);
+        return res.redirect('/payment-connections?error=true&message=' + 
+          encodeURIComponent('Database error saving your Stripe account: ' + dbError.message));
+      }
     } catch (error: any) {
       log(`Stripe callback error: ${error.message}`, "stripe");
       console.error("Full OAuth error:", error);
