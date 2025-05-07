@@ -16,6 +16,47 @@ const stripe = new Stripe(stripeSecretKey, {
 });
 
 export function setupStripeRoutes(app: Express) {
+  // Log all stripe routes being registered
+  log("Setting up Stripe routes", "stripe");
+  
+  // List all available env vars for debugging (without revealing secrets)
+  const envVarKeys = Object.keys(process.env).filter(key => key.includes('STRIPE'));
+  log(`Available Stripe env vars: ${envVarKeys.join(', ')}`, "stripe");
+  // Test endpoint for Stripe API connectivity
+  app.get("/api/stripe/test-connection", async (req, res) => {
+    try {
+      // First test if we can make any HTTP request
+      log("Testing basic HTTP connectivity...", "stripe");
+      const testResponse = await fetch("https://httpbin.org/get");
+      const testData = await testResponse.json();
+      
+      // Now test Stripe API specifically
+      log("Testing Stripe API connectivity...", "stripe");
+      const account = await stripe.account.retrieve();
+      
+      res.json({
+        success: true,
+        httpTest: { 
+          success: true, 
+          statusCode: testResponse.status
+        },
+        stripeTest: {
+          success: true,
+          accountId: account.id,
+          detailsSubmitted: account.details_submitted,
+          chargesEnabled: account.charges_enabled
+        }
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Stripe connection test failed: ${errorMessage}`, "stripe");
+      res.status(500).json({
+        success: false,
+        error: errorMessage
+      });
+    }
+  });
+  
   // Get Stripe public key
   app.get("/api/stripe/config", (req, res) => {
     res.json({ publishableKey: process.env.VITE_STRIPE_PUBLIC_KEY });
