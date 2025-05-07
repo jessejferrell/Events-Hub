@@ -89,15 +89,15 @@ export default function VendorRegistrationPage() {
     }
   }, [vendorProfile]);
   
-  // Set up the form with default values from existing profile
+  // Set up the form with default values from existing profile or user profile
   const form = useForm<VendorFormValues>({
     resolver: zodResolver(vendorFormSchema),
     defaultValues: {
-      businessName: vendorProfile?.businessName || "",
+      businessName: vendorProfile?.businessName || user?.name || "",
       description: vendorProfile?.description || "",
       websiteUrl: vendorProfile?.websiteUrl || "",
       phoneNumber: vendorProfile?.phoneNumber || user?.phoneNumber || "",
-      preferredLocation: vendorProfile?.preferredLocation || "",
+      preferredLocation: vendorProfile?.preferredLocation || `${user?.city || ''}, ${user?.state || ''}`.trim(),
       needsElectricity: vendorProfile?.needsElectricity || false,
       needsWater: vendorProfile?.needsWater || false,
       specialRequirements: vendorProfile?.specialRequirements || "",

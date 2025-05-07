@@ -297,11 +297,25 @@ export default function CheckoutPage() {
           <Card className="mt-4">
             <CardHeader>
               <CardTitle>Customer Information</CardTitle>
+              <CardDescription>Your profile information will be used for this purchase</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <p><strong>Name:</strong> {user?.name || user?.username}</p>
                 <p><strong>Email:</strong> {user?.email}</p>
+                <p><strong>Phone:</strong> {user?.phoneNumber || 'Not provided'}</p>
+                
+                <div className="pt-2 border-t border-border mt-2">
+                  <p className="font-semibold mb-1">Shipping/Billing Address:</p>
+                  {user?.address ? (
+                    <div className="text-sm text-muted-foreground">
+                      <p>{user.address}</p>
+                      <p>{user.city}, {user.state} {user.zipCode}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No address provided</p>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

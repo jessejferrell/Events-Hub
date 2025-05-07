@@ -102,7 +102,7 @@ export default function VolunteerRegistrationPage() {
     }
   }, [volunteerProfile]);
   
-  // Set up the form with default values from existing profile
+  // Set up the form with default values from existing profile or user profile
   const form = useForm<VolunteerFormValues>({
     resolver: zodResolver(volunteerFormSchema),
     defaultValues: {
@@ -116,7 +116,8 @@ export default function VolunteerRegistrationPage() {
       emergencyContactName: volunteerProfile?.emergencyContactName || "",
       emergencyContactPhone: volunteerProfile?.emergencyContactPhone || "",
       tShirtSize: volunteerProfile?.tShirtSize || "",
-      specialAccommodations: volunteerProfile?.specialAccommodations || "",
+      specialAccommodations: volunteerProfile?.specialAccommodations || 
+                            (user?.address ? `Address: ${user.address}, ${user.city}, ${user.state} ${user.zipCode}` : ""),
       agreeToTerms: false,
     },
   });
