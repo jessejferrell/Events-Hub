@@ -29,7 +29,12 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Please enter a valid email"),
-  name: z.string().optional(),
+  name: z.string().min(2, "Full name is required"),
+  phoneNumber: z.string().min(10, "Valid phone number is required"),
+  address: z.string().min(3, "Street address is required"),
+  city: z.string().min(2, "City is required"),
+  state: z.string().min(2, "State is required"),
+  zipCode: z.string().min(5, "Valid zip code is required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(1, "Please confirm your password"),
 }).refine(data => data.password === data.confirmPassword, {
@@ -71,6 +76,11 @@ export default function AuthPage() {
       username: "",
       email: "",
       name: "",
+      phoneNumber: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
       password: "",
       confirmPassword: "",
     },
@@ -280,7 +290,7 @@ export default function AuthPage() {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Full Name (Optional)</FormLabel>
+                          <FormLabel>Full Name</FormLabel>
                           <FormControl>
                             <Input placeholder="John Doe" {...field} />
                           </FormControl>
@@ -288,6 +298,78 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="phoneNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="(123) 456-7890" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Street Address</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123 Main St" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Anytown" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={registerForm.control}
+                        name="state"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>State</FormLabel>
+                            <FormControl>
+                              <Input placeholder="State" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={registerForm.control}
+                        name="zipCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Zip Code</FormLabel>
+                            <FormControl>
+                              <Input placeholder="12345" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     
                     <FormField
                       control={registerForm.control}
