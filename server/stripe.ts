@@ -332,6 +332,20 @@ export function setupStripeRoutes(app: Express) {
   
   // DIRECT APPROACH: Ultra-simplified Stripe OAuth callback endpoint
   app.get("/api/stripe/oauth/callback", async (req, res) => {
+    // First, write everything to a file to ensure we capture it
+    try {
+      const fs = require('fs');
+      fs.writeFileSync('stripe-callback-debug.txt', 
+        `TIME: ${new Date().toISOString()}\n` +
+        `QUERY: ${JSON.stringify(req.query)}\n` +
+        `SESSION: ${req.sessionID}\n` +
+        `AUTH: ${req.isAuthenticated()}\n` +
+        `HEADERS: ${JSON.stringify(req.headers)}\n`
+      );
+    } catch (logErr) {
+      // Continue even if logging fails
+    }
+  
     try {
       // Use console.error to ensure messages appear in logs
       console.error("====== STRIPE OAUTH CALLBACK ======");
@@ -354,6 +368,17 @@ export function setupStripeRoutes(app: Express) {
       // Handle Stripe errors
       if (error) {
         console.error("ERROR FROM STRIPE:", error, error_description);
+        // Write error to specific file
+        try {
+          const fs = require('fs');
+          fs.writeFileSync('stripe-error.txt', 
+            `TIME: ${new Date().toISOString()}\n` +
+            `ERROR: ${error}\n` +
+            `DESCRIPTION: ${error_description}\n`
+          );
+        } catch (logErr) {
+          // Continue even if logging fails
+        }
         return res.redirect(`/payment-connections?error=true&message=${encodeURIComponent(error_description as string || 'Stripe authorization was denied')}`);
       }
       
