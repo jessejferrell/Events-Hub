@@ -57,6 +57,87 @@ export function setupStripeRoutes(app: Express) {
     }
   });
   
+  // DIRECT TEST: This endpoint specifically tests the OAuth token exchange
+  app.get("/api/stripe/test-oauth", async (req, res) => {
+    try {
+      // This is just a test endpoint - we're not using a real code
+      // Just testing if we can reach the token endpoint with our credentials
+      const clientId = process.env.STRIPE_CLIENT_ID;
+      const secretKey = process.env.STRIPE_SECRET_KEY;
+      
+      if (!clientId || !secretKey) {
+        return res.status(500).json({ 
+          success: false, 
+          error: "Missing credentials",
+          haveClientId: !!clientId,
+          haveSecretKey: !!secretKey 
+        });
+      }
+      
+      // Log credentials format but never the full values
+      console.log("Client ID format:", clientId.substring(0, 6) + "..." + clientId.substring(clientId.length - 4));
+      console.log("Secret key format:", secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
+      
+      // Try direct token endpoint call with just client_id (no auth code)
+      // This should fail, but with a specific error about missing code, not auth
+      const params = new URLSearchParams();
+      params.append('grant_type', 'authorization_code');
+      params.append('code', 'fake_code_for_testing');
+      params.append('client_id', clientId);
+      params.append('client_secret', secretKey);
+      
+      console.log("Making test token request");
+      
+      const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      });
+      
+      console.log("Got response status:", tokenResponse.status);
+      
+      const responseBody = await tokenResponse.text();
+      let parsedBody;
+      try {
+        parsedBody = JSON.parse(responseBody);
+      } catch (e) {
+        parsedBody = { unparseable: responseBody };
+      }
+      
+      const responseData = {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        body: parsedBody,
+        headers: Object.fromEntries([...tokenResponse.headers.entries()].map(([k,v]) => [k,v]))
+      };
+      
+      // Return full test results for debugging
+      return res.json({
+        success: true,
+        directTokenExchange: responseData,
+        clientIdFormat: {
+          prefix: clientId.substring(0, 6),
+          suffix: clientId.substring(clientId.length - 4),
+          length: clientId.length
+        },
+        secretKeyFormat: {
+          prefix: secretKey.substring(0, 6),
+          suffix: secretKey.substring(secretKey.length - 4),
+          length: secretKey.length
+        }
+      });
+    } catch (error) {
+      console.error("OAuth TEST FAILED:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        stack: error.stack
+      });
+    }
+  });
+  
   // Get Stripe public key
   app.get("/api/stripe/config", (req, res) => {
     res.json({ publishableKey: process.env.VITE_STRIPE_PUBLIC_KEY });
