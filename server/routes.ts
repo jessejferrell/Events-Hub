@@ -1512,24 +1512,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = parseInt(req.params.id);
       const { role } = req.body;
       
+      // Get user to update
+      const userToUpdate = await storage.getUser(userId);
+      if (!userToUpdate) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Validate role
       if (!["user", "event_owner", "vendor", "volunteer", "admin", "super_admin"].includes(role)) {
         return res.status(400).json({ message: "Invalid role" });
       }
       
-      // Check permissions:
-      // 1. Only super_admin can create another super_admin
-      // 2. Only super_admin can change an admin's role
-      if (role === "super_admin" || (await storage.getUser(userId))?.role === "admin") {
-        // Check if current user is super_admin
-        const isSuperAdmin = req.user.email === 'jessejferrell@gmail.com' || req.user.role === 'super_admin';
-        if (!isSuperAdmin) {
-          return res.status(403).json({
-            message: "Only super admins can create another super admin or modify admin roles"
-          });
-        }
+      // Check permissions with strong typing for super admin
+      const isSuperAdmin = req.user?.email === 'jessejferrell@gmail.com' || req.user?.role === 'super_admin';
+      
+      // Restricted operations that only super_admin can perform:
+      const isRestrictedOperation = 
+        role === "super_admin" || // Creating another super_admin
+        userToUpdate.role === "admin" || // Modifying an admin's role
+        userToUpdate.role === "super_admin"; // Modifying a super_admin's role
+      
+      if (isRestrictedOperation && !isSuperAdmin) {
+        return res.status(403).json({
+          message: "Only super admins can create/modify admin and super admin roles"
+        });
       }
       
+      // Self-protection: prevent admins from downgrading themselves
+      if (userId === req.user?.id && role !== "admin" && role !== "super_admin") {
+        return res.status(403).json({
+          message: "You cannot downgrade your own admin role"
+        });
+      }
+      
+      // Perform the update
       const updatedUser = await storage.updateUserRole(userId, role);
+      
+      // Create admin note to track role changes
+      await storage.createAdminNote({
+        adminId: req.user?.id || 1,
+        targetType: "user",
+        targetId: userId,
+        note: `User role changed from "${userToUpdate.role}" to "${role}" by ${req.user?.username || 'system'}`
+      });
+      
       // Remove password from response
       const { password, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
