@@ -204,8 +204,17 @@ export function setupStripeRoutes(app: Express) {
         
         // Construct the request body according to Stripe's API specification
         const params = new URLSearchParams();
+        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
+        params.append('client_id', clientId);
+        params.append('client_secret', secretKey);
         params.append('grant_type', 'authorization_code');
+        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
+        params.append('client_id', clientId);
+        params.append('client_secret', secretKey);
         params.append('code', code as string);
+        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
+        params.append('client_id', clientId);
+        params.append('client_secret', secretKey);
         
         // These are the required parameters for Stripe Connect token exchange
         const clientId = process.env.STRIPE_CLIENT_ID;
@@ -221,12 +230,15 @@ export function setupStripeRoutes(app: Express) {
         log(`Using Stripe client_id starting with: ${clientId.substring(0, 8)}...`, "stripe");
         log(`Using Stripe secret_key starting with: ${secretKey.substring(0, 8)}...`, "stripe");
         
+        // For API version 2019-02-19, client_id and client_secret should be in the body, not Authorization header
+        params.append("client_id", clientId);
+        params.append("client_secret", secretKey);
+        
         // Make direct request to Stripe's OAuth token endpoint
-        const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
-          method: 'POST',
+        const tokenResponse = await fetch("https://connect.stripe.com/oauth/token", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': `Bearer ${secretKey}`
+            "Content-Type": "application/x-www-form-urlencoded"
           },
           body: params.toString()
         });
@@ -393,8 +405,17 @@ export function setupStripeRoutes(app: Express) {
         
         // Construct the request body according to Stripe's API specification
         const params = new URLSearchParams();
+        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
+        params.append('client_id', clientId);
+        params.append('client_secret', secretKey);
         params.append('grant_type', 'authorization_code');
+        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
+        params.append('client_id', clientId);
+        params.append('client_secret', secretKey);
         params.append('code', code as string);
+        // Add client_id and client_secret to params directly (preferred method for API v2019-02-19)
+        params.append('client_id', clientId);
+        params.append('client_secret', secretKey);
         
         // These are the required parameters for Stripe Connect token exchange
         const clientId = process.env.STRIPE_CLIENT_ID;
