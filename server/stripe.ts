@@ -12,7 +12,7 @@ if (stripeSecretKey === "sk_test_example" || stripePublicKey === "pk_test_exampl
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2023-10-16" as "2023-10-16",
+  apiVersion: "2025-03-31.basil",
 });
 
 export function setupStripeRoutes(app: Express) {
@@ -970,8 +970,9 @@ export function setupStripeRoutes(app: Express) {
           } else {
             log(`PaymentIntent ${paymentIntent.id} has no user/event metadata, can't associate with records`, "stripe");
           }
-        } catch (error: any) {
-          log(`Error processing payment_intent.succeeded: ${error.message}`, "stripe");
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          log(`Error processing payment_intent.succeeded: ${errorMessage}`, "stripe");
         }
         break;
       }
@@ -1012,10 +1013,17 @@ export function setupStripeRoutes(app: Express) {
   });
 
   // Helper function to handle successful checkout
-  async function handleCheckoutSessionCompleted(session: any) {
+  async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
     try {
-      // Extract metadata
-      const { eventId, userId, quantity } = session.metadata;
+      const metadata = session.metadata as Record<string, string> || {};
+      const eventId = metadata.eventId;
+      const userId = metadata.userId;
+      const quantity = metadata.quantity || '1';
+      
+      if (!eventId || !userId) {
+        log(`Missing required metadata in session: ${JSON.stringify(metadata)}`, "stripe");
+        return;
+      }
       
       // Get the event
       const event = await storage.getEvent(parseInt(eventId));
@@ -1024,42 +1032,47 @@ export function setupStripeRoutes(app: Express) {
         return;
       }
       
-      // Create ticket record
-      const ticket = await storage.createTicket({
-        userId: parseInt(userId),
-        eventId: parseInt(eventId),
-        status: "purchased",
-        transactionId: session.payment_intent,
-        price: session.amount_total / 100, // convert from cents
-        // We use metadata for storing additional info since our schema might not have quantity
-        metadata: { quantity: parseInt(quantity) }
-      });
-      
-      // Create order record if needed for the ticket
-      const orderData = {
-        userId: parseInt(userId),
-        eventId: parseInt(eventId),
-        amount: session.amount_total / 100,
-        status: "completed",
-        paymentStatus: "paid",
-        stripePaymentId: session.payment_intent
-      };
-      
-      // The createPayment method might not exist, use appropriate DB operations
-      // based on your schema - this might be createOrder instead
+      // Create an order first
       try {
+        const paymentIntent = session.payment_intent as string;
+        const orderData = {
+          userId: parseInt(userId),
+          eventId: parseInt(eventId),
+          totalAmount: (session.amount_total || 0) / 100, // convert from cents
+          paymentMethod: 'stripe',
+          status: "completed",
+          paymentStatus: "paid",
+          stripePaymentId: paymentIntent,
+          stripeSessionId: session.id,
+          metadata: { 
+            checkoutSessionId: session.id,
+            quantity: parseInt(quantity)
+          }
+        };
+        
         const order = await storage.createOrder(orderData);
         log(`Order created: ${order.id} for event ${eventId}`, "stripe");
         
-        // Update ticket with order ID if needed
-        await storage.updateTicketStatus(ticket.id, "confirmed");
+        // Now create the ticket record
+        const ticket = await storage.createTicket({
+          userId: parseInt(userId),
+          eventId: parseInt(eventId),
+          orderId: order.id,
+          status: "confirmed",
+          price: (session.amount_total || 0) / 100, // convert from cents
+          ticketType: 'standard',
+          metadata: { 
+            quantity: parseInt(quantity),
+            checkoutSessionId: session.id
+          }
+        });
         
+        log(`Ticket purchased: ${ticket.id} for event ${eventId}`, "stripe");
       } catch (orderError: unknown) {
         const errorMessage = orderError instanceof Error ? orderError.message : String(orderError);
-        log(`Error creating order: ${errorMessage}`, "stripe");
+        log(`Error processing checkout: ${errorMessage}`, "stripe");
       }
       
-      log(`Ticket purchased: ${ticket.id} for event ${eventId}`, "stripe");
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       log(`Error handling checkout completion: ${errorMessage}`, "stripe");
