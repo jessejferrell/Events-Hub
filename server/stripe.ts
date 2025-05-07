@@ -185,9 +185,24 @@ export function setupStripeRoutes(app: Express) {
     const productionDomain = "https://events.mosspointmainstreet.org";
     const replitAppDomain = "https://events-manager.replit.app";
     
-    // THESE ARE THE EXACT WEBHOOK URLS THAT MUST BE REGISTERED IN STRIPE DASHBOARD
-    const prodWebhookUrl = `${productionDomain}/api/stripe/webhook`;
-    const devWebhookUrl = `${replitAppDomain}/api/stripe/webhook`;
+    // THESE ARE THE EXACT URLS THAT MUST BE REGISTERED IN STRIPE DASHBOARD
+    // FOR BOTH WEBHOOKS AND OAUTH REDIRECTS
+    const prodUrl = `${productionDomain}/api/stripe/webhook`;
+    const devUrl = `${replitAppDomain}/api/stripe/webhook`;
+    
+    // Generate sample OAuth URLs to verify
+    const stripeOAuthUrl = new URL('https://dashboard.stripe.com/oauth/authorize');
+    stripeOAuthUrl.searchParams.append('response_type', 'code');
+    stripeOAuthUrl.searchParams.append('client_id', clientId || 'CLIENT_ID');
+    stripeOAuthUrl.searchParams.append('scope', 'read_write');
+    
+    // In development mode
+    const devOAuthUrl = new URL(stripeOAuthUrl.toString());
+    devOAuthUrl.searchParams.append('redirect_uri', devUrl);
+    
+    // In production mode
+    const prodOAuthUrl = new URL(stripeOAuthUrl.toString());
+    prodOAuthUrl.searchParams.append('redirect_uri', prodUrl);
     
     res.json({
       clientId: clientId ? clientId.substring(0, 4) + '...' + clientId.substring(clientId.length - 4) : 'missing',
@@ -196,11 +211,14 @@ export function setupStripeRoutes(app: Express) {
       replitAppDomain,
       currentDomain: req.protocol + '://' + req.get('host'),
       replit_domains: process.env.REPLIT_DOMAINS || '',
-      // The EXACT webhook URLs to register in Stripe Dashboard
-      webhookUrls: [
-        prodWebhookUrl,
-        devWebhookUrl
-      ]
+      // The EXACT URLs to register in Stripe Dashboard for both Webhooks and OAuth redirects
+      registeredUrls: [
+        prodUrl,
+        devUrl
+      ],
+      // Sample OAuth URLs for verification (with sensitive data removed)
+      devOAuthUrlExample: devOAuthUrl.toString().replace(/client_id=[^&]+/, 'client_id=HIDDEN'),
+      prodOAuthUrlExample: prodOAuthUrl.toString().replace(/client_id=[^&]+/, 'client_id=HIDDEN')
     });
   });
 
@@ -237,19 +255,22 @@ export function setupStripeRoutes(app: Express) {
       const idPrefix = stripeClientId.substring(0, 8);
       log(`Using Stripe Client ID starting with: ${idPrefix}...`, "stripe");
 
-      // USING EXACTLY THE SAME URLs THAT ARE REGISTERED IN STRIPE DASHBOARD
+      // USING EXACTLY THE SAME URLs THAT ARE REGISTERED IN STRIPE DASHBOARD FOR BOTH WEBHOOKS AND OAUTH
       let registeredRedirectUri;
       
       // In development on Replit, use events-manager.replit.app
       if (process.env.NODE_ENV !== 'production') {
         // USING THE EXACT REGISTERED URL FROM STRIPE DASHBOARD
         registeredRedirectUri = "https://events-manager.replit.app/api/stripe/webhook";
-        log(`Using EXACT REGISTERED webhook URL: ${registeredRedirectUri}`, "stripe");
+        log(`Using EXACT REGISTERED URL: ${registeredRedirectUri}`, "stripe");
       } else {
         // In production, use the EXACT REGISTERED URL FROM STRIPE DASHBOARD
         registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/webhook";
-        log(`Using EXACT REGISTERED webhook URL: ${registeredRedirectUri}`, "stripe");
+        log(`Using EXACT REGISTERED URL: ${registeredRedirectUri}`, "stripe");
       }
+      
+      // Log a clear message about URLs
+      log(`CRITICAL: Using the EXACT same URL for both webhook endpoint AND OAuth redirect`, "stripe");
       
       // Generate a unique identifier based on user ID and timestamp
       // This will be stored to disk as a fallback mechanism
@@ -1131,193 +1152,284 @@ export function setupStripeRoutes(app: Express) {
     }
   });
 
-  // Webhook endpoint to handle Stripe events
-  app.post("/api/stripe/webhook", async (req, res) => {
-    const sig = req.headers["stripe-signature"] as string;
+  // THIS ENDPOINT HANDLES BOTH WEBHOOK EVENTS AND OAUTH CALLBACKS
+  // In Stripe Dashboard, this path must be registered for BOTH webhook events AND OAuth redirects
+  app.all("/api/stripe/webhook", async (req, res) => {
+    log(`Request to /api/stripe/webhook - Method: ${req.method}`, "stripe");
     
-    // Get the appropriate webhook secret based on host/domain
-    const mainWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET; // Primary domain (mosspointmainstreet.org)
-    const replitWebhookSecret = process.env.STRIPE_REPLIT_WEBHOOK_SECRET; // Replit domain
-    
-    if (!mainWebhookSecret || !replitWebhookSecret) {
-      log(`Missing webhook secrets. Main: ${Boolean(mainWebhookSecret)}, Replit: ${Boolean(replitWebhookSecret)}`, "stripe");
-      return res.status(500).json({ 
-        success: false,
-        error: "Server configuration error: Missing webhook secrets"
-      });
-    }
-    
-    // Determine which secret to use based on the host header or Forwarded header
-    const host = req.get('host') || '';
-    const forwardedHost = req.get('X-Forwarded-Host') || '';
-    const effectiveHost = forwardedHost || host;
-    
-    log(`Webhook received from host: ${effectiveHost}`, "stripe");
-    
-    // Select the appropriate webhook secret
-    let webhookSecret = mainWebhookSecret;
-    const isReplitDomain = effectiveHost.includes('replit.app');
-    
-    if (isReplitDomain) {
-      log(`Using Replit-specific webhook secret for domain: ${effectiveHost}`, "stripe");
-      webhookSecret = replitWebhookSecret;
-    } else {
-      log(`Using main domain webhook secret for domain: ${effectiveHost}`, "stripe");
-    }
-
-    let event;
-
-    try {
-      // Verify webhook signature with the appropriate secret
-      if (!sig) {
-        log(`Missing Stripe signature in webhook request`, "stripe");
-        return res.status(400).json({
-          received: false,
-          error: "Missing Stripe signature",
-          domain: effectiveHost
-        });
+    // Handle GET requests (OAuth callbacks)
+    if (req.method === 'GET') {
+      const { code, state } = req.query;
+      log(`OAuth callback received at /api/stripe/webhook: ${JSON.stringify({ code: code ? 'present' : 'missing', state: state ? 'present' : 'missing' })}`, "stripe");
+      
+      if (!code) {
+        log(`No authorization code in OAuth callback`, "stripe");
+        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Authorization failed or was denied'));
       }
-
-      if (webhookSecret) {
-        try {
-          // First try with the primary secret (selected based on domain)
-          event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-          log(`Webhook verified with primary secret for domain: ${effectiveHost}`, "stripe");
-        } catch (primaryErr: unknown) {
-          const primaryErrorMessage = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
-          log(`Primary webhook verification failed: ${primaryErrorMessage}`, "stripe");
-          
-          // Try the alternative secret as a fallback
-          const fallbackSecret = isReplitDomain ? mainWebhookSecret : replitWebhookSecret;
+      
+      // Validate state parameter if provided
+      if (state) {
+        // Get original state from session
+        const sessionState = (req.session as any).stripeConnectState;
+        
+        if (sessionState && sessionState !== state) {
+          log(`State validation failed. Expected: ${sessionState}, Received: ${state}`, "stripe");
+          return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Security verification failed'));
+        }
+        
+        // Clear state from session
+        if (sessionState) {
+          delete (req.session as any).stripeConnectState;
+          req.session.save();
+        }
+      }
+      
+      try {
+        // Exchange code for access token
+        const secretKey = process.env.STRIPE_SECRET_KEY;
+        
+        if (!secretKey) {
+          log(`Missing Stripe secret key`, "stripe");
+          return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Server configuration error'));
+        }
+        
+        // Create a fresh Stripe instance
+        const stripeClient = new Stripe(secretKey, {
+          apiVersion: "2025-04-30.basil",
+        });
+        
+        // Exchange the code for an access token
+        const response = await stripeClient.oauth.token({
+          grant_type: 'authorization_code',
+          code: code as string,
+        });
+        
+        log(`OAuth token exchange succeeded`, "stripe");
+        
+        if (!response.stripe_user_id) {
+          log(`Missing stripe_user_id in OAuth response`, "stripe");
+          return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Invalid response from Stripe'));
+        }
+        
+        const stripeAccountId = response.stripe_user_id;
+        
+        // If user is logged in, save to their profile
+        if (req.isAuthenticated()) {
+          log(`Updating user ${req.user.id} with Stripe account ID ${stripeAccountId}`, "stripe");
           
           try {
-            log(`Attempting verification with fallback webhook secret...`, "stripe");
-            event = stripe.webhooks.constructEvent(req.body, sig, fallbackSecret);
-            log(`Fallback webhook verification succeeded!`, "stripe");
-          } catch (fallbackErr: unknown) {
-            const fallbackErrorMessage = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-            log(`Fallback webhook verification also failed: ${fallbackErrorMessage}`, "stripe");
-            return res.status(400).json({
-              received: false,
-              error: "Webhook signature verification failed with both secrets",
-              primaryError: primaryErrorMessage,
-              fallbackError: fallbackErrorMessage,
-              domain: effectiveHost
-            });
+            await storage.updateUserStripeAccount(req.user.id, stripeAccountId);
+            return res.redirect('/payment-connections?success=true');
+          } catch (dbError: any) {
+            log(`Database error: ${dbError.message}`, "stripe");
+            return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Database error. Your account ID is: ' + stripeAccountId));
+          }
+        } else {
+          // Store the account ID in session and redirect to login
+          (req.session as any).pendingStripeAccountId = stripeAccountId;
+          req.session.save();
+          
+          return res.redirect('/auth?message=' + encodeURIComponent('Please log in to complete your Stripe connection'));
+        }
+      } catch (error: any) {
+        log(`OAuth error: ${error.message}`, "stripe");
+        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(error.message || 'An error occurred'));
+      }
+    }
+    // Handle POST requests (webhook events)
+    else if (req.method === 'POST') {
+      const sig = req.headers["stripe-signature"] as string;
+      
+      // Get the appropriate webhook secret based on host/domain
+      const mainWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET; // Primary domain (mosspointmainstreet.org)
+      const replitWebhookSecret = process.env.STRIPE_REPLIT_WEBHOOK_SECRET; // Replit domain
+      
+      if (!mainWebhookSecret || !replitWebhookSecret) {
+        log(`Missing webhook secrets. Main: ${Boolean(mainWebhookSecret)}, Replit: ${Boolean(replitWebhookSecret)}`, "stripe");
+        return res.status(500).json({ 
+          success: false,
+          error: "Server configuration error: Missing webhook secrets"
+        });
+      }
+      
+      // Determine which secret to use based on the host header or Forwarded header
+      const host = req.get('host') || '';
+      const forwardedHost = req.get('X-Forwarded-Host') || '';
+      const effectiveHost = forwardedHost || host;
+      
+      log(`Webhook received from host: ${effectiveHost}`, "stripe");
+      
+      // Select the appropriate webhook secret
+      let webhookSecret = mainWebhookSecret;
+      const isReplitDomain = effectiveHost.includes('replit.app');
+      
+      if (isReplitDomain) {
+        log(`Using Replit-specific webhook secret for domain: ${effectiveHost}`, "stripe");
+        webhookSecret = replitWebhookSecret;
+      } else {
+        log(`Using main domain webhook secret for domain: ${effectiveHost}`, "stripe");
+      }
+
+      let event;
+
+      try {
+        // Verify webhook signature with the appropriate secret
+        if (!sig) {
+          log(`Missing Stripe signature in webhook request`, "stripe");
+          return res.status(400).json({
+            received: false,
+            error: "Missing Stripe signature",
+            domain: effectiveHost
+          });
+        }
+
+        if (webhookSecret) {
+          try {
+            // First try with the primary secret (selected based on domain)
+            event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+            log(`Webhook verified with primary secret for domain: ${effectiveHost}`, "stripe");
+          } catch (primaryErr: unknown) {
+            const primaryErrorMessage = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+            log(`Primary webhook verification failed: ${primaryErrorMessage}`, "stripe");
+            
+            // Try the alternative secret as a fallback
+            const fallbackSecret = isReplitDomain ? mainWebhookSecret : replitWebhookSecret;
+            
+            try {
+              log(`Attempting verification with fallback webhook secret...`, "stripe");
+              event = stripe.webhooks.constructEvent(req.body, sig, fallbackSecret);
+              log(`Fallback webhook verification succeeded!`, "stripe");
+            } catch (fallbackErr: unknown) {
+              const fallbackErrorMessage = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+              log(`Fallback webhook verification also failed: ${fallbackErrorMessage}`, "stripe");
+              return res.status(400).json({
+                received: false,
+                error: "Webhook signature verification failed with both secrets",
+                primaryError: primaryErrorMessage,
+                fallbackError: fallbackErrorMessage,
+                domain: effectiveHost
+              });
+            }
+          }
+        } else {
+          // This should never happen due to our earlier check, but just in case
+          log(`ERROR: No webhook secret available for verification`, "stripe");
+          return res.status(500).json({ 
+            received: false,
+            error: "Server configuration error: No webhook secret available",
+            domain: effectiveHost
+          });
+        }
+
+        // Handle specific event types
+        switch (event.type) {
+          case "checkout.session.completed": {
+            const session = event.data.object;
+            await handleCheckoutSessionCompleted(session);
+            break;
+          }
+          case "payment_intent.succeeded": {
+            const paymentIntent = event.data.object;
+            log(`PaymentIntent succeeded: ${paymentIntent.id}`, "stripe");
+            
+            // Store detailed payment information
+            try {
+              // Extract metadata if available
+              const metadata = paymentIntent.metadata || {};
+              const userId = metadata.userId ? parseInt(metadata.userId) : null;
+              const eventId = metadata.eventId ? parseInt(metadata.eventId) : null;
+              
+              if (userId && eventId) {
+                // Record transaction details in analytics
+                await storage.recordAnalyticEvent({
+                  metric: "payment_success",
+                  value: paymentIntent.amount / 100, // Convert from cents
+                  eventId,
+                  dimension: "payment_type",
+                  dimensionValue: metadata.paymentType || "standard",
+                  metadata: {
+                    userId, // Store userId in metadata as it's not in the schema
+                    paymentId: paymentIntent.id,
+                    paymentMethod: paymentIntent.payment_method_types?.[0] || "card",
+                    currency: paymentIntent.currency,
+                    // PaymentIntent type doesn't have amount_refunded, use 0 as default
+                    amountRefunded: 0,
+                    receiptEmail: paymentIntent.receipt_email || null,
+                    description: paymentIntent.description || null,
+                    status: paymentIntent.status,
+                    timestamp: new Date().toISOString()
+                    // Don't store fullData to avoid bloating the database
+                  }
+                });
+                
+                log(`Recorded detailed payment analytics for user ${userId}, event ${eventId}`, "stripe");
+                
+                // Create admin note about payment
+                await storage.createAdminNote({
+                  adminId: 1, // System admin ID
+                  targetType: "event",
+                  targetId: eventId,
+                  note: `Payment of ${(paymentIntent.amount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()} received from user #${userId}`
+                });
+              } else {
+                log(`PaymentIntent ${paymentIntent.id} has no user/event metadata, can't associate with records`, "stripe");
+              }
+            } catch (error: unknown) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              log(`Error processing payment_intent.succeeded: ${errorMessage}`, "stripe");
+            }
+            break;
+          }
+          
+          // New handlers for Connect account verification
+          case "account.updated": {
+            // A connected account was updated, check verification status
+            const account = event.data.object;
+            log(`Connected Stripe account updated: ${account.id}`, "stripe");
+            await handleAccountUpdated(account);
+            break;
+          }
+          
+          case "account.application.deauthorized": {
+            // A user has deauthorized your application
+            const account = event.data.object;
+            log(`Stripe account deauthorized: ${account.id}`, "stripe");
+            await handleAccountDeauthorized(account);
+            break;
+          }
+          
+          case "account.external_account.created": {
+            // A bank account or card was added to a connected account
+            const externalAccount = event.data.object;
+            log(`External account added: ${externalAccount.id}`, "stripe");
+            break;
+          }
+          
+          case "account.external_account.updated": {
+            // A bank account or card was updated on a connected account
+            const externalAccount = event.data.object;
+            log(`External account updated: ${externalAccount.id}`, "stripe");
+            break;
           }
         }
-      } else {
-        // This should never happen due to our earlier check, but just in case
-        log(`ERROR: No webhook secret available for verification`, "stripe");
-        return res.status(500).json({ 
-          received: false,
-          error: "Server configuration error: No webhook secret available",
+
+        res.json({ received: true });
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        log(`Unexpected error during webhook processing: ${errorMessage}`, "stripe");
+        return res.status(500).json({
+          received: false, 
+          error: `Webhook processing error: ${errorMessage}`,
           domain: effectiveHost
         });
       }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      log(`Unexpected error during webhook processing: ${errorMessage}`, "stripe");
-      return res.status(500).json({
-        received: false, 
-        error: `Webhook processing error: ${errorMessage}`,
-        domain: effectiveHost
+    } else {
+      // Method not allowed
+      return res.status(405).json({ 
+        error: "Method not allowed",
+        allowedMethods: ["GET", "POST"]
       });
     }
-
-    // Handle specific event types
-    switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object;
-        await handleCheckoutSessionCompleted(session);
-        break;
-      }
-      case "payment_intent.succeeded": {
-        const paymentIntent = event.data.object;
-        log(`PaymentIntent succeeded: ${paymentIntent.id}`, "stripe");
-        
-        // Store detailed payment information
-        try {
-          // Extract metadata if available
-          const metadata = paymentIntent.metadata || {};
-          const userId = metadata.userId ? parseInt(metadata.userId) : null;
-          const eventId = metadata.eventId ? parseInt(metadata.eventId) : null;
-          
-          if (userId && eventId) {
-            // Record transaction details in analytics
-            await storage.recordAnalyticEvent({
-              metric: "payment_success",
-              value: paymentIntent.amount / 100, // Convert from cents
-              eventId,
-              dimension: "payment_type",
-              dimensionValue: metadata.paymentType || "standard",
-              metadata: {
-                userId, // Store userId in metadata as it's not in the schema
-                paymentId: paymentIntent.id,
-                paymentMethod: paymentIntent.payment_method_types?.[0] || "card",
-                currency: paymentIntent.currency,
-                // PaymentIntent type doesn't have amount_refunded, use 0 as default
-                amountRefunded: 0,
-                receiptEmail: paymentIntent.receipt_email || null,
-                description: paymentIntent.description || null,
-                status: paymentIntent.status,
-                timestamp: new Date().toISOString()
-                // Don't store fullData to avoid bloating the database
-              }
-            });
-            
-            log(`Recorded detailed payment analytics for user ${userId}, event ${eventId}`, "stripe");
-            
-            // Create admin note about payment
-            await storage.createAdminNote({
-              adminId: 1, // System admin ID
-              targetType: "event",
-              targetId: eventId,
-              note: `Payment of ${(paymentIntent.amount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()} received from user #${userId}`
-            });
-          } else {
-            log(`PaymentIntent ${paymentIntent.id} has no user/event metadata, can't associate with records`, "stripe");
-          }
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          log(`Error processing payment_intent.succeeded: ${errorMessage}`, "stripe");
-        }
-        break;
-      }
-      
-      // New handlers for Connect account verification
-      case "account.updated": {
-        // A connected account was updated, check verification status
-        const account = event.data.object;
-        log(`Connected Stripe account updated: ${account.id}`, "stripe");
-        await handleAccountUpdated(account);
-        break;
-      }
-      
-      case "account.application.deauthorized": {
-        // A user has deauthorized your application
-        const account = event.data.object;
-        log(`Stripe account deauthorized: ${account.id}`, "stripe");
-        await handleAccountDeauthorized(account);
-        break;
-      }
-      
-      case "account.external_account.created": {
-        // A bank account or card was added to a connected account
-        const externalAccount = event.data.object;
-        log(`External account added: ${externalAccount.id}`, "stripe");
-        break;
-      }
-      
-      case "account.external_account.updated": {
-        // A bank account or card was updated on a connected account
-        const externalAccount = event.data.object;
-        log(`External account updated: ${externalAccount.id}`, "stripe");
-        break;
-      }
-    }
-
-    res.json({ received: true });
   });
 
   // Helper function to handle successful checkout
