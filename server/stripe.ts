@@ -1503,6 +1503,188 @@ export function setupStripeRoutes(app: Express) {
     }
   }
   
+  // Direct API endpoint for token exchange - maximum debug
+  app.post("/api/stripe/direct-token-exchange", async (req, res) => {
+    try {
+      const { code } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ error: "Authorization code is required" });
+      }
+      
+      // Log the request details for debugging
+      console.log("==== DIRECT TOKEN EXCHANGE REQUEST ====");
+      console.log("Authorization Code:", code);
+      console.log("======================================");
+      
+      // Get credentials
+      const clientId = process.env.STRIPE_CLIENT_ID;
+      const secretKey = process.env.STRIPE_SECRET_KEY;
+      
+      if (!clientId || !secretKey) {
+        return res.status(500).json({ error: "Missing required Stripe credentials" });
+      }
+      
+      // Try multiple methods to get the token
+      
+      // First method: SDK approach
+      try {
+        console.log("Attempting token exchange using Stripe SDK...");
+        const freshStripe = new Stripe(secretKey, {
+          apiVersion: "2025-04-30.basil",
+        });
+        
+        const tokenResponse = await freshStripe.oauth.token({
+          grant_type: 'authorization_code',
+          code: code,
+        });
+        
+        console.log("SDK token response:", JSON.stringify(tokenResponse, null, 2));
+        
+        const connectedAccountId = tokenResponse.stripe_user_id;
+        
+        if (!connectedAccountId) {
+          console.error("No stripe_user_id in SDK response:", tokenResponse);
+          // Continue to next method instead of failing
+        } else {
+          // Success! Return the account ID
+          console.log("SDK approach successful - account ID:", connectedAccountId);
+          return res.json({
+            success: true,
+            method: "sdk",
+            accountId: connectedAccountId,
+            message: "Successfully retrieved Stripe account ID using SDK"
+          });
+        }
+      } catch (sdkError) {
+        console.log("SDK approach failed:", sdkError);
+        // Continue to next method instead of failing
+      }
+      
+      // Second method: Direct API approach using node-fetch
+      try {
+        console.log("Attempting token exchange using direct API...");
+        
+        // The OAuth token exchange endpoint
+        const tokenUrl = 'https://connect.stripe.com/oauth/token';
+        
+        // Data for the token request
+        const params = new URLSearchParams();
+        params.append('client_secret', secretKey);
+        params.append('grant_type', 'authorization_code');
+        params.append('code', code);
+        
+        console.log("Request URL:", tokenUrl);
+        console.log("Using key starting with:", secretKey.substring(0, 6) + "...");
+        
+        // Use fetch to make the request
+        const response = await fetch(tokenUrl, {
+          method: 'POST',
+          body: params,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Bearer ${secretKey}`,
+          },
+        });
+        
+        console.log("Raw response status:", response.status);
+        const responseText = await response.text();
+        console.log("Raw response text:", responseText);
+        
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error("Failed to parse response:", parseError);
+          responseData = { parse_error: true };
+        }
+        
+        if (!response.ok) {
+          console.error("Direct API approach failed with status:", response.status);
+          console.error("Response data:", responseData);
+          // Continue to next method instead of failing
+        } else {
+          // Extract the account ID from response
+          const connectedAccountId = responseData.stripe_user_id;
+          
+          if (!connectedAccountId) {
+            console.error("No stripe_user_id in direct API response:", responseData);
+            // Continue to next method
+          } else {
+            // Success! Return the account ID
+            console.log("Direct API approach successful - account ID:", connectedAccountId);
+            return res.json({
+              success: true,
+              method: "direct_api",
+              accountId: connectedAccountId,
+              message: "Successfully retrieved Stripe account ID using direct API"
+            });
+          }
+        }
+      } catch (directApiError) {
+        console.error("Direct API approach threw exception:", directApiError);
+        // Continue to next method
+      }
+      
+      // Third method: Direct API with cURL emulation
+      try {
+        console.log("Attempting token exchange using cURL approach...");
+        
+        // Convert code, CLIENT_ID, and SECRET_KEY to proper format
+        const formattedCode = encodeURIComponent(code);
+        
+        const curlCommand = `curl https://connect.stripe.com/oauth/token \
+-d client_secret=${secretKey} \
+-d grant_type=authorization_code \
+-d code=${formattedCode} \
+-H "Content-Type: application/x-www-form-urlencoded"`;
+        
+        console.log("Generated cURL command - sensitive info redacted");
+        
+        // Use Node's child_process to execute cURL
+        const { execSync } = require('child_process');
+        const curlOutput = execSync(curlCommand, { encoding: 'utf8' });
+        
+        console.log("cURL raw output:", curlOutput);
+        
+        let curlData;
+        try {
+          curlData = JSON.parse(curlOutput);
+        } catch (parseError) {
+          console.error("Failed to parse cURL output:", parseError);
+          throw new Error("Invalid JSON response from cURL");
+        }
+        
+        const connectedAccountId = curlData.stripe_user_id;
+        
+        if (!connectedAccountId) {
+          console.error("No stripe_user_id in cURL response:", curlData);
+          throw new Error("Missing stripe_user_id in cURL response");
+        }
+        
+        // Success! Return the account ID
+        console.log("cURL approach successful - account ID:", connectedAccountId);
+        return res.json({
+          success: true,
+          method: "curl",
+          accountId: connectedAccountId,
+          message: "Successfully retrieved Stripe account ID using cURL"
+        });
+      } catch (curlError) {
+        console.error("cURL approach failed:", curlError);
+      }
+      
+      // If we get here, all methods failed
+      return res.status(500).json({
+        error: "All token exchange methods failed",
+        message: "Failed to exchange code for token using multiple approaches"
+      });
+    } catch (error) {
+      console.error(`Error in direct token exchange: ${error.message}`, error);
+      return res.status(500).json({ error: error.message || "Unknown error occurred" });
+    }
+  });
+  
   // Helper function to find a user by stripe account ID
   async function findUserByStripeAccountId(stripeAccountId: string) {
     try {
