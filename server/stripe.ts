@@ -314,210 +314,146 @@ export function setupStripeRoutes(app: Express) {
     }
   });
   
-  // Enhanced Stripe OAuth callback endpoint with state validation
+  // SIMPLIFIED Stripe OAuth callback endpoint (complete rewrite)
   app.get("/api/stripe/oauth/callback", async (req, res) => {
     try {
-      console.log("**************************");
+      console.log("==============================================");
       console.log("STRIPE OAUTH CALLBACK RECEIVED");
       console.log("Query params:", JSON.stringify(req.query));
-      console.log("Headers:", JSON.stringify(req.headers, null, 2));
-      console.log("User authenticated:", req.isAuthenticated());
-      console.log("**************************");
+      console.log("==============================================");
       
-      const { code, state } = req.query;
+      const { code, error, error_description } = req.query;
       
-      // First, validate if there's any error from Stripe
-      if (!code) {
-        const error = req.query.error;
-        const errorDescription = req.query.error_description;
-        log(`OAuth error: ${error} - ${errorDescription}`, "stripe");
-        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(errorDescription as string || 'Authorization denied'));
-      }
-      
-      // CRITICAL: Validate the state parameter (CSRF protection)
-      // Try multiple methods to retrieve the original state
-      let originalState = null;
-      
-      // 1. First check session (primary storage)
-      const sessionState = (req.session as any).stripeConnectState;
-      if (sessionState) {
-        log(`Found state in session: ${sessionState}`, "stripe");
-        originalState = sessionState;
-      }
-      
-      // 2. Next check cookie (secondary storage)
-      if (!originalState) {
-        const cookieState = req.cookies?.stripe_connect_state;
-        if (cookieState) {
-          log(`Found state in cookie: ${cookieState}`, "stripe");
-          originalState = cookieState;
-        }
-      }
-      
-      // 3. Finally check file (tertiary backup)
-      if (!originalState) {
-        try {
-          // Don't use require in async contexts, it causes issues
-          const { existsSync, readFileSync } = await import('fs');
-          if (existsSync('./stripe-connect-state.txt')) {
-            originalState = readFileSync('./stripe-connect-state.txt', 'utf8').trim();
-            log(`Found state in filesystem: ${originalState}`, "stripe");
-          }
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          log(`Error reading state from file: ${errorMessage}`, "stripe");
-        }
-      }
-      
-      // If we have original state and it doesn't match, reject the request
-      if (originalState && originalState !== state) {
-        log(`State validation failed. Expected: ${originalState}, Received: ${state}`, "stripe");
-        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Security verification failed. Please try again.'));
-      }
-      
-      // Clean up state from storage
-      if (sessionState) {
-        delete (req.session as any).stripeConnectState;
-        req.session.save();
-      }
-      
-      if (req.cookies?.stripe_connect_state) {
-        res.clearCookie('stripe_connect_state');
-      }
-      
-      try {
-        // Don't use require in async contexts, it causes issues
-        const { existsSync, unlinkSync } = await import('fs');
-        if (existsSync('./stripe-connect-state.txt')) {
-          unlinkSync('./stripe-connect-state.txt');
-        }
-      } catch (err) {
-        // Ignore file deletion errors
-      }
-      
-      log(`State verified, exchanging authorization code for access token...`, "stripe");
-      
-      // Exchange the code for a Stripe account ID using direct fetch for more control
-      let response;
-      try {
-        // Use fetch API for direct control over the request
-        log(`Directly exchanging authorization code for access token...`, "stripe");
-        
-        // These are the required parameters for Stripe Connect token exchange
-        const clientId = process.env.STRIPE_CLIENT_ID;
-        const secretKey = process.env.STRIPE_SECRET_KEY;
-        
-        if (!clientId || !secretKey) {
-          log(`Missing required Stripe credentials`, "stripe");
-          return res.redirect('/payment-connections?error=true&message=' + 
-            encodeURIComponent('Server configuration error. Please contact support.'));
-        }
-        
-        // Construct the request body according to Stripe's API specification
-        const params = new URLSearchParams();
-        params.append('grant_type', 'authorization_code');
-        params.append('code', code as string);
-        // For API version 2019-02-19, client_id and client_secret should be in the body
-        params.append('client_id', clientId);
-        params.append('client_secret', secretKey);
-        
-        // Log some diagnostic information (first few characters only) 
-        log(`Using Stripe client_id starting with: ${clientId.substring(0, 8)}...`, "stripe");
-        log(`Using Stripe secret_key starting with: ${secretKey.substring(0, 8)}...`, "stripe");
-        
-        console.log("STRIPE DEBUG: Sending OAuth token request with params:", params.toString());
-        
-        // Make direct request to Stripe's OAuth token endpoint
-        const tokenResponse = await fetch("https://connect.stripe.com/oauth/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: params.toString()
-        });
-        
-        // Get the full response text for debugging
-        const responseText = await tokenResponse.text();
-        console.log("STRIPE DEBUG: Raw response from Stripe:", responseText);
-        
-        // Parse the response JSON (re-parse from text)
-        let responseData;
-        try {
-            responseData = JSON.parse(responseText);
-        } catch (e) {
-            console.error("STRIPE DEBUG: Failed to parse JSON response:", e);
-            throw new Error("Invalid response from Stripe: " + responseText);
-        }
-        
-        // Check if the response contains an error
-        if (!tokenResponse.ok) {
-          log(`Token exchange failed with status ${tokenResponse.status}: ${JSON.stringify(responseData)}`, "stripe");
-          
-          // Handle specific error types
-          if (responseData.error === 'invalid_grant') {
-            return res.redirect('/payment-connections?error=true&message=' + 
-              encodeURIComponent('Invalid authorization code. It may have expired or already been used.'));
-          }
-          
-          if (responseData.error === 'invalid_client') {
-            return res.redirect('/payment-connections?error=true&message=' + 
-              encodeURIComponent('Authentication failed. Please contact support.'));
-          }
-          
-          return res.redirect('/payment-connections?error=true&message=' + 
-            encodeURIComponent(responseData.error_description || 'Failed to connect with Stripe. Please try again.'));
-        }
-        
-        // Success - store the response
-        response = responseData;
-        log(`Successfully exchanged code for access token`, "stripe");
-      } catch (exchangeError: any) {
-        log(`Token exchange error: ${exchangeError.message}`, "stripe");
+      // Handle error from Stripe
+      if (error) {
+        console.log("Stripe returned an error:", error, error_description);
         return res.redirect('/payment-connections?error=true&message=' + 
-          encodeURIComponent('Network error when connecting to Stripe. Please try again.'));
+          encodeURIComponent((error_description as string) || 'Authorization denied'));
       }
       
-      // Extract the connected account ID
-      const connectedAccountId = response.stripe_user_id as string;
-      log(`Connected Account ID: ${connectedAccountId}`, "stripe");
+      // Validate authorization code
+      if (!code) {
+        console.log("No authorization code provided");
+        return res.redirect('/payment-connections?error=true&message=' + 
+          encodeURIComponent('No authorization code received. Please try again.'));
+      }
       
-      // Direct approach: use an HTML form that auto-submits to apply the connection
-      // This allows us to pass the Stripe account ID back to the client even if session is lost
-      return res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Completing Stripe Connection</title>
-          <style>
-            body { font-family: system-ui, sans-serif; text-align: center; padding-top: 50px; }
-            .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          </style>
-        </head>
-        <body>
-          <h2>Connecting your Stripe account...</h2>
-          <div class="loader"></div>
-          <p>Please don't close this window. You'll be redirected automatically.</p>
+      console.log("Authorization code received, proceeding with token exchange");
+      
+      // Get required credentials
+      const clientId = process.env.STRIPE_CLIENT_ID;
+      const secretKey = process.env.STRIPE_SECRET_KEY;
+      
+      // Validate credentials
+      if (!clientId || !secretKey) {
+        console.log("Missing Stripe credentials");
+        return res.redirect('/payment-connections?error=true&message=' + 
+          encodeURIComponent('Server configuration error. Please contact support.'));
+      }
+      
+      // Simple approach: use the Stripe SDK for token exchange
+      try {
+        console.log("Exchanging authorization code for access token...");
+        
+        // First try with Stripe SDK method
+        try {
+          // This might not work with old API version, but let's try it first
+          const response = await stripe.oauth.token({
+            grant_type: 'authorization_code',
+            code: code as string,
+          });
           
-          <form id="connectionForm" method="POST" action="/api/stripe/manual-connect">
-            <input type="hidden" name="stripeAccountId" value="${connectedAccountId}">
-          </form>
+          console.log("Successfully got token response via SDK");
           
-          <script>
-            // Submit the form automatically
-            document.addEventListener('DOMContentLoaded', function() {
-              setTimeout(function() {
-                document.getElementById('connectionForm').submit();
-              }, 1000);
-            });
-          </script>
-        </body>
-        </html>
-      `);
-    } catch (error: any) {
-      log(`OAuth callback error: ${error.message}`, "stripe");
-      console.error("OAuth error details:", error);
-      return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Connection error. Please try connecting again.'));
+          // If successful, save the account ID
+          const connectedAccountId = response.stripe_user_id;
+          
+          if (!connectedAccountId) {
+            throw new Error("No account ID in response");
+          }
+          
+          console.log("Connected account ID:", connectedAccountId);
+          
+          // Save to file for recovery
+          try {
+            const { writeFileSync } = await import('fs');
+            writeFileSync('recover-connection.txt', connectedAccountId);
+          } catch (err) {
+            console.error("Could not write recovery file:", err);
+          }
+          
+          // Check if user is authenticated
+          if (req.isAuthenticated()) {
+            console.log("User is authenticated, saving account ID");
+            await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
+            return res.redirect('/payment-connections?success=true');
+          } else {
+            console.log("User is NOT authenticated, redirecting to login");
+            // Use a simpler approach - just redirect with a parameter
+            return res.redirect('/auth?redirect=/payment-connections&stripeConnected=true');
+          }
+        } catch (sdkError) {
+          console.error("SDK method failed, trying manual approach:", sdkError);
+          
+          // Fallback to direct API call
+          const params = new URLSearchParams();
+          params.append('grant_type', 'authorization_code');
+          params.append('code', code as string);
+          params.append('client_id', clientId);
+          params.append('client_secret', secretKey);
+          
+          console.log("Request parameters:", params.toString());
+          
+          const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+          });
+          
+          const responseText = await tokenResponse.text();
+          console.log("Raw response:", responseText);
+          
+          if (!tokenResponse.ok) {
+            throw new Error(`Token exchange failed (${tokenResponse.status}): ${responseText}`);
+          }
+          
+          const responseData = JSON.parse(responseText);
+          const connectedAccountId = responseData.stripe_user_id;
+          
+          if (!connectedAccountId) {
+            throw new Error("No account ID in response");
+          }
+          
+          console.log("Connected account ID:", connectedAccountId);
+          
+          // Save to file for recovery
+          try {
+            const { writeFileSync } = await import('fs');
+            writeFileSync('recover-connection.txt', connectedAccountId);
+          } catch (err) {
+            console.error("Could not write recovery file:", err);
+          }
+          
+          // Check if user is authenticated
+          if (req.isAuthenticated()) {
+            console.log("User is authenticated, saving account ID");
+            await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
+            return res.redirect('/payment-connections?success=true');
+          } else {
+            console.log("User is NOT authenticated, redirecting to login");
+            // Use a simpler approach - just redirect with a parameter
+            return res.redirect('/auth?redirect=/payment-connections&stripeConnected=true');
+          }
+        }
+      } catch (exchangeError) {
+        console.error("Token exchange error:", exchangeError);
+        return res.redirect('/payment-connections?error=true&message=' + 
+          encodeURIComponent('Failed to connect with Stripe. Please try again.'));
+      }
+    } catch (error) {
+      console.error("Unhandled error in OAuth callback:", error);
+      return res.redirect('/payment-connections?error=true&message=' + 
+        encodeURIComponent('An unexpected error occurred. Please try again.'));
     }
   });
 
