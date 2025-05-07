@@ -213,12 +213,12 @@ export function setupStripeRoutes(app: Express) {
       
       // In development on Replit, use events-manager.replit.app
       if (process.env.NODE_ENV !== 'production') {
-        // Using Replit domain with the exactly registered path in Stripe dashboard
-        registeredRedirectUri = "https://events-manager.replit.app/stripe-callback";
+        // Using the EXACT Replit domain and path registered in Stripe Connect dashboard
+        registeredRedirectUri = "https://events-manager.replit.app/api/stripe/oauth/callback";
         log(`Using Replit app redirect URI: ${registeredRedirectUri}`, "stripe");
       } else {
-        // In production, use the production domain with exactly registered path
-        registeredRedirectUri = "https://events.mosspointmainstreet.org/stripe-callback";
+        // In production, use the EXACT production domain path registered in Stripe Connect
+        registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/oauth/callback";
         log(`Using production redirect URI: ${registeredRedirectUri}`, "stripe");
       }
       
