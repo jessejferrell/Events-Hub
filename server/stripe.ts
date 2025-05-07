@@ -354,78 +354,62 @@ export function setupStripeRoutes(app: Express) {
         }
       }
       
-      // Exchange the code for a Stripe account ID using direct fetch for more control
+      // Exchange the code for a Stripe account ID using the Stripe SDK
       let response;
       try {
-        // Use fetch API for direct control over the request
-        log(`Directly exchanging authorization code for access token...`, "stripe");
+        log(`Exchanging authorization code for access token using Stripe SDK...`, "stripe");
         
         // Get credentials
-        const clientId = process.env.STRIPE_CLIENT_ID;
         const secretKey = process.env.STRIPE_SECRET_KEY;
         
-        // Construct the request body according to Stripe's API specification
-        const params = new URLSearchParams();
-        params.append("grant_type", "authorization_code");
-        params.append("code", code as string);
-        // For API version 2019-02-19, client_id and client_secret should be in the body
-        params.append("client_id", clientId || "");
-        params.append("client_secret", secretKey || "");
-        
-        if (!clientId || !secretKey) {
+        if (!secretKey) {
           log(`Missing required Stripe credentials`, "stripe");
           return res.redirect('/payment-connections?error=true&message=' + 
             encodeURIComponent('Server configuration error. Please contact support.'));
         }
         
-        // Log some diagnostic information (first few characters only)
-        log(`Using Stripe client_id starting with: ${clientId.substring(0, 8)}...`, "stripe");
+        // Log some diagnostic information (first few chars only)
         log(`Using Stripe secret_key starting with: ${secretKey.substring(0, 8)}...`, "stripe");
         
-        // NOTE: We already added these to the params above, don't add them twice
-        
-        // For OAuth token exchange, Stripe expects the parameters in the body
-        // The client ID should not be used as an API key for Basic Auth
-        // According to OAuth spec, client_id and client_secret should be in the body
-        
-        // Make direct request to Stripe's OAuth token endpoint
-        const tokenResponse = await fetch("https://connect.stripe.com/oauth/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: params.toString()
+        // Create a fresh Stripe instance with latest key
+        const freshStripe = new Stripe(secretKey, {
+          apiVersion: "2025-04-30.basil",
         });
         
-        // Parse the response
-        const responseData = await tokenResponse.json();
+        log(`Created fresh Stripe instance for token exchange`, "stripe");
         
-        // Check if the response contains an error
-        if (!tokenResponse.ok) {
-          log(`Token exchange failed with status ${tokenResponse.status}: ${JSON.stringify(responseData)}`, "stripe");
+        // Use Stripe SDK to exchange the authorization code for an access token
+        try {
+          // SDK handles all the authentication and request formatting for us
+          const tokenResponse = await freshStripe.oauth.token({
+            grant_type: 'authorization_code',
+            code: code as string,
+          });
           
-          // Handle specific error types
-          if (responseData.error === 'invalid_grant') {
+          // Success! Store the response
+          log(`SDK token exchange succeeded: ${JSON.stringify(tokenResponse)}`, "stripe");
+          response = tokenResponse;
+        } catch (sdkError: any) {
+          log(`SDK token exchange failed: ${sdkError.message}`, "stripe");
+          
+          // Handle specific error types from Stripe error object
+          if (sdkError.code === 'invalid_grant') {
             return res.redirect('/payment-connections?error=true&message=' + 
               encodeURIComponent('Invalid authorization code. It may have expired or already been used.'));
           }
           
-          if (responseData.error === 'invalid_client') {
+          if (sdkError.code === 'invalid_client') {
             return res.redirect('/payment-connections?error=true&message=' + 
               encodeURIComponent('Authentication failed. Please contact support.'));
           }
           
           return res.redirect('/payment-connections?error=true&message=' + 
-            encodeURIComponent(responseData.error_description || 'Failed to connect with Stripe. Please try again.'));
+            encodeURIComponent(sdkError.message || 'Failed to connect with Stripe. Please try again.'));
         }
-        
-        // Success - store the response
-        response = responseData;
-        log(`Successfully exchanged code for access token`, "stripe");
       } catch (exchangeError: any) {
-        log(`Token exchange error: ${exchangeError.message}`, "stripe");
+        log(`Critical error during token exchange: ${exchangeError.message}`, "stripe");
         return res.redirect('/payment-connections?error=true&message=' + 
-          encodeURIComponent('Network error when connecting to Stripe. Please try again.'));
+          encodeURIComponent('Error connecting to Stripe. Please try again.'));
       }
       
       console.error(`OAuth token response: ${JSON.stringify(response)}`);
