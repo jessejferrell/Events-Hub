@@ -20,11 +20,6 @@ export default function Footer() {
             <p className="text-sm text-gray-600 mb-4">
               Your one-stop platform for discovering, creating, and managing local events in your community.
             </p>
-            <p className="text-sm text-gray-600 mb-4">
-              <a href="https://experiencedresults.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                Visit Experienced Results
-              </a>
-            </p>
             <div className="flex space-x-4 mt-4">
               <a href="https://www.facebook.com/ExperiencedResults" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
                 <Facebook className="h-5 w-5" />
@@ -95,7 +90,9 @@ export default function Footer() {
             <div className="space-y-3 text-sm">
               <div className="flex items-center">
                 <Mail className="h-5 w-5 text-primary mr-2" />
-                <span className="text-gray-600">events@mosspointmainstreet.org</span>
+                <a href="mailto:events@mosspointmainstreet.org" className="text-gray-600 hover:text-primary">
+                  events@mosspointmainstreet.org
+                </a>
               </div>
             </div>
           </div>
