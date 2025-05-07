@@ -73,9 +73,33 @@ export default function PaymentConnectionsPage() {
   const handleConnectStripe = () => {
     setIsRedirecting(true);
     
+    // Capture the time we started the connection attempt (for debugging)
+    const startTime = new Date().toISOString();
+    console.log(`[${startTime}] Starting Stripe connect flow`);
+    
     fetch("/api/stripe/connect")
-      .then(res => res.json())
+      .then(res => {
+        console.log(`[${new Date().toISOString()}] Received response: ${res.status} ${res.statusText}`);
+        
+        // If there's an error, try to extract it properly
+        if (!res.ok) {
+          return res.text().then(text => {
+            try {
+              // Try to parse as JSON
+              const errorJson = JSON.parse(text);
+              throw new Error(errorJson.message || `Error ${res.status}: ${res.statusText}`);
+            } catch (e) {
+              // If not valid JSON, use text directly
+              throw new Error(`Error ${res.status}: ${text || res.statusText}`);
+            }
+          });
+        }
+        
+        return res.json();
+      })
       .then(data => {
+        console.log(`[${new Date().toISOString()}] Parsed data:`, data);
+        
         if (data.connected) {
           // Already connected
           toast({
@@ -85,19 +109,26 @@ export default function PaymentConnectionsPage() {
           refetchStatus();
           setIsRedirecting(false);
         } else if (data.url) {
+          // Log the redirect URL we're going to (except sensitive parts)
+          const urlObj = new URL(data.url);
+          const sanitizedUrl = `${urlObj.origin}${urlObj.pathname}?...params-hidden...`;
+          console.log(`[${new Date().toISOString()}] Redirecting to: ${sanitizedUrl}`);
+          
           // Redirect to Stripe Connect OAuth
           window.location.href = data.url;
         } else {
           // Something went wrong
+          console.error(`[${new Date().toISOString()}] Invalid response:`, data);
           toast({
             title: "Connection error",
-            description: data.message || "Could not connect to Stripe.",
+            description: data.message || "Could not connect to Stripe. Invalid response format.",
             variant: "destructive",
           });
           setIsRedirecting(false);
         }
       })
       .catch(error => {
+        console.error(`[${new Date().toISOString()}] Connection error:`, error);
         toast({
           title: "Connection error",
           description: error.message || "Could not connect to Stripe.",

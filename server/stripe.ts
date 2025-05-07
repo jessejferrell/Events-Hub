@@ -12,7 +12,7 @@ if (stripeSecretKey === "sk_test_example" || stripePublicKey === "pk_test_exampl
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2019-02-19",
+  apiVersion: "2023-10-16", // Updated to a current API version
 });
 
 export function setupStripeRoutes(app: Express) {
