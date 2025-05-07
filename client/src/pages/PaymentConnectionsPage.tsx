@@ -158,36 +158,52 @@ export default function PaymentConnectionsPage() {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const error = searchParams.get("error");
+    const warning = searchParams.get("warning");
     
     // If there's an error in the URL but we know the connection was actually made,
     // this is a false error from session issues
-    if (error === "true" && connectionStatus?.connected) {
+    if ((error === "true" || warning === "true") && connectionStatus?.connected) {
       // Clean up URL and show success message instead
       window.history.replaceState({}, document.title, window.location.pathname);
       toast({
         title: "Connection successful",
-        description: "Your Stripe account was actually connected successfully! The error was incorrect.",
+        description: "Your Stripe account was connected successfully despite the error message!",
       });
     }
   }, [toast, connectionStatus?.connected]);
   
-  // Automatically try recovery if there's an error in the URL parameters
+  // Automatically try recovery if there's an error or warning in the URL parameters
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const error = searchParams.get("error");
+    const warning = searchParams.get("warning");
     
-    // If there's an error in the URL and we're not already connected,
-    // automatically attempt recovery once
-    if (error === "true" && !connectionStatus?.connected && !isRecovering) {
-      // Wait a moment to let things settle before trying recovery
+    // If there's an error or warning in the URL and we're not already connected,
+    // automatically attempt recovery right away
+    if ((error === "true" || warning === "true") && !connectionStatus?.connected && !isRecovering) {
+      // Attempt recovery immediately after page loads
+      console.log("Auto-attempting connection recovery...");
+      // Set a short timeout to make sure component is fully mounted
       const timer = setTimeout(() => {
-        console.log("Auto-attempting connection recovery...");
         handleRecoverConnection();
-      }, 1000);
+      }, 300);
       
       return () => clearTimeout(timer);
     }
-  }, [connectionStatus?.connected, window.location.search]);
+  }, [connectionStatus?.connected, isRecovering]);
+  
+  // Always check for a recovery file on page load, even without error parameters
+  useEffect(() => {
+    // Only run once on initial page load and only if not connected
+    if (!connectionStatus?.connected && !isRecovering) {
+      // Delay slightly to let other components load
+      const timer = setTimeout(() => {
+        handleRecoverConnection();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const isConnected = connectionStatus?.connected;
   
