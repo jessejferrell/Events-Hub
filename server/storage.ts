@@ -12,7 +12,8 @@ import {
   volunteerShifts, type VolunteerShift, type InsertVolunteerShift,
   volunteerAssignments, type VolunteerAssignment, type InsertVolunteerAssignment,
   adminNotes, type AdminNote, type InsertAdminNote,
-  analytics, type Analytics, type InsertAnalytics
+  analytics, type Analytics, type InsertAnalytics,
+  userOnboarding, type UserOnboarding, type InsertUserOnboarding
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -27,6 +28,10 @@ const MemoryStore = createMemoryStore(session);
 
 // Interface for the storage operations
 export interface IStorage {
+  // Onboarding operations
+  getUserOnboarding(userId: number): Promise<UserOnboarding | undefined>;
+  updateUserOnboarding(userId: number, data: Partial<UserOnboarding>): Promise<UserOnboarding>;
+  createUserOnboarding(userId: number): Promise<UserOnboarding>;
   // Session store
   sessionStore: session.Store;
 
@@ -146,6 +151,53 @@ export class DatabaseStorage implements IStorage {
       tableName: 'session' 
     });
     log("Database storage initialized", "storage");
+  }
+
+  // === ONBOARDING OPERATIONS ===
+  
+  async getUserOnboarding(userId: number): Promise<UserOnboarding | undefined> {
+    const result = await db
+      .select()
+      .from(userOnboarding)
+      .where(eq(userOnboarding.userId, userId));
+    return result[0];
+  }
+
+  async updateUserOnboarding(userId: number, data: Partial<UserOnboarding>): Promise<UserOnboarding> {
+    // First check if onboarding data exists
+    const existingData = await this.getUserOnboarding(userId);
+    
+    if (!existingData) {
+      // Create new onboarding record if it doesn't exist
+      return this.createUserOnboarding(userId, data);
+    }
+    
+    // Update existing record
+    const result = await db
+      .update(userOnboarding)
+      .set({ 
+        ...data, 
+        updatedAt: new Date() 
+      })
+      .where(eq(userOnboarding.userId, userId))
+      .returning();
+    
+    return result[0];
+  }
+
+  async createUserOnboarding(userId: number, data: Partial<UserOnboarding> = {}): Promise<UserOnboarding> {
+    const result = await db
+      .insert(userOnboarding)
+      .values({
+        userId,
+        completedSteps: data.completedSteps || {},
+        dismissedTooltips: data.dismissedTooltips || {},
+        onboardingComplete: data.onboardingComplete || false,
+        lastStep: data.lastStep || null,
+      })
+      .returning();
+    
+    return result[0];
   }
 
   // === USER OPERATIONS ===

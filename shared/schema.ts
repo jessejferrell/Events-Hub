@@ -25,13 +25,39 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const userRelations = relations(users, ({ many }) => ({
+// User Onboarding model
+export const userOnboarding = pgTable("user_onboarding", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  completedSteps: jsonb("completed_steps").default({}).notNull(), // JSON object with completed onboarding steps
+  dismissedTooltips: jsonb("dismissed_tooltips").default({}).notNull(), // JSON object with tooltips the user has dismissed
+  onboardingComplete: boolean("onboarding_complete").default(false).notNull(),
+  lastStep: text("last_step"), // Last onboarding step the user was on
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userOnboardingRelations = relations(userOnboarding, ({ one }) => ({
+  user: one(users, {
+    fields: [userOnboarding.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertUserOnboardingSchema = createInsertSchema(userOnboarding).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const userRelations = relations(users, ({ many, one }) => ({
   tickets: many(tickets),
   vendorProfiles: many(vendorProfiles),
   volunteerProfiles: many(volunteerProfiles),
   orders: many(orders),
   adminNotes: many(adminNotes, { relationName: "userNotes" }),
   createdNotes: many(adminNotes, { relationName: "adminCreatedNotes" }),
+  onboarding: one(userOnboarding),
 }));
 
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -515,6 +541,9 @@ export const insertAnalyticsSchema = createInsertSchema(analytics).omit({
 // Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type UserOnboarding = typeof userOnboarding.$inferSelect;
+export type InsertUserOnboarding = z.infer<typeof insertUserOnboardingSchema>;
 
 export type Event = typeof events.$inferSelect;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
