@@ -1598,11 +1598,14 @@ export default function AdminDashboardPage() {
             
             {/* User Detail Dialog */}
             <Dialog open={showUserDetail} onOpenChange={setShowUserDetail}>
-              <DialogContent className="max-w-4xl">
+              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
                 {selectedUser && (
                   <>
                     <DialogHeader>
                       <DialogTitle>User Details</DialogTitle>
+                      <DialogDescription>
+                        Comprehensive user information including profile, vendor/volunteer data, and transaction history
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* Basic User Info */}
