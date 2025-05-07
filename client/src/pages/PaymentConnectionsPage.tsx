@@ -155,25 +155,8 @@ export default function PaymentConnectionsPage() {
     }
   }, [toast, connectionStatus?.connected]);
   
-  // Automatically try recovery if there's an error or warning in the URL parameters
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const error = searchParams.get("error");
-    const warning = searchParams.get("warning");
-    
-    // If there's an error or warning in the URL and we're not already connected,
-    // automatically attempt recovery right away
-    if ((error === "true" || warning === "true") && !connectionStatus?.connected && !isRecovering) {
-      // Attempt recovery immediately after page loads
-      console.log("Auto-attempting connection recovery...");
-      // Set a short timeout to make sure component is fully mounted
-      const timer = setTimeout(() => {
-        handleRecoverConnection();
-      }, 300);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [connectionStatus?.connected, isRecovering]);
+  // REMOVED: Automatic recovery attempt that was running constantly and causing issues
+  // Now users need to explicitly click the "Recover Connection" button when needed
   
   // REMOVED automatic connection recovery which was causing unwanted popups
   // User can now manually click "Recover Connection" button if needed

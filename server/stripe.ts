@@ -630,10 +630,14 @@ export function setupStripeRoutes(app: Express) {
       // PRIORITY 1: Check the filesystem for a saved Stripe account ID
       // This is the most reliable method
       try {
-        // Don't use require in async contexts, it causes issues
-        const { existsSync, readFileSync } = await import('fs');
-        if (existsSync('./recover-connection.txt')) {
-          const savedAccountId = readFileSync('./recover-connection.txt', 'utf8').trim();
+        // Don't use require or dynamic imports in Express handler code
+        // Use synchronous file methods with full path to avoid path resolution issues
+        const fs = await import('fs');
+        const path = await import('path');
+        const filePath = path.resolve('./recover-connection.txt');
+        
+        if (fs.existsSync(filePath)) {
+          const savedAccountId = fs.readFileSync(filePath, 'utf8').trim();
           
           if (savedAccountId && savedAccountId.startsWith('acct_')) {
             log(`Found saved account ID in recovery file: ${savedAccountId}`, "stripe");
