@@ -25,7 +25,7 @@ import {
   Filter,
   RefreshCw,
   FileText,
-  Trash as TrashIcon,
+  Trash,
   Edit,
   Eye,
   AlertTriangle,
@@ -34,7 +34,7 @@ import {
   CheckCircle,
   XCircle,
   Copy,
-  Pencil as PencilIcon
+  Pencil
 } from "lucide-react";
 import {
   BarChart,
@@ -1974,14 +1974,14 @@ export default function AdminDashboardPage() {
                                             className="text-blue-500 hover:text-blue-700"
                                             title="Edit note"
                                           >
-                                            <PencilIcon className="h-3 w-3" />
+                                            <Pencil className="h-3 w-3" />
                                           </button>
                                           <button 
                                             onClick={() => deleteUserNoteMutation.mutate(note.id)}
                                             className="text-red-500 hover:text-red-700"
                                             title="Delete note"
                                           >
-                                            <TrashIcon className="h-3 w-3" />
+                                            <Trash className="h-3 w-3" />
                                           </button>
                                         </div>
                                       </div>
