@@ -12,7 +12,7 @@ if (stripeSecretKey === "sk_test_example" || stripePublicKey === "pk_test_exampl
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2019-02-19", // Must match webhook API version
+  apiVersion: "2025-04-30.basil", // Updated to latest API version
 });
 
 export function setupStripeRoutes(app: Express) {
@@ -32,7 +32,7 @@ export function setupStripeRoutes(app: Express) {
       
       // Now test Stripe API specifically
       log("Testing Stripe API connectivity...", "stripe");
-      const account = await stripe.account.retrieve();
+      const account = await stripe.accounts.retrieve();
       
       res.json({
         success: true,
