@@ -20,6 +20,11 @@ export default function Footer() {
             <p className="text-sm text-gray-600 mb-4">
               Your one-stop platform for discovering, creating, and managing local events in your community.
             </p>
+            <p className="text-sm text-gray-600 mb-4">
+              <a href="https://experiencedresults.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                Visit Experienced Results
+              </a>
+            </p>
             <div className="flex space-x-4 mt-4">
               <a href="https://www.facebook.com/ExperiencedResults" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary transition-colors">
                 <Facebook className="h-5 w-5" />
@@ -101,9 +106,9 @@ export default function Footer() {
       <div className="border-t border-gray-200">
         <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
           <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
-            <span>&copy; {new Date().getFullYear()} Experienced Results. All rights reserved.</span>
+            <span>&copy; {new Date().getFullYear()} <a href="https://experiencedresults.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary">Experienced Results</a>. All rights reserved.</span>
             <span className="hidden md:inline">|</span>
-            <span>Designed & Managed by Experienced Results</span>
+            <span>Designed & Managed by <a href="https://experiencedresults.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary">Experienced Results</a></span>
           </div>
           <div className="flex mt-2 md:mt-0 space-x-6">
             <Link href="/privacy" className="hover:text-primary transition-colors">
