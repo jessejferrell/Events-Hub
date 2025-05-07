@@ -22,6 +22,7 @@ import UserProfilePage from "@/pages/UserProfilePage";
 import EmailNotificationsPage from "@/pages/EmailNotificationsPage";
 import PrivacyPolicyPage from "@/pages/PrivacyPolicyPage";
 import TermsOfServicePage from "@/pages/TermsOfServicePage";
+import CookiesPage from "@/pages/CookiesPage";
 
 function Router() {
   return (
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/events/:id" component={EventDetailsPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfServicePage} />
+      <Route path="/cookies" component={CookiesPage} />
       
       {/* Basic user features - any logged in user */}
       <ProtectedRoute path="/profile" component={UserProfilePage} />
