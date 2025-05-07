@@ -822,8 +822,26 @@ export function setupStripeRoutes(app: Express) {
   // Webhook endpoint to handle Stripe events
   app.post("/api/stripe/webhook", async (req, res) => {
     const sig = req.headers["stripe-signature"] as string;
-    // Get webhook secret from environment
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    
+    // Get the appropriate webhook secret based on host/domain
+    const mainWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET; // Primary domain (mosspointmainstreet.org)
+    const replitWebhookSecret = process.env.STRIPE_REPLIT_WEBHOOK_SECRET; // Replit domain
+    
+    // Determine which secret to use based on the host header or Forwarded header
+    const host = req.get('host') || '';
+    const forwardedHost = req.get('X-Forwarded-Host') || '';
+    const effectiveHost = forwardedHost || host;
+    
+    log(`Webhook received from host: ${effectiveHost}`, "stripe");
+    
+    // Select the appropriate webhook secret
+    let webhookSecret = mainWebhookSecret;
+    if (effectiveHost.includes('replit.app')) {
+      log(`Using Replit-specific webhook secret`, "stripe");
+      webhookSecret = replitWebhookSecret;
+    } else {
+      log(`Using main domain webhook secret`, "stripe");
+    }
 
     let event;
 
