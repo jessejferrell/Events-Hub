@@ -134,25 +134,8 @@ export default function PaymentConnectionsPage() {
     }
   }, [toast, refetchStatus]);
   
-  // Force refresh of connection status periodically when not connected
-  useEffect(() => {
-    // If not connected and not loading, check every 3 seconds
-    // This helps catch when the OAuth flow completes but the app doesn't notice
-    let interval: number | undefined;
-    
-    if (!connectionStatus?.connected && !isLoadingConnection) {
-      interval = window.setInterval(() => {
-        console.log("Auto-refreshing Stripe connection status...");
-        refetchStatus();
-      }, 3000);
-    }
-    
-    return () => {
-      if (interval) {
-        window.clearInterval(interval);
-      }
-    };
-  }, [connectionStatus?.connected, isLoadingConnection, refetchStatus]);
+  // REMOVED auto-refresh which was running constantly and annoying users
+  // Manual refresh is better and avoids confusion
   
   // Special handler for when "Connection Failed" appears but Stripe confirmed success
   useEffect(() => {
@@ -192,18 +175,8 @@ export default function PaymentConnectionsPage() {
     }
   }, [connectionStatus?.connected, isRecovering]);
   
-  // Always check for a recovery file on page load, even without error parameters
-  useEffect(() => {
-    // Only run once on initial page load and only if not connected
-    if (!connectionStatus?.connected && !isRecovering) {
-      // Delay slightly to let other components load
-      const timer = setTimeout(() => {
-        handleRecoverConnection();
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, []);
+  // REMOVED automatic connection recovery which was causing unwanted popups
+  // User can now manually click "Recover Connection" button if needed
 
   const isConnected = connectionStatus?.connected;
   

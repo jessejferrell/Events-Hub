@@ -280,10 +280,12 @@ export function setupStripeRoutes(app: Express) {
       
       // 3. File system (tertiary backup)
       try {
-        const fs = require('fs');
-        fs.writeFileSync('recover-connection.txt', connectedAccountId);
+        // Don't use require in async contexts, it causes issues
+        const { writeFileSync } = await import('fs');
+        writeFileSync('recover-connection.txt', connectedAccountId);
       } catch (err) {
         // Ignore file write errors
+        console.error("Could not write recovery file:", err);
       }
       
       if (!req.isAuthenticated()) {
@@ -340,9 +342,10 @@ export function setupStripeRoutes(app: Express) {
       // 3. Finally check file (tertiary backup)
       if (!originalState) {
         try {
-          const fs = require('fs');
-          if (fs.existsSync('./stripe-connect-state.txt')) {
-            originalState = fs.readFileSync('./stripe-connect-state.txt', 'utf8').trim();
+          // Don't use require in async contexts, it causes issues
+          const { existsSync, readFileSync } = await import('fs');
+          if (existsSync('./stripe-connect-state.txt')) {
+            originalState = readFileSync('./stripe-connect-state.txt', 'utf8').trim();
             log(`Found state in filesystem: ${originalState}`, "stripe");
           }
         } catch (err) {
@@ -367,9 +370,10 @@ export function setupStripeRoutes(app: Express) {
       }
       
       try {
-        const fs = require('fs');
-        if (fs.existsSync('./stripe-connect-state.txt')) {
-          fs.unlinkSync('./stripe-connect-state.txt');
+        // Don't use require in async contexts, it causes issues
+        const { existsSync, unlinkSync } = await import('fs');
+        if (existsSync('./stripe-connect-state.txt')) {
+          unlinkSync('./stripe-connect-state.txt');
         }
       } catch (err) {
         // Ignore file deletion errors
@@ -513,8 +517,9 @@ export function setupStripeRoutes(app: Express) {
       
       // Also save to file for backup
       try {
-        const fs = require('fs');
-        fs.writeFileSync('recover-connection.txt', stripeAccountId);
+        // Don't use require in async contexts, it causes issues
+        const { writeFileSync } = await import('fs');
+        writeFileSync('recover-connection.txt', stripeAccountId);
       } catch (err) {
         console.error("Failed to write to file:", err);
         // Continue anyway
