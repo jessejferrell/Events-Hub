@@ -48,6 +48,8 @@ import { format } from "date-fns";
 const profileSchema = z.object({
   name: z.string().optional(),
   email: z.string().email("Please enter a valid email"),
+  phoneNumber: z.string().optional(),
+  address: z.string().optional(),
 });
 
 // Password form schema
@@ -86,6 +88,8 @@ export default function UserProfilePage() {
     defaultValues: {
       name: user?.name || "",
       email: user?.email || "",
+      phoneNumber: user?.phoneNumber || "",
+      address: user?.address || "",
     },
   });
 
@@ -212,6 +216,34 @@ export default function UserProfilePage() {
                             <FormLabel>Email</FormLabel>
                             <FormControl>
                               <Input placeholder="Your email" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={profileForm.control}
+                        name="phoneNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Your phone number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={profileForm.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Address</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Your address" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
