@@ -849,6 +849,52 @@ export function setupStripeRoutes(app: Express) {
       case "payment_intent.succeeded": {
         const paymentIntent = event.data.object;
         log(`PaymentIntent succeeded: ${paymentIntent.id}`, "stripe");
+        
+        // Store detailed payment information
+        try {
+          // Extract metadata if available
+          const metadata = paymentIntent.metadata || {};
+          const userId = metadata.userId ? parseInt(metadata.userId) : null;
+          const eventId = metadata.eventId ? parseInt(metadata.eventId) : null;
+          
+          if (userId && eventId) {
+            // Record transaction details in analytics
+            await storage.recordAnalyticEvent({
+              metric: "payment_success",
+              value: paymentIntent.amount / 100, // Convert from cents
+              userId,
+              eventId,
+              dimension: "payment_type",
+              dimensionValue: metadata.paymentType || "standard",
+              metadata: {
+                paymentId: paymentIntent.id,
+                paymentMethod: paymentIntent.payment_method_type,
+                currency: paymentIntent.currency,
+                amountRefunded: paymentIntent.amount_refunded / 100,
+                receiptEmail: paymentIntent.receipt_email,
+                description: paymentIntent.description,
+                status: paymentIntent.status,
+                timestamp: new Date().toISOString(),
+                fullData: paymentIntent // Store entire object for complete records
+              }
+            });
+            
+            log(`Recorded detailed payment analytics for user ${userId}, event ${eventId}`, "stripe");
+            
+            // Create admin note about payment
+            await storage.createAdminNote({
+              targetType: "event",
+              targetId: eventId,
+              note: `Payment of ${(paymentIntent.amount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()} received from user #${userId}`,
+              createdBy: 0, // System
+              importance: "medium"
+            });
+          } else {
+            log(`PaymentIntent ${paymentIntent.id} has no user/event metadata, can't associate with records`, "stripe");
+          }
+        } catch (error: any) {
+          log(`Error processing payment_intent.succeeded: ${error.message}`, "stripe");
+        }
         break;
       }
       
@@ -956,8 +1002,9 @@ export function setupStripeRoutes(app: Express) {
       // Check the verification requirements
       const requirements = account.requirements;
       
-      // Track verification status so we can show it in the UI
+      // Create comprehensive status object with all account details
       const status = {
+        accountId: account.id,
         detailsSubmitted: account.details_submitted,
         chargesEnabled: account.charges_enabled,
         payoutsEnabled: account.payouts_enabled,
@@ -965,38 +1012,89 @@ export function setupStripeRoutes(app: Express) {
           currentlyDue: requirements?.currently_due || [],
           eventuallyDue: requirements?.eventually_due || [],
           pastDue: requirements?.past_due || []
-        }
+        },
+        capabilities: account.capabilities || {},
+        business_type: account.business_type,
+        business_profile: account.business_profile,
+        settings: account.settings,
+        tos_acceptance: account.tos_acceptance,
+        future_requirements: account.future_requirements,
+        payouts_enabled: account.payouts_enabled,
+        timestamp: new Date().toISOString()
       };
       
-      // Update user metadata with status if needed
-      // This depends on your schema - you might store it in metadata
-      // or specific fields
+      // Store complete verification status in database
+      try {
+        // Store the detailed status in a new analytics record
+        await storage.recordAnalyticEvent({
+          metric: "stripe_account_update",
+          value: 1,
+          eventId: null, // Not tied to a specific event
+          userId: user.id, // But tied to a specific user
+          dimension: "account_status",
+          dimensionValue: account.charges_enabled ? "verified" : "pending",
+          metadata: status // Store the full status object
+        });
+        
+        // Update user record with latest verification status
+        await storage.updateUserStripeAccount(
+          user.id, 
+          account.id, 
+          {
+            detailsSubmitted: account.details_submitted,
+            chargesEnabled: account.charges_enabled,
+            payoutsEnabled: account.payouts_enabled,
+            requirementsCurrentlyDue: requirements?.currently_due?.length || 0
+          }
+        );
+        
+        log(`Updated Stripe account status for user ${user.id}`, "stripe");
+      } catch (dbError: any) {
+        log(`Error storing account status: ${dbError.message}`, "stripe");
+      }
       
       // Notify the user about required actions if needed
       if (requirements?.currently_due?.length > 0) {
-        // You could send an email or notification here
         log(`User ${user.id} has pending Stripe requirements: ${requirements.currently_due.join(', ')}`, "stripe");
         
-        // Here you could trigger an email notification
-        // emailService.sendVerificationReminder(user.email, {
-        //   accountId: account.id,
-        //   requirements: requirements.currently_due
-        // });
+        try {
+          // Create admin notification for pending requirements
+          await storage.createAdminNote({
+            targetType: "user",
+            targetId: user.id,
+            note: `Stripe account has pending requirements: ${requirements.currently_due.join(', ')}`,
+            createdBy: 0, // System generated
+            importance: "medium"
+          });
+          
+          // Here we could trigger an email notification
+          // emailService.sendVerificationReminder(user.email, {
+          //   accountId: account.id,
+          //   requirements: requirements.currently_due
+          // });
+        } catch (noteError: any) {
+          log(`Error creating admin note: ${noteError.message}`, "stripe");
+        }
       }
       
       // When the account becomes fully verified
       if (account.charges_enabled && !user.stripeVerified) {
         log(`User ${user.id} Stripe account is now fully verified!`, "stripe");
         
-        // Update user record to indicate verification
-        // This depends on your schema - you might not have this field
         try {
-          // If you have a field for this
-          // await storage.updateUserVerificationStatus(user.id, true);
+          // Create admin note about verification
+          await storage.createAdminNote({
+            targetType: "user",
+            targetId: user.id,
+            note: `Stripe account is now fully verified and can process payments.`,
+            createdBy: 0, // System generated
+            importance: "high"
+          });
           
-          // Alternatively store in metadata
+          // Update user verification status if we have such a field
+          // await storage.updateUserVerificationStatus(user.id, true);
         } catch (updateError: any) {
-          log(`Error updating user verification status: ${updateError.message}`, "stripe");
+          log(`Error updating verification status: ${updateError.message}`, "stripe");
         }
       }
       
