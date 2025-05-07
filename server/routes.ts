@@ -2103,6 +2103,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get transactions for a specific event
+  app.get('/api/admin/events/:eventId/transactions', requireAdmin, async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.eventId);
+      
+      // Validate event exists
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Get all transactions associated with this event
+      const orders = await storage.getOrdersByEvent(eventId);
+      
+      // Get all ticket purchases for the event
+      const tickets = await storage.getTicketsByEvent(eventId);
+      
+      // Get all vendor registrations for the event
+      const vendorRegistrations = await storage.getVendorRegistrations({ eventId });
+      
+      // Get all volunteer assignments for the event
+      const volunteerAssignments = await storage.getVolunteerAssignments({ eventId });
+      
+      // Get analytics data specifically for this event
+      const analytics = await storage.getAnalyticsByMetric('payment_success', eventId);
+      
+      // Build a comprehensive transaction history
+      const transactions = {
+        orders,
+        tickets,
+        vendorRegistrations,
+        volunteerAssignments,
+        analytics,
+        eventDetails: event
+      };
+      
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: `Error retrieving event transactions: ${error.message}` });
+    }
+  });
+  
+  // Get transactions for a specific user
+  app.get('/api/admin/users/:userId/transactions', requireAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      
+      // Validate user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Get all orders by this user
+      const orders = await storage.getOrdersByUser(userId);
+      
+      // Get all tickets purchased by this user
+      const tickets = await storage.getTicketsByUser(userId);
+      
+      // Get vendor profile and registrations
+      const vendorProfile = await storage.getVendorProfile(userId);
+      const vendorRegistrations = vendorProfile 
+        ? await storage.getVendorRegistrations({ userId }) 
+        : [];
+      
+      // Get volunteer profile and assignments
+      const volunteerProfile = await storage.getVolunteerProfile(userId);
+      const volunteerAssignments = volunteerProfile 
+        ? await storage.getVolunteerAssignments({ userId }) 
+        : [];
+      
+      // Get Stripe account status if it exists
+      let stripeAccountStatus = null;
+      if (user.stripeAccountId) {
+        const analytics = await storage.getAnalyticsByMetric('stripe_account_update');
+        
+        // Find the most recent analytics entry for this user's Stripe account
+        const userAccountAnalytics = analytics
+          .filter(entry => entry.userId === userId)
+          .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+          
+        if (userAccountAnalytics.length > 0) {
+          stripeAccountStatus = userAccountAnalytics[0].metadata;
+        }
+      }
+      
+      // Build comprehensive user transaction history
+      const transactions = {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          stripeAccountId: user.stripeAccountId,
+          stripeCustomerId: user.stripeCustomerId
+        },
+        orders,
+        tickets,
+        vendorProfile,
+        vendorRegistrations,
+        volunteerProfile,
+        volunteerAssignments,
+        stripeAccountStatus
+      };
+      
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: `Error retrieving user transactions: ${error.message}` });
+    }
+  });
+  
+  // Get all connected Stripe accounts and their verification status
+  app.get('/api/admin/stripe/connected-accounts', requireAdmin, async (req, res) => {
+    try {
+      // Get all users with Stripe accounts
+      const allUsers = await storage.getAllUsers();
+      const connectedUsers = allUsers.filter(user => user.stripeAccountId);
+      
+      if (connectedUsers.length === 0) {
+        return res.json({ accounts: [] });
+      }
+      
+      // Get analytics data for Stripe account updates
+      const analytics = await storage.getAnalyticsByMetric('stripe_account_update');
+      
+      // Build account status report with latest status for each account
+      const accounts = connectedUsers.map(user => {
+        // Find the most recent analytics entry for this user's Stripe account
+        const userAccountAnalytics = analytics
+          .filter(entry => entry.userId === user.id)
+          .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+        
+        // Extract status details or provide defaults
+        const statusDetails = userAccountAnalytics.length > 0 
+          ? userAccountAnalytics[0].metadata
+          : {
+              detailsSubmitted: false,
+              chargesEnabled: false,
+              payoutsEnabled: false,
+              requirements: {
+                currentlyDue: [],
+                eventuallyDue: [],
+                pastDue: []
+              }
+            };
+        
+        return {
+          userId: user.id,
+          username: user.username,
+          email: user.email,
+          name: user.name,
+          stripeAccountId: user.stripeAccountId,
+          lastUpdated: userAccountAnalytics.length > 0 
+            ? userAccountAnalytics[0].dateTime 
+            : null,
+          status: statusDetails
+        };
+      });
+      
+      res.json({ accounts });
+    } catch (error: any) {
+      res.status(500).json({ message: `Error retrieving Stripe account status: ${error.message}` });
+    }
+  });
+  
   // Export financial report (admin only)
   app.get("/api/admin/financial-report", requireAdmin, async (req, res) => {
     try {

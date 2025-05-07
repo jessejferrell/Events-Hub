@@ -822,17 +822,20 @@ export function setupStripeRoutes(app: Express) {
   // Webhook endpoint to handle Stripe events
   app.post("/api/stripe/webhook", async (req, res) => {
     const sig = req.headers["stripe-signature"] as string;
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    // Get webhook secret from environment
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     let event;
 
     try {
-      // Verify webhook signature
-      if (endpointSecret) {
-        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+      // Verify webhook signature with the appropriate secret
+      if (webhookSecret) {
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        log(`Webhook verified with secret: ${webhookSecret.substring(0, 5)}...`, "stripe");
       } else {
-        // For development, just parse the JSON
+        // For development, just parse the JSON (not recommended for production)
         event = req.body;
+        log(`WARNING: Webhook received without verification - no webhook secret found.`, "stripe");
       }
     } catch (err: any) {
       log(`Webhook signature verification failed: ${err.message}`, "stripe");
