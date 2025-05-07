@@ -63,6 +63,19 @@ export function setupStripeRoutes(app: Express) {
                             req.headers.origin.replace(/\/$/, '') : 
                             (process.env.NODE_ENV === 'production' ? domain : replitAppDomain);
     
+    // Store current request information in session to help with recovery
+    (req.session as any).stripeConnectAttempt = {
+      timestamp: new Date().toISOString(),
+      userId: req.user.id,
+      domain: effectiveDomain
+    };
+    
+    // Save the session immediately to ensure it's stored before redirect
+    // We'll need to let the save complete before continuing
+    req.session.save(() => {
+      log(`Stored connection attempt info in session for user ${req.user.id}`, "stripe");
+    });
+    
     log(`Using domain for redirect: ${effectiveDomain}`, "stripe");
     
     // Generate OAuth URL
@@ -320,51 +333,136 @@ export function setupStripeRoutes(app: Express) {
         });
       }
       
-      // Check if there's a pending account ID in the session
+      // First check if there's a pending account ID in the session
       const pendingAccountId = (req.session as any).pendingStripeAccountId;
       
-      if (!pendingAccountId) {
-        return res.json({ 
-          recovered: false, 
-          message: "No pending Stripe account found in session" 
-        });
-      }
-      
-      log(`Found pending Stripe account ${pendingAccountId} for user ${user.id}`, "stripe");
-      
-      // Verify the account exists and is valid
-      try {
-        const account = await stripe.accounts.retrieve(pendingAccountId);
+      if (pendingAccountId) {
+        log(`Found pending Stripe account ${pendingAccountId} for user ${user.id}`, "stripe");
         
-        if (!account) {
-          return res.json({ 
-            recovered: false, 
-            message: "Pending account ID is invalid" 
+        // Verify the account exists and is valid
+        try {
+          const account = await stripe.accounts.retrieve(pendingAccountId);
+          
+          if (!account) {
+            return res.json({ 
+              recovered: false, 
+              message: "Pending account ID is invalid" 
+            });
+          }
+          
+          // The account exists, so save it to the user record
+          await storage.updateUserStripeAccount(user.id, pendingAccountId);
+          
+          // Clear the pending ID from the session
+          (req.session as any).pendingStripeAccountId = null;
+          await new Promise<void>((resolve) => {
+            req.session.save(() => resolve());
           });
+          
+          return res.json({
+            recovered: true,
+            message: "Successfully recovered Stripe connection",
+            accountId: pendingAccountId
+          });
+        } catch (accountError: any) {
+          log(`Error retrieving pending account: ${accountError.message}`, "stripe");
+          // Continue to other recovery methods rather than failing right away
         }
-        
-        // The account exists, so save it to the user record
-        await storage.updateUserStripeAccount(user.id, pendingAccountId);
-        
-        // Clear the pending ID from the session
-        (req.session as any).pendingStripeAccountId = null;
-        await new Promise<void>((resolve) => {
-          req.session.save(() => resolve());
-        });
-        
-        return res.json({
-          recovered: true,
-          message: "Successfully recovered Stripe connection",
-          accountId: pendingAccountId
-        });
-      } catch (accountError: any) {
-        log(`Error retrieving pending account: ${accountError.message}`, "stripe");
-        return res.json({
-          recovered: false,
-          message: "Invalid pending account ID",
-          error: accountError.message
-        });
       }
+      
+      // Second recovery method: check if we have connection data from prior to OAuth initiation
+      const connectAttempt = (req.session as any).stripeConnectAttempt;
+      if (connectAttempt && connectAttempt.userId === user.id) {
+        log(`Found previous connect attempt for user ${user.id}`, "stripe");
+        
+        // Get the 10 most recently created Stripe accounts to check if one is for this user
+        try {
+          const accounts = await stripe.accounts.list({ limit: 10 });
+          
+          // Look at freshly created accounts
+          for (const account of accounts.data) {
+            // We don't have a reliable way to match the account to the user directly,
+            // but we can try to connect the most recent account if it was created within 10 minutes
+            const accountCreated = new Date(account.created * 1000);
+            const connectAttemptTime = new Date(connectAttempt.timestamp);
+            const timeDiff = Math.abs(accountCreated.getTime() - connectAttemptTime.getTime());
+            const minsDiff = timeDiff / (1000 * 60);
+            
+            // If this account was created within 10 minutes of the connection attempt,
+            // it's likely the intended account
+            if (minsDiff < 10) {
+              log(`Found potential account ${account.id} created within ${minsDiff.toFixed(2)} minutes of connection attempt`, "stripe");
+              
+              // Save the account ID to the user record
+              await storage.updateUserStripeAccount(user.id, account.id);
+              
+              // Clear the connection attempt from the session
+              (req.session as any).stripeConnectAttempt = null;
+              await new Promise<void>((resolve) => {
+                req.session.save(() => resolve());
+              });
+              
+              return res.json({
+                recovered: true,
+                message: "Successfully recovered Stripe connection from recent accounts",
+                accountId: account.id
+              });
+            }
+          }
+          
+          // If we get here, we didn't find a matching account
+          return res.json({
+            recovered: false,
+            message: "No matching recent Stripe account found",
+            tryManualConnection: true
+          });
+        } catch (listError: any) {
+          log(`Error listing Stripe accounts: ${listError.message}`, "stripe");
+          // Continue to fallback method instead of failing
+        }
+      }
+      
+      // Third recovery method: allow "force connect" from cookie file
+      try {
+        // Check if there's a recover-connection.txt file
+        const fs = require('fs');
+        if (fs.existsSync('./recover-connection.txt')) {
+          const savedAccountId = fs.readFileSync('./recover-connection.txt', 'utf8').trim();
+          if (savedAccountId && savedAccountId.startsWith('acct_')) {
+            log(`Found saved account ID in recovery file: ${savedAccountId}`, "stripe");
+            
+            // Verify the account
+            try {
+              await stripe.accounts.retrieve(savedAccountId);
+              
+              // Update the user account
+              await storage.updateUserStripeAccount(user.id, savedAccountId);
+              
+              // Delete the recovery file after successful recovery
+              fs.unlinkSync('./recover-connection.txt');
+              
+              return res.json({
+                recovered: true,
+                message: "Successfully recovered Stripe connection from saved file",
+                accountId: savedAccountId
+              });
+            } catch (accountError: any) {
+              log(`Invalid account ID in recovery file: ${accountError.message}`, "stripe");
+              // Delete the invalid file
+              fs.unlinkSync('./recover-connection.txt');
+            }
+          }
+        }
+      } catch (fileError: any) {
+        log(`Error processing recovery file: ${fileError.message}`, "stripe");
+        // Continue to final response
+      }
+      
+      // If all recovery methods failed
+      return res.json({ 
+        recovered: false, 
+        message: "No pending Stripe account found that could be recovered" 
+      });
     } catch (error: any) {
       log(`Error recovering Stripe connection: ${error.message}`, "stripe");
       return res.status(500).json({
