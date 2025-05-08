@@ -1039,23 +1039,59 @@ export function setupStripeRoutes(app: Express) {
     }
 
     try {
-      if (!req.user.stripeAccountId) {
-        return res.json({ connected: false });
+      log(`Checking Stripe account status for user ${req.user.id}`, "stripe");
+      log(`User stripeAccountId from server: "${req.user.stripeAccountId || 'NONE'}"`, "stripe");
+      
+      // If the stripeAccountId is empty string, null, or undefined, return not connected
+      if (!req.user.stripeAccountId || req.user.stripeAccountId === "") {
+        log(`User ${req.user.id} has no Stripe account connected`, "stripe");
+        return res.json({ 
+          connected: false,
+          accountId: "",
+          detailsSubmitted: false,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+          message: "No Stripe account connected"
+        });
       }
       
       // Retrieve the account to get its current status
-      const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
-      
-      return res.json({
-        connected: true,
-        accountId: account.id,
-        detailsSubmitted: account.details_submitted,
-        chargesEnabled: account.charges_enabled,
-        payoutsEnabled: account.payouts_enabled
-      });
+      log(`Retrieving account details for ${req.user.stripeAccountId}`, "stripe");
+      try {
+        const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
+        
+        log(`Successfully retrieved account ${account.id}`, "stripe");
+        return res.json({
+          connected: true,
+          accountId: account.id,
+          detailsSubmitted: account.details_submitted,
+          chargesEnabled: account.charges_enabled,
+          payoutsEnabled: account.payouts_enabled
+        });
+      } catch (stripeError: any) {
+        // If the account doesn't exist or is invalid, update our database to clear it
+        log(`Error retrieving Stripe account ${req.user.stripeAccountId}: ${stripeError.message}`, "stripe");
+        
+        if (stripeError.code === 'account_invalid' || stripeError.code === 'resource_missing') {
+          log(`Account invalid or missing, clearing from database`, "stripe");
+          await storage.updateUserStripeAccount(req.user.id, null);
+        }
+        
+        return res.json({ 
+          connected: false,
+          accountId: "",
+          detailsSubmitted: false,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+          message: stripeError.message
+        });
+      }
     } catch (error: any) {
-      log(`Error retrieving Stripe account: ${error.message}`, "stripe");
-      return res.status(500).json({ message: "Failed to retrieve Stripe account status" });
+      log(`Error in account status endpoint: ${error.message}`, "stripe");
+      return res.status(500).json({ 
+        connected: false,
+        message: "Failed to retrieve Stripe account status"
+      });
     }
   });
 
@@ -1351,7 +1387,27 @@ export function setupStripeRoutes(app: Express) {
           log(`Updating user ${req.user.id} with Stripe account ID ${stripeAccountId}`, "stripe");
           
           try {
+            // Check if the user already has a Stripe account
+            if (req.user.stripeAccountId) {
+              log(`User ${req.user.id} already has Stripe account ${req.user.stripeAccountId}, replacing with ${stripeAccountId}`, "stripe");
+            }
+            
+            // Save the account ID - this function now handles empty strings correctly
             await storage.updateUserStripeAccount(req.user.id, stripeAccountId);
+            
+            // Also save a backup for recovery in case of session issues
+            try {
+              const fs = await import('fs');
+              const path = await import('path');
+              const filePath = path.resolve('./recover-connection.txt');
+              fs.writeFileSync(filePath, stripeAccountId);
+              log(`Saved account ID to recovery file: ${stripeAccountId}`, "stripe");
+            } catch (fileError: any) {
+              log(`Warning: Failed to write recovery file: ${fileError.message}`, "stripe");
+              // Non-fatal error, continue
+            }
+            
+            // Redirect with success message
             return res.redirect('/payment-connections?success=true');
           } catch (dbError: any) {
             log(`Database error: ${dbError.message}`, "stripe");
