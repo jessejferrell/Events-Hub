@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { queryClient } from "@/lib/queryClient";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -52,11 +53,26 @@ export default function PaymentConnectionsPage() {
   const { data: connectionStatus, isLoading: isLoadingConnection, refetch: refetchStatus } = useQuery({
     queryKey: ["/api/stripe/account-status"],
     queryFn: async () => {
-      const res = await fetch("/api/stripe/account-status");
+      console.log("Fetching connection status from server...");
+      const res = await fetch("/api/stripe/account-status", {
+        // Add cache busting to ensure we get fresh data
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        // Add timestamp to prevent browser caching
+        cache: 'no-store'
+      });
       if (!res.ok) throw new Error("Failed to fetch Stripe account status");
-      return await res.json();
+      const data = await res.json();
+      console.log("Received connection status:", data);
+      return data;
     },
     enabled: !!user,
+    // Force a refetch on window focus to ensure updated status
+    refetchOnWindowFocus: true,
+    // Don't cache the result for long - we want fresh data
+    staleTime: 2000,
   });
   
   // Recovery process - attempt to recover a pending Stripe connection from the session
@@ -146,6 +162,7 @@ export default function PaymentConnectionsPage() {
     setRecoveryResult(null);
     
     try {
+      console.log("Attempting to recover Stripe connection...");
       const res = await fetch("/api/stripe/recover-connection");
       
       if (!res.ok) {
@@ -153,6 +170,7 @@ export default function PaymentConnectionsPage() {
       }
       
       const data = await res.json();
+      console.log("Recovery response:", data);
       setRecoveryResult(data);
       
       if (data.recovered) {
@@ -161,8 +179,20 @@ export default function PaymentConnectionsPage() {
           description: "Successfully recovered your Stripe account connection.",
         });
         
-        // Refetch connection status after successful recovery
-        refetchStatus();
+        // Ensure we get fresh status after recovery
+        console.log("Connection recovered - forcing refetch of connection status");
+        
+        // Invalidate the query cache to ensure fresh data
+        queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
+        
+        // Then refetch with our function
+        await refetchStatus();
+        
+        // Force a second refetch after a small delay to ensure we have the latest data
+        setTimeout(async () => {
+          console.log("Performing second refetch to ensure latest status");
+          await refetchStatus();
+        }, 1000);
         
         // Clear URL params if any
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -171,7 +201,10 @@ export default function PaymentConnectionsPage() {
           title: "Already connected",
           description: "Your account is already connected to Stripe.",
         });
-        refetchStatus();
+        
+        // Still refresh status to ensure UI is consistent
+        console.log("Account already connected - updating status");
+        await refetchStatus();
       } else {
         toast({
           title: "Recovery not needed",
@@ -179,6 +212,7 @@ export default function PaymentConnectionsPage() {
         });
       }
     } catch (error: any) {
+      console.error("Recovery error:", error);
       toast({
         title: "Recovery failed",
         description: error.message || "Failed to recover Stripe connection.",
@@ -227,24 +261,43 @@ export default function PaymentConnectionsPage() {
         description: "Verifying your Stripe account connection...",
       });
       
+      // Invalidate the query cache to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
+      
       // Add a small delay to ensure backend has time to process everything
-      setTimeout(() => {
-        refetchStatus();
-        
-        // After refetching, check again if we're connected
-        setTimeout(() => {
-          if (connectionStatus?.connected) {
-            console.log("CONNECTION CONFIRMED: User is connected to Stripe");
-            toast({
-              title: "Connection successful",
-              description: "Your Stripe account has been successfully connected!",
-            });
-          } else {
-            console.log("Still not showing as connected, attempting recovery");
-            handleRecoverConnection();
-          }
-        }, 1000);
-      }, 1000);
+      setTimeout(async () => {
+        try {
+          console.log("First refetch attempt post-OAuth");
+          await refetchStatus();
+          
+          // After refetching, check again if we're connected
+          setTimeout(async () => {
+            console.log("Second refetch attempt post-OAuth");
+            await refetchStatus();
+            
+            console.log("Current connection status after refetch:", connectionStatus);
+            
+            if (connectionStatus?.connected) {
+              console.log("CONNECTION CONFIRMED: User is connected to Stripe");
+              toast({
+                title: "Connection successful",
+                description: "Your Stripe account has been successfully connected!",
+              });
+            } else {
+              console.log("Still not showing as connected, attempting recovery");
+              await handleRecoverConnection();
+              
+              // Final status check after recovery attempt
+              setTimeout(async () => {
+                console.log("Final status check after recovery");
+                await refetchStatus();
+              }, 1000);
+            }
+          }, 1500);
+        } catch (err) {
+          console.error("Error during post-OAuth status checks:", err);
+        }
+      }, 1500);
       
       return;
     }
@@ -257,7 +310,8 @@ export default function PaymentConnectionsPage() {
       });
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
-      // Refetch account status
+      // Refetch account status - invalidate cache first
+      queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
       refetchStatus();
     } else if (error === "true") {
       // If we get an error, let's try an immediate recovery just in case
@@ -269,6 +323,9 @@ export default function PaymentConnectionsPage() {
       // Always try to recover when there's an error
       // The connection might have succeeded despite the error
       console.log("Attempting automatic recovery after error");
+      
+      // Invalidate cache before trying to recover
+      queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
       handleRecoverConnection();
       
       toast({
