@@ -359,7 +359,11 @@ export default function PaymentConnectionsPage() {
     }
   }, [toast, connectionStatus?.connected]);
   
-  const isConnected = connectionStatus?.connected;
+  // Directly use connectionStatus.connected instead of this variable
+  // This was causing the UI to be out of sync with the actual connection status
+  // const isConnected = connectionStatus?.connected;
+  
+  // Instead, we'll use connectionStatus?.connected directly in the UI
   
   // Manual refresh function
   const handleManualRefresh = () => {
@@ -420,6 +424,13 @@ export default function PaymentConnectionsPage() {
     }
   };
 
+  // For debugging in production vs development
+  console.log("=== DEBUG CONNECTION STATUS ===");
+  console.log("Connection status value:", connectionStatus?.connected);
+  console.log("connectionStatus object:", connectionStatus);
+  console.log("Environment:", import.meta.env.MODE);
+  console.log("==============================");
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -430,11 +441,11 @@ export default function PaymentConnectionsPage() {
           
           {!isLoading && !isLoadingConnection && (
             <div className={`px-4 py-2 rounded-full flex items-center ${
-              isConnected 
+              connectionStatus?.connected 
                 ? "bg-green-100 text-green-800 border border-green-300" 
                 : "bg-amber-100 text-amber-800 border border-amber-300"
             }`}>
-              {isConnected ? (
+              {connectionStatus?.connected ? (
                 <>
                   <BadgeCheck className="h-5 w-5 mr-2 text-green-600" />
                   <span className="font-medium">Connected to Stripe</span>
@@ -465,7 +476,7 @@ export default function PaymentConnectionsPage() {
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-10 w-40 mt-4" />
               </div>
-            ) : isConnected ? (
+            ) : connectionStatus?.connected ? (
               <div>
                 <div className="mb-4 p-4 bg-green-50 rounded-md border border-green-200">
                   <div className="flex justify-between items-start">
