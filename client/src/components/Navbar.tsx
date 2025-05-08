@@ -9,64 +9,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "wouter";
-import { LogOut, User, Settings, Mail, AlertCircle, BadgeCheck, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { LogOut, User, Settings, Mail } from "lucide-react";
+import { useCallback } from "react";
 import { CartWidget } from "@/components/cart/CartWidget";
-import { useQuery } from "@tanstack/react-query";
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
   const [location] = useLocation();
-  const [stripeChecked, setStripeChecked] = useState(false);
-  
-  // Define the type for Stripe status
-  interface StripeStatus {
-    connected: boolean;
-    accountId?: string;
-    detailsSubmitted?: boolean;
-    chargesEnabled?: boolean;
-    payoutsEnabled?: boolean;
-    message?: string;
-  }
-  
-  // Fresh fetch of Stripe status, independent from any cached state
-  const { data: stripeStatus, isLoading: isLoadingStripeStatus } = useQuery<StripeStatus>({
-    queryKey: ['/api/stripe/account-status'],
-    queryFn: async () => {
-      try {
-        const res = await fetch('/api/stripe/account-status');
-        if (!res.ok) {
-          throw new Error(`Failed to fetch Stripe status: ${res.status}`);
-        }
-        const data = await res.json();
-        
-        // Ensure we have a valid response with at least the connected field
-        if (typeof data?.connected !== 'boolean') {
-          console.warn('Invalid Stripe status response format:', data);
-          return { connected: false, message: "Invalid response format" };
-        }
-        
-        return data;
-      } catch (error) {
-        console.error('Error fetching Stripe status:', error);
-        // Return a failsafe response that won't break the UI
-        return { connected: false, message: "Error checking status" };
-      }
-    },
-    enabled: !!user && (user.role === 'admin' || user.role === 'event_owner'),
-    refetchInterval: 10000, // Check every 10 seconds
-    staleTime: 0, // Never consider the data fresh
-    refetchOnMount: true, // Always refetch when component mounts
-    refetchOnWindowFocus: true, // Refetch when window regains focus
-  });
-  
-  // We don't need this separate fetch since we have the query above
-  // that will properly handle status updates with refetching
-  useEffect(() => {
-    if (user && (user.role === 'admin' || user.role === 'event_owner')) {
-      setStripeChecked(true);
-    }
-  }, [user, stripeStatus]);
 
   const handleLogout = useCallback(() => {
     logoutMutation.mutate();
@@ -166,119 +115,82 @@ export default function Navbar() {
       {/* Main Navigation */}
       <nav className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center">
-            <ul className="flex flex-wrap">
-              <li className="mr-2">
-                <Link href="/">
-                  <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                    location === "/" 
-                      ? "text-white border-b-2 border-white" 
-                      : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                  }`}>
-                    Home
-                  </div>
-                </Link>
-              </li>
-              <li className="mr-2">
-                <Link href="/events">
-                  <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                    location === "/events" || location.startsWith("/events/")
-                      ? "text-white border-b-2 border-white" 
-                      : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                  }`}>
-                    Events
-                  </div>
-                </Link>
-              </li>
-              {user && (user.role === "event_owner" || user.role === "admin") && (
-                <li className="mr-2">
-                  <Link href="/my-events">
-                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                      location === "/my-events" || location.startsWith("/my-events/")
-                        ? "text-white border-b-2 border-white" 
-                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                    }`}>
-                      My Events
-                    </div>
-                  </Link>
-                </li>
-              )}
-              {user && user.role === "admin" && (
-                <>
-                  <li className="mr-2">
-                    <Link href="/admin">
-                      <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                        location === "/admin" 
-                          ? "text-white border-b-2 border-white" 
-                          : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                      }`}>
-                        Admin
-                      </div>
-                    </Link>
-                  </li>
-                  <li className="mr-2">
-                    <Link href="/email-notifications">
-                      <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                        location === "/email-notifications" 
-                          ? "text-white border-b-2 border-white" 
-                          : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                      }`}>
-                        Email Notifications
-                      </div>
-                    </Link>
-                  </li>
-                </>
-              )}
-              {user && (user.role === "event_owner" || user.role === "admin") && (
-                <li className="mr-2">
-                  <Link href="/payment-connections">
-                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                      location === "/payment-connections" 
-                        ? "text-white border-b-2 border-white" 
-                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                    }`}>
-                      Payment Connections
-                    </div>
-                  </Link>
-                </li>
-              )}
-            </ul>
-            
-            {/* Stripe connection status indicator */}
+          <ul className="flex flex-wrap">
+            <li className="mr-2">
+              <Link href="/">
+                <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                  location === "/" 
+                    ? "text-white border-b-2 border-white" 
+                    : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                }`}>
+                  Home
+                </div>
+              </Link>
+            </li>
+            <li className="mr-2">
+              <Link href="/events">
+                <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                  location === "/events" || location.startsWith("/events/")
+                    ? "text-white border-b-2 border-white" 
+                    : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                }`}>
+                  Events
+                </div>
+              </Link>
+            </li>
             {user && (user.role === "event_owner" || user.role === "admin") && (
-              <div className="flex items-center ml-auto">
-                {isLoadingStripeStatus ? (
-                  <div className="flex items-center text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    <span>Checking...</span>
+              <li className="mr-2">
+                <Link href="/my-events">
+                  <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                    location === "/my-events" || location.startsWith("/my-events/")
+                      ? "text-white border-b-2 border-white" 
+                      : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                  }`}>
+                    My Events
                   </div>
-                ) : (
-                  <>
-                    {/* ONLY use server data - don't add any client-side logic */}
-                    {(() => {
-                      // Use ONLY what the server knows - user.stripeAccountId is the single source of truth
-                      const isConnected = !!(user && user.stripeAccountId && user.stripeAccountId.startsWith('acct_'));
-                      
-                      console.log("NAVBAR - User stripeAccountId:", user?.stripeAccountId || "NONE");
-                      console.log("NAVBAR - Is connected:", isConnected);
-                      
-                      return isConnected ? (
-                        <div className="flex items-center text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full">
-                          <BadgeCheck className="h-3 w-3 mr-1 text-green-600" />
-                          <span>Stripe Connected</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
-                          <AlertCircle className="h-3 w-3 mr-1 text-amber-600" />
-                          <span>Not Connected</span>
-                        </div>
-                      );
-                    })()}
-                  </>
-                )}
-              </div>
+                </Link>
+              </li>
             )}
-          </div>
+            {user && user.role === "admin" && (
+              <>
+                <li className="mr-2">
+                  <Link href="/admin">
+                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                      location === "/admin" 
+                        ? "text-white border-b-2 border-white" 
+                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                    }`}>
+                      Admin
+                    </div>
+                  </Link>
+                </li>
+                <li className="mr-2">
+                  <Link href="/email-notifications">
+                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                      location === "/email-notifications" 
+                        ? "text-white border-b-2 border-white" 
+                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                    }`}>
+                      Email Notifications
+                    </div>
+                  </Link>
+                </li>
+              </>
+            )}
+            {user && (user.role === "event_owner" || user.role === "admin") && (
+              <li className="mr-2">
+                <Link href="/payment-connections">
+                  <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                    location === "/payment-connections" 
+                      ? "text-white border-b-2 border-white" 
+                      : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                  }`}>
+                    Payment Connections
+                  </div>
+                </Link>
+              </li>
+            )}
+          </ul>
         </div>
       </nav>
     </header>
