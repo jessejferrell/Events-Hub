@@ -1010,9 +1010,13 @@ export function setupStripeRoutes(app: Express) {
         });
       }
       
+      log(`Disconnecting Stripe account for user ${user.id}`, "stripe");
+      
       // Remove the connection in our database
-      // Pass empty string instead of null since the method signature requires a string
-      await storage.updateUserStripeAccount(user.id, "");
+      // Pass null to clear the connection
+      await storage.updateUserStripeAccount(user.id, null);
+      
+      log(`Successfully disconnected Stripe account for user ${user.id}`, "stripe");
       
       return res.json({
         success: true,

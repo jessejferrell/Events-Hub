@@ -261,10 +261,19 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateUserStripeAccount(userId: number, stripeAccountId: string): Promise<User> {
+  async updateUserStripeAccount(userId: number, stripeAccountId: string | null): Promise<User> {
+    // If we get an empty string, treat it as null
+    const normalizedStripeAccountId = stripeAccountId === "" ? null : stripeAccountId;
+    
+    // Log what we're doing to help with debugging
+    log(`Setting stripe account ID for user ${userId} to ${normalizedStripeAccountId || "NULL"}`, "storage");
+    
     const result = await db
       .update(users)
-      .set({ stripeAccountId, updatedAt: new Date() })
+      .set({ 
+        stripeAccountId: normalizedStripeAccountId, 
+        updatedAt: new Date() 
+      })
       .where(eq(users.id, userId))
       .returning();
     
