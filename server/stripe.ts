@@ -995,32 +995,70 @@ export function setupStripeRoutes(app: Express) {
   // Add endpoint to disconnect a Stripe account
   app.post("/api/stripe/disconnect", async (req, res) => {
     try {
+      // Ensure user is authenticated
       const user = req.user;
       if (!user) {
+        log("Disconnect attempt - Not authenticated", "stripe");
         return res.status(401).json({ 
           success: false,
           message: "Not authenticated" 
         });
       }
       
+      log(`Disconnect attempt - User ${user.id} (${user.username})`, "stripe");
+      
+      // Check if user has a Stripe account to disconnect
       if (!user.stripeAccountId) {
+        log(`Disconnect attempt - No Stripe account ID for user ${user.id}`, "stripe");
         return res.status(400).json({
           success: false,
           message: "No Stripe account connected"
         });
       }
       
+      const accountId = user.stripeAccountId;
+      log(`Disconnect attempt - Disconnecting account ${accountId} for user ${user.id}`, "stripe");
+      
+      // First, try to deauthorize on Stripe's side
+      try {
+        // Only attempt deauthorization if this is a Connect account
+        if (accountId.startsWith('acct_')) {
+          log(`Attempting to deauthorize Connect account ${accountId} on Stripe's side`, "stripe");
+          await stripe.oauth.deauthorize({
+            client_id: process.env.STRIPE_CLIENT_ID!,
+            stripe_user_id: accountId,
+          });
+          log(`Successfully deauthorized account ${accountId} on Stripe's side`, "stripe");
+        }
+      } catch (deauthError: any) {
+        // Log but continue - we'll still remove the connection from our database
+        log(`Warning: Could not deauthorize account on Stripe's side: ${deauthError.message}`, "stripe");
+        // Don't return error - we still want to remove from our database
+      }
+      
       // Remove the connection in our database
-      // Pass empty string instead of null since the method signature requires a string
+      log(`Removing account ${accountId} connection for user ${user.id} in database`, "stripe");
       await storage.updateUserStripeAccount(user.id, "");
+      
+      // Clear any session data related to Stripe
+      if (req.session) {
+        (req.session as any).pendingStripeAccountId = null;
+        (req.session as any).stripeConnectState = null;
+        req.session.save();
+      }
+      
+      log(`Successfully disconnected Stripe account ${accountId} for user ${user.id}`, "stripe");
       
       return res.json({
         success: true,
-        message: "Successfully disconnected Stripe account"
+        message: "Successfully disconnected Stripe account",
+        disconnectedAccountId: accountId
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       log(`Error disconnecting Stripe account: ${errorMessage}`, "stripe");
+      log(`Error details: ${JSON.stringify(error)}`, "stripe");
+      
       return res.status(500).json({
         success: false,
         message: "Failed to disconnect account",
@@ -1031,27 +1069,64 @@ export function setupStripeRoutes(app: Express) {
 
   app.get("/api/stripe/account-status", async (req, res) => {
     if (!req.isAuthenticated()) {
+      log("Account status check - Not authenticated", "stripe");
       return res.status(401).json({ message: "Authentication required" });
     }
 
     try {
+      // Log the user ID making the request
+      log(`Account status check - User ${req.user.id} (${req.user.username})`, "stripe");
+      
       if (!req.user.stripeAccountId) {
-        return res.json({ connected: false });
+        log(`Account status check - No Stripe account ID for user ${req.user.id}`, "stripe");
+        return res.json({ 
+          connected: false,
+          message: "No Stripe account connected"  
+        });
       }
+      
+      log(`Account status check - Retrieving account ${req.user.stripeAccountId} for user ${req.user.id}`, "stripe");
       
       // Retrieve the account to get its current status
       const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
       
-      return res.json({
+      // Log detailed account information for debugging
+      log(`Account status check - Retrieved account ${account.id}, details_submitted: ${account.details_submitted}`, "stripe");
+      
+      const response = {
         connected: true,
         accountId: account.id,
         detailsSubmitted: account.details_submitted,
         chargesEnabled: account.charges_enabled,
         payoutsEnabled: account.payouts_enabled
-      });
+      };
+      
+      // Log the response
+      log(`Account status check - Responding with: ${JSON.stringify(response)}`, "stripe");
+      
+      return res.json(response);
     } catch (error: any) {
+      // If the account doesn't exist in Stripe, clear the connection
+      if (error.code === 'account_invalid' || error.code === 'resource_missing' || error.type === 'invalid_request_error') {
+        log(`Account status check - Invalid account ID ${req.user.stripeAccountId}, clearing connection`, "stripe");
+        
+        // Clear the stored account ID since it's invalid
+        await storage.updateUserStripeAccount(req.user.id, "");
+        
+        return res.json({ 
+          connected: false,
+          message: "Account no longer exists or is invalid",
+          clearedInvalidAccount: true
+        });
+      }
+      
       log(`Error retrieving Stripe account: ${error.message}`, "stripe");
-      return res.status(500).json({ message: "Failed to retrieve Stripe account status" });
+      log(`Error details: ${JSON.stringify(error)}`, "stripe");
+      
+      return res.status(500).json({ 
+        message: "Failed to retrieve Stripe account status",
+        error: error.message
+      });
     }
   });
 
