@@ -405,15 +405,26 @@ export default function PaymentConnectionsPage() {
                     {connectionStatus.connected && (
                       <div className="mt-2">
                         <p className="text-sm text-amber-700 mb-2">Account ID: {connectionStatus.accountId}</p>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="text-amber-700 border-amber-300 hover:bg-amber-100"
-                          onClick={handleManualRefresh}
-                        >
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                          Refresh Status
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                            onClick={handleManualRefresh}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Refresh Status
+                          </Button>
+                          
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="text-red-700 border-red-300 hover:bg-red-100"
+                            onClick={handleDisconnectStripe}
+                          >
+                            Disconnect
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>

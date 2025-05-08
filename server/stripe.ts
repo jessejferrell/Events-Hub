@@ -1011,18 +1011,20 @@ export function setupStripeRoutes(app: Express) {
       }
       
       // Remove the connection in our database
-      await storage.updateUserStripeAccount(user.id, null);
+      // Pass empty string instead of null since the method signature requires a string
+      await storage.updateUserStripeAccount(user.id, "");
       
       return res.json({
         success: true,
         message: "Successfully disconnected Stripe account"
       });
     } catch (error) {
-      log(`Error disconnecting Stripe account: ${getErrorMessage(error)}`, "stripe");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Error disconnecting Stripe account: ${errorMessage}`, "stripe");
       return res.status(500).json({
         success: false,
         message: "Failed to disconnect account",
-        error: getErrorMessage(error)
+        error: errorMessage
       });
     }
   });
