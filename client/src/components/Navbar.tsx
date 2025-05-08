@@ -9,13 +9,37 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "wouter";
-import { LogOut, User, Settings, Mail } from "lucide-react";
-import { useCallback } from "react";
+import { LogOut, User, Settings, Mail, AlertCircle, BadgeCheck } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { CartWidget } from "@/components/cart/CartWidget";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
   const [location] = useLocation();
+  const [stripeChecked, setStripeChecked] = useState(false);
+  
+  // Fresh fetch of Stripe status, independent from any cached state
+  const { data: stripeStatus } = useQuery({
+    queryKey: ['/api/stripe/account-status', Date.now()], // Force fresh check with timestamp
+    enabled: !!user && (user.role === 'admin' || user.role === 'event_owner'),
+    refetchInterval: 10000, // Check every 10 seconds
+  });
+  
+  // Fresh stripe status check whenever page is loaded
+  useEffect(() => {
+    if (user && (user.role === 'admin' || user.role === 'event_owner')) {
+      fetch('/api/stripe/account-status')
+        .then(res => res.json())
+        .then(data => {
+          setStripeChecked(true);
+          console.log('Navbar direct Stripe status check:', data);
+        })
+        .catch(err => {
+          console.error('Error checking Stripe status in Navbar:', err);
+        });
+    }
+  }, [user]);
 
   const handleLogout = useCallback(() => {
     logoutMutation.mutate();
@@ -115,82 +139,101 @@ export default function Navbar() {
       {/* Main Navigation */}
       <nav className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
         <div className="container mx-auto px-4">
-          <ul className="flex flex-wrap">
-            <li className="mr-2">
-              <Link href="/">
-                <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                  location === "/" 
-                    ? "text-white border-b-2 border-white" 
-                    : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                }`}>
-                  Home
-                </div>
-              </Link>
-            </li>
-            <li className="mr-2">
-              <Link href="/events">
-                <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                  location === "/events" || location.startsWith("/events/")
-                    ? "text-white border-b-2 border-white" 
-                    : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                }`}>
-                  Events
-                </div>
-              </Link>
-            </li>
-            {user && (user.role === "event_owner" || user.role === "admin") && (
+          <div className="flex justify-between items-center">
+            <ul className="flex flex-wrap">
               <li className="mr-2">
-                <Link href="/my-events">
+                <Link href="/">
                   <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                    location === "/my-events" || location.startsWith("/my-events/")
+                    location === "/" 
                       ? "text-white border-b-2 border-white" 
                       : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
                   }`}>
-                    My Events
+                    Home
                   </div>
                 </Link>
               </li>
-            )}
-            {user && user.role === "admin" && (
-              <>
-                <li className="mr-2">
-                  <Link href="/admin">
-                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                      location === "/admin" 
-                        ? "text-white border-b-2 border-white" 
-                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                    }`}>
-                      Admin
-                    </div>
-                  </Link>
-                </li>
-                <li className="mr-2">
-                  <Link href="/email-notifications">
-                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                      location === "/email-notifications" 
-                        ? "text-white border-b-2 border-white" 
-                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
-                    }`}>
-                      Email Notifications
-                    </div>
-                  </Link>
-                </li>
-              </>
-            )}
-            {user && (user.role === "event_owner" || user.role === "admin") && (
               <li className="mr-2">
-                <Link href="/payment-connections">
+                <Link href="/events">
                   <div className={`inline-block py-3 px-4 font-medium transition-all ${
-                    location === "/payment-connections" 
+                    location === "/events" || location.startsWith("/events/")
                       ? "text-white border-b-2 border-white" 
                       : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
                   }`}>
-                    Payment Connections
+                    Events
                   </div>
                 </Link>
               </li>
+              {user && (user.role === "event_owner" || user.role === "admin") && (
+                <li className="mr-2">
+                  <Link href="/my-events">
+                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                      location === "/my-events" || location.startsWith("/my-events/")
+                        ? "text-white border-b-2 border-white" 
+                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                    }`}>
+                      My Events
+                    </div>
+                  </Link>
+                </li>
+              )}
+              {user && user.role === "admin" && (
+                <>
+                  <li className="mr-2">
+                    <Link href="/admin">
+                      <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                        location === "/admin" 
+                          ? "text-white border-b-2 border-white" 
+                          : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                      }`}>
+                        Admin
+                      </div>
+                    </Link>
+                  </li>
+                  <li className="mr-2">
+                    <Link href="/email-notifications">
+                      <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                        location === "/email-notifications" 
+                          ? "text-white border-b-2 border-white" 
+                          : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                      }`}>
+                        Email Notifications
+                      </div>
+                    </Link>
+                  </li>
+                </>
+              )}
+              {user && (user.role === "event_owner" || user.role === "admin") && (
+                <li className="mr-2">
+                  <Link href="/payment-connections">
+                    <div className={`inline-block py-3 px-4 font-medium transition-all ${
+                      location === "/payment-connections" 
+                        ? "text-white border-b-2 border-white" 
+                        : "text-white/70 hover:text-white border-b-2 border-transparent hover:border-white/50"
+                    }`}>
+                      Payment Connections
+                    </div>
+                  </Link>
+                </li>
+              )}
+            </ul>
+            
+            {/* Stripe connection status indicator */}
+            {user && (user.role === "event_owner" || user.role === "admin") && (
+              <div className="flex items-center ml-auto">
+                {stripeStatus && stripeStatus.connected ? (
+                  <div className="flex items-center text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full">
+                    <BadgeCheck className="h-3 w-3 mr-1 text-green-600" />
+                    <span>Stripe Connected</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
+                    <AlertCircle className="h-3 w-3 mr-1 text-amber-600" />
+                    <span>Not Connected</span>
+                  </div>
+                )}
+              </div>
             )}
-          </ul>
+          </div>
         </div>
       </nav>
     </header>
