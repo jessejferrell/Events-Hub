@@ -50,17 +50,23 @@ export default function PaymentConnectionsPage() {
   });
 
   // Check for Stripe account connection status
+  // Generate a unique query key that changes on each render to force fresh data
+  const queryTimestamp = Date.now();
+
   const { data: connectionStatus, isLoading: isLoadingConnection, refetch: refetchStatus } = useQuery({
-    queryKey: ["/api/stripe/account-status"],
+    queryKey: ["/api/stripe/account-status", queryTimestamp],
     queryFn: async () => {
       console.log("Fetching connection status from server...");
-      const res = await fetch("/api/stripe/account-status", {
-        // Add cache busting to ensure we get fresh data
+      // Generate a unique timestamp to absolutely prevent any caching issues
+      const timestamp = Date.now();
+      const res = await fetch(`/api/stripe/account-status?_t=${timestamp}`, {
+        // Add aggressive cache prevention headers
         headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         },
-        // Add timestamp to prevent browser caching
+        // Force fetch to bypass all caches
         cache: 'no-store'
       });
       if (!res.ok) throw new Error("Failed to fetch Stripe account status");
@@ -123,7 +129,11 @@ export default function PaymentConnectionsPage() {
             description: "Your account is already connected to Stripe.",
           });
           // Invalidate to ensure fresh data
-          queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
+          queryClient.invalidateQueries({ 
+            predicate: (query) => 
+              Array.isArray(query.queryKey) && 
+              query.queryKey[0] === "/api/stripe/account-status"
+          });
           refetchStatus();
           setIsRedirecting(false);
         } else if (data.url) {
@@ -429,7 +439,101 @@ export default function PaymentConnectionsPage() {
   console.log("Connection status value:", connectionStatus?.connected);
   console.log("connectionStatus object:", connectionStatus);
   console.log("Environment:", import.meta.env.MODE);
+  
+  // Emergency debug measure - make a direct fetch call to check the server response
+  fetch("/api/stripe/account-status?emergency=true")
+    .then(res => res.json())
+    .then(data => {
+      console.log("EMERGENCY DIRECT FETCH - Server says:", data);
+      console.log("EMERGENCY - Connected status:", !!data.connected);
+      
+      // FORCE THE UI TO UPDATE BASED ON DIRECT FETCH RESPONSE
+      if (data.connected && !connectionStatus?.connected) {
+        console.log("EMERGENCY CORRECTION: Server says connected but UI doesn't. Forcing UI update.");
+        queryClient.setQueryData(["/api/stripe/account-status"], data);
+      }
+    })
+    .catch(err => {
+      console.error("EMERGENCY FETCH FAILED:", err);
+    });
+  
   console.log("==============================");
+
+  // CRITICAL FIX: Create a component that directly checks the server status
+  // This will ensure we always show the correct connection status regardless of caching issues
+  const ConnectionStatusIndicator = () => {
+    const [serverStatus, setServerStatus] = useState<{connected: boolean} | null>(null);
+    const [isChecking, setIsChecking] = useState(false);
+    
+    useEffect(() => {
+      // Only run this once on mount
+      const checkServerDirectly = async () => {
+        try {
+          setIsChecking(true);
+          // Add a unique timestamp to prevent any caching
+          const timestamp = Date.now();
+          const response = await fetch(`/api/stripe/account-status?force_refresh=true&_t=${timestamp}`, {
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log("Direct check received:", data);
+            setServerStatus(data);
+            
+            // If there's a mismatch between what we're showing and what the server says,
+            // force an update to the query cache
+            if (data.connected !== connectionStatus?.connected) {
+              console.log("FIXING CRITICAL STATUS MISMATCH - Forcing correct display");
+              queryClient.setQueryData(["/api/stripe/account-status"], data);
+            }
+          }
+        } catch (error) {
+          console.error("Error checking server directly:", error);
+        } finally {
+          setIsChecking(false);
+        }
+      };
+      
+      // Run immediately and then again after a short delay to ensure we have latest data
+      checkServerDirectly();
+      const timer = setTimeout(checkServerDirectly, 1000);
+      
+      return () => clearTimeout(timer);
+    }, []);
+    
+    // Always trust the direct server check over the query result if available
+    const isConnected = serverStatus?.connected ?? connectionStatus?.connected;
+    
+    return (
+      <div className={`px-4 py-2 rounded-full flex items-center ${
+        isConnected
+          ? "bg-green-100 text-green-800 border border-green-300" 
+          : "bg-amber-100 text-amber-800 border border-amber-300"
+      }`}>
+        {isChecking ? (
+          <>
+            <Loader2 className="h-5 w-5 mr-2 animate-spin text-neutral-600" />
+            <span className="font-medium">Checking connection...</span>
+          </>
+        ) : isConnected ? (
+          <>
+            <BadgeCheck className="h-5 w-5 mr-2 text-green-600" />
+            <span className="font-medium">Connected to Stripe</span>
+          </>
+        ) : (
+          <>
+            <AlertCircle className="h-5 w-5 mr-2 text-amber-600" />
+            <span className="font-medium">Not connected to Stripe</span>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -439,25 +543,7 @@ export default function PaymentConnectionsPage() {
         <div className="mb-6 flex flex-wrap justify-between items-center">
           <h1 className="text-2xl font-bold">Payment Connections</h1>
           
-          {!isLoading && !isLoadingConnection && (
-            <div className={`px-4 py-2 rounded-full flex items-center ${
-              connectionStatus?.connected 
-                ? "bg-green-100 text-green-800 border border-green-300" 
-                : "bg-amber-100 text-amber-800 border border-amber-300"
-            }`}>
-              {connectionStatus?.connected ? (
-                <>
-                  <BadgeCheck className="h-5 w-5 mr-2 text-green-600" />
-                  <span className="font-medium">Connected to Stripe</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-5 w-5 mr-2 text-amber-600" />
-                  <span className="font-medium">Not connected to Stripe</span>
-                </>
-              )}
-            </div>
-          )}
+          {!isLoading && !isLoadingConnection && <ConnectionStatusIndicator />}
         </div>
         
         {/* Stripe Connect Card */}
