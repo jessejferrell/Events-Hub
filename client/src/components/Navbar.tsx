@@ -254,32 +254,13 @@ export default function Navbar() {
                   </div>
                 ) : (
                   <>
-                    {/* Multi-level check for connected status similar to PaymentConnectionsPage */}
+                    {/* ONLY use server data - don't add any client-side logic */}
                     {(() => {
-                      // Robust status detection - never display incorrect status due to data inconsistency
-                      let isConnected = false;
+                      // Use ONLY what the server knows - user.stripeAccountId is the single source of truth
+                      const isConnected = !!(user && user.stripeAccountId && user.stripeAccountId.startsWith('acct_'));
                       
-                      try {
-                        // PRIMARY CHECK: Direct from connected field
-                        if (stripeStatus && typeof stripeStatus.connected === 'boolean') {
-                          isConnected = stripeStatus.connected;
-                        }
-                        // SECONDARY CHECK: Account ID presence
-                        else if (stripeStatus?.accountId && 
-                                typeof stripeStatus.accountId === 'string' && 
-                                stripeStatus.accountId.startsWith('acct_')) {
-                          isConnected = true;
-                        }
-                        // TERTIARY CHECK: Account capabilities
-                        else if (stripeStatus && 
-                                (stripeStatus.detailsSubmitted === true || 
-                                stripeStatus.chargesEnabled === true || 
-                                stripeStatus.payoutsEnabled === true)) {
-                          isConnected = true;
-                        }
-                      } catch (error) {
-                        console.error("Error determining status in navbar:", error);
-                      }
+                      console.log("NAVBAR - User stripeAccountId:", user?.stripeAccountId || "NONE");
+                      console.log("NAVBAR - Is connected:", isConnected);
                       
                       return isConnected ? (
                         <div className="flex items-center text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full">

@@ -107,66 +107,37 @@ export default function PaymentConnectionsPage() {
     error?: string;
   } | null>(null);
 
-  // Redirect to Stripe Connect flow
+  // Simple direct connect function
   const handleConnectStripe = () => {
     setIsRedirecting(true);
     
-    // Capture the time we started the connection attempt (for debugging)
-    const startTime = new Date().toISOString();
-    console.log(`[${startTime}] Starting Stripe connect flow`);
-    
     fetch("/api/stripe/connect")
       .then(res => {
-        console.log(`[${new Date().toISOString()}] Received response: ${res.status} ${res.statusText}`);
-        
-        // If there's an error, try to extract it properly
         if (!res.ok) {
-          return res.text().then(text => {
-            try {
-              // Try to parse as JSON
-              const errorJson = JSON.parse(text);
-              throw new Error(errorJson.message || `Error ${res.status}: ${res.statusText}`);
-            } catch (e) {
-              // If not valid JSON, use text directly
-              throw new Error(`Error ${res.status}: ${text || res.statusText}`);
-            }
-          });
+          throw new Error(`Error ${res.status}`);
         }
-        
         return res.json();
       })
       .then(data => {
-        console.log(`[${new Date().toISOString()}] Parsed data:`, data);
-        
         if (data.connected) {
-          // Already connected
           toast({
             title: "Already connected",
             description: "Your account is already connected to Stripe.",
           });
-          refetchStatus();
-          setIsRedirecting(false);
+          window.location.reload();
         } else if (data.url) {
-          // Log the redirect URL we're going to (except sensitive parts)
-          const urlObj = new URL(data.url);
-          const sanitizedUrl = `${urlObj.origin}${urlObj.pathname}?...params-hidden...`;
-          console.log(`[${new Date().toISOString()}] Redirecting to: ${sanitizedUrl}`);
-          
-          // Redirect to Stripe Connect OAuth
+          // Redirect to Stripe OAuth
           window.location.href = data.url;
         } else {
-          // Something went wrong
-          console.error(`[${new Date().toISOString()}] Invalid response:`, data);
           toast({
             title: "Connection error",
-            description: data.message || "Could not connect to Stripe. Invalid response format.",
+            description: "Could not connect to Stripe.",
             variant: "destructive",
           });
           setIsRedirecting(false);
         }
       })
       .catch(error => {
-        console.error(`[${new Date().toISOString()}] Connection error:`, error);
         toast({
           title: "Connection error",
           description: error.message || "Could not connect to Stripe.",
@@ -227,158 +198,53 @@ export default function PaymentConnectionsPage() {
     }
   }, [isRecovering, refetchStatus, toast]);
 
-  // Check URL for successful redirect or error
+  // Simple URL handling - just clean up and show messages
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const success = searchParams.get("success");
     const error = searchParams.get("error");
     const message = searchParams.get("message");
-    const code = searchParams.get("code"); // This is the Stripe authorization code
+    const code = searchParams.get("code");
     
-    console.log("========= PAYMENT PAGE PARAMS =========");
-    console.log("URL:", window.location.href);
-    console.log("Query params:", {
-      success, error, message, code: code ? "PRESENT" : "NONE"
-    });
-    console.log("All params:", Object.fromEntries(searchParams.entries()));
-    console.log("=====================================");
-    
-    // If we have a code parameter, this indicates we've been redirected from Stripe
-    // or we're being redirected back from Stripe OAuth
+    // If we have a code parameter, clear it
     if (code) {
-      console.log("DETECTED: Stripe authorization code present");
-      
-      // This means we've successfully completed a Stripe OAuth flow
-      // Let's clean the URL first to prevent repeated processing
       searchParams.delete("code");
-      window.history.replaceState(
-        {}, 
-        document.title, 
-        window.location.pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "")
-      );
+      window.history.replaceState({}, document.title, window.location.pathname);
       
-      // Always force a refresh of the connection status when we return with a code
-      // This ensures the UI updates regardless of other params
-      console.log("Forcibly refreshing connection status after OAuth redirect");
-      toast({
-        title: "Checking connection status",
-        description: "Verifying your Stripe account connection...",
-      });
-      
-      // Add a small delay to ensure backend has time to process everything
-      setTimeout(() => {
-        refetchStatus();
-        
-        // After refetching, check again if we're connected
-        setTimeout(() => {
-          if (connectionStatus?.connected) {
-            console.log("CONNECTION CONFIRMED: User is connected to Stripe");
-            toast({
-              title: "Connection successful",
-              description: "Your Stripe account has been successfully connected!",
-            });
-          } else {
-            console.log("Still not showing as connected, attempting recovery");
-            handleRecoverConnection();
-          }
-        }, 1000);
-      }, 1000);
-      
+      // Force reload to get the latest server state
+      window.location.reload();
       return;
     }
     
+    // Show success message
     if (success === "true") {
-      console.log("SHOWING SUCCESS TOAST");
       toast({
         title: "Connection successful",
         description: "Your Stripe account has been connected.",
       });
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
-      // Refetch account status
-      refetchStatus();
-    } else if (error === "true") {
-      // If we get an error, let's try an immediate recovery just in case
-      // the error is just a UI issue and the account was actually connected
-      console.log("SHOWING ERROR TOAST");
-      console.log("Connection error detected in URL");
-      console.log("Error message:", message);
-      
-      // Always try to recover when there's an error
-      // The connection might have succeeded despite the error
-      console.log("Attempting automatic recovery after error");
-      handleRecoverConnection();
-      
+      window.location.reload();
+    } 
+    // Show error message
+    else if (error === "true") {
       toast({
         title: "Connection issue",
-        description: message || "There was an issue with the Stripe connection. Attempting to recover...",
+        description: message || "There was an issue with the Stripe connection.",
         variant: "destructive"
       });
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [toast, refetchStatus, connectionStatus, handleRecoverConnection]);
+  }, [toast]);
   
-  // Special handler for when "Connection Failed" appears but Stripe confirmed success
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const error = searchParams.get("error");
-    const warning = searchParams.get("warning");
-    
-    // If there's an error in the URL but we know the connection was actually made,
-    // this is a false error from session issues
-    if ((error === "true" || warning === "true") && connectionStatus?.connected) {
-      // Clean up URL and show success message instead
-      window.history.replaceState({}, document.title, window.location.pathname);
-      toast({
-        title: "Connection successful",
-        description: "Your Stripe account was connected successfully despite the error message!",
-      });
-    }
-  }, [toast, connectionStatus?.connected]);
+  // USE EXACTLY WHAT THE SERVER KNOWS - NO CLIENT-SIDE LOGIC
+  // This checks ONLY what's in the user object and nothing else
+  const isConnected = !!(user && user.stripeAccountId && user.stripeAccountId.startsWith('acct_'));
   
-  // Multiple validation layers to ensure the connection status is accurate
-  // This makes the code work consistently in both production and development
-  const isConnected = (() => {
-    // Always log the raw data we're working with for debugging
-    console.log("=== STRIPE CONNECTION STATUS DATA ===");
-    console.log("Raw status data:", connectionStatus);
-    console.log("Environment:", process.env.NODE_ENV || "development");
-    console.log("====================================");
-    
-    try {
-      // PRIMARY CHECK: If we have connection data, trust the connected field as source of truth
-      if (connectionStatus && typeof connectionStatus.connected === 'boolean') {
-        console.log("Primary validation successful: using connected field =", connectionStatus.connected);
-        return connectionStatus.connected;
-      }
-      
-      // SECONDARY CHECK: If we have an account ID that's a valid format, we're connected
-      if (connectionStatus?.accountId && 
-          typeof connectionStatus.accountId === 'string' && 
-          connectionStatus.accountId.startsWith('acct_')) {
-        console.log("Secondary validation: using accountId presence as indicator");
-        return true;
-      }
-      
-      // TERTIARY CHECK: Look for other signals of connection status
-      if (connectionStatus && 
-          (connectionStatus.detailsSubmitted === true || 
-           connectionStatus.chargesEnabled === true || 
-           connectionStatus.payoutsEnabled === true)) {
-        console.log("Tertiary validation: connected based on account capabilities");
-        return true;
-      }
-      
-      // FALLBACK: No positive indicators found
-      console.log("No connection indicators found - assuming not connected");
-      return false;
-    } catch (error) {
-      // FAIL-SAFE: If anything goes wrong in our logic, assume not connected for safety
-      console.error("Error determining connection status:", error);
-      return false;
-    }
-  })();
+  // Log for debugging but don't use this for determining status
+  console.log("=== STRIPE CONNECTION STATUS ===");
+  console.log("USER OBJECT SAYS:", isConnected ? "CONNECTED" : "NOT CONNECTED");
+  console.log("User stripeAccountId from server:", user?.stripeAccountId || "NONE");
+  console.log("============================");
   
   // Manual refresh function
   const handleManualRefresh = () => {
