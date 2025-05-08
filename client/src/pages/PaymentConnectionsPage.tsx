@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import Navbar from "@/components/Navbar";
@@ -137,113 +137,9 @@ export default function PaymentConnectionsPage() {
         setIsRedirecting(false);
       });
   };
-
-  // Check URL for successful redirect or error
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const success = searchParams.get("success");
-    const error = searchParams.get("error");
-    const message = searchParams.get("message");
-    const code = searchParams.get("code"); // This is the Stripe authorization code
-    
-    console.log("========= PAYMENT PAGE PARAMS =========");
-    console.log("URL:", window.location.href);
-    console.log("Query params:", {
-      success, error, message, code: code ? "PRESENT" : "NONE"
-    });
-    console.log("All params:", Object.fromEntries(searchParams.entries()));
-    console.log("=====================================");
-    
-    // If we have a code parameter, this indicates we've been redirected from Stripe
-    // but somehow the backend didn't properly process it
-    if (code && !success && !error) {
-      console.log("DETECTED: Code present without success/error flags");
-      console.log("Found Stripe code in URL but no success/error parameters - attempting recovery");
-      
-      // And clean the URL of the code parameter to prevent repeated attempts
-      searchParams.delete("code");
-      window.history.replaceState(
-        {}, 
-        document.title, 
-        window.location.pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "")
-      );
-      
-      // DISABLED: Recovery can be done manually
-      // handleRecoverConnection();
-      
-      return;
-    }
-    
-    if (success === "true") {
-      console.log("SHOWING SUCCESS TOAST");
-      toast({
-        title: "Connection successful",
-        description: "Your Stripe account has been connected.",
-      });
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      // Refetch account status
-      refetchStatus();
-    } else if (error === "true") {
-      // If we get an error, let's try an immediate recovery just in case
-      // the error is just a UI issue and the account was actually connected
-      console.log("SHOWING ERROR TOAST");
-      console.log("Connection error detected in URL");
-      console.log("Error message:", message);
-      
-      // DISABLED: Recovery can be done manually
-      // handleRecoverConnection();
-      
-      toast({
-        title: "Connection failed",
-        description: message || "Failed to connect Stripe account. Please try again.",
-        variant: "destructive"
-      });
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, [toast, refetchStatus]);
   
-  // REMOVED auto-refresh which was running constantly and annoying users
-  // Manual refresh is better and avoids confusion
-  
-  // Special handler for when "Connection Failed" appears but Stripe confirmed success
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const error = searchParams.get("error");
-    const warning = searchParams.get("warning");
-    
-    // If there's an error in the URL but we know the connection was actually made,
-    // this is a false error from session issues
-    if ((error === "true" || warning === "true") && connectionStatus?.connected) {
-      // Clean up URL and show success message instead
-      window.history.replaceState({}, document.title, window.location.pathname);
-      toast({
-        title: "Connection successful",
-        description: "Your Stripe account was connected successfully despite the error message!",
-      });
-    }
-  }, [toast, connectionStatus?.connected]);
-  
-  // REMOVED: Automatic recovery attempt that was running constantly and causing issues
-  // Now users need to explicitly click the "Recover Connection" button when needed
-  
-  // REMOVED automatic connection recovery which was causing unwanted popups
-  // User can now manually click "Recover Connection" button if needed
-
-  const isConnected = connectionStatus?.connected;
-  
-  // Manual refresh function
-  const handleManualRefresh = () => {
-    refetchStatus();
-    toast({
-      title: "Refreshing connection status",
-      description: "Checking your Stripe account connection status...",
-    });
-  };
-  
-  // Function to attempt recovering a Stripe connection
-  const handleRecoverConnection = async () => {
+  // Function to attempt recovering a Stripe connection - memoize to prevent useEffect dependency issues
+  const handleRecoverConnection = useCallback(async () => {
     if (isRecovering) return;
     
     setIsRecovering(true);
@@ -291,6 +187,127 @@ export default function PaymentConnectionsPage() {
     } finally {
       setIsRecovering(false);
     }
+  }, [isRecovering, refetchStatus, toast]);
+
+  // Check URL for successful redirect or error
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+    const message = searchParams.get("message");
+    const code = searchParams.get("code"); // This is the Stripe authorization code
+    
+    console.log("========= PAYMENT PAGE PARAMS =========");
+    console.log("URL:", window.location.href);
+    console.log("Query params:", {
+      success, error, message, code: code ? "PRESENT" : "NONE"
+    });
+    console.log("All params:", Object.fromEntries(searchParams.entries()));
+    console.log("=====================================");
+    
+    // If we have a code parameter, this indicates we've been redirected from Stripe
+    // or we're being redirected back from Stripe OAuth
+    if (code) {
+      console.log("DETECTED: Stripe authorization code present");
+      
+      // This means we've successfully completed a Stripe OAuth flow
+      // Let's clean the URL first to prevent repeated processing
+      searchParams.delete("code");
+      window.history.replaceState(
+        {}, 
+        document.title, 
+        window.location.pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "")
+      );
+      
+      // Always force a refresh of the connection status when we return with a code
+      // This ensures the UI updates regardless of other params
+      console.log("Forcibly refreshing connection status after OAuth redirect");
+      toast({
+        title: "Checking connection status",
+        description: "Verifying your Stripe account connection...",
+      });
+      
+      // Add a small delay to ensure backend has time to process everything
+      setTimeout(() => {
+        refetchStatus();
+        
+        // After refetching, check again if we're connected
+        setTimeout(() => {
+          if (connectionStatus?.connected) {
+            console.log("CONNECTION CONFIRMED: User is connected to Stripe");
+            toast({
+              title: "Connection successful",
+              description: "Your Stripe account has been successfully connected!",
+            });
+          } else {
+            console.log("Still not showing as connected, attempting recovery");
+            handleRecoverConnection();
+          }
+        }, 1000);
+      }, 1000);
+      
+      return;
+    }
+    
+    if (success === "true") {
+      console.log("SHOWING SUCCESS TOAST");
+      toast({
+        title: "Connection successful",
+        description: "Your Stripe account has been connected.",
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refetch account status
+      refetchStatus();
+    } else if (error === "true") {
+      // If we get an error, let's try an immediate recovery just in case
+      // the error is just a UI issue and the account was actually connected
+      console.log("SHOWING ERROR TOAST");
+      console.log("Connection error detected in URL");
+      console.log("Error message:", message);
+      
+      // Always try to recover when there's an error
+      // The connection might have succeeded despite the error
+      console.log("Attempting automatic recovery after error");
+      handleRecoverConnection();
+      
+      toast({
+        title: "Connection issue",
+        description: message || "There was an issue with the Stripe connection. Attempting to recover...",
+        variant: "destructive"
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [toast, refetchStatus, connectionStatus, handleRecoverConnection]);
+  
+  // Special handler for when "Connection Failed" appears but Stripe confirmed success
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const error = searchParams.get("error");
+    const warning = searchParams.get("warning");
+    
+    // If there's an error in the URL but we know the connection was actually made,
+    // this is a false error from session issues
+    if ((error === "true" || warning === "true") && connectionStatus?.connected) {
+      // Clean up URL and show success message instead
+      window.history.replaceState({}, document.title, window.location.pathname);
+      toast({
+        title: "Connection successful",
+        description: "Your Stripe account was connected successfully despite the error message!",
+      });
+    }
+  }, [toast, connectionStatus?.connected]);
+  
+  const isConnected = connectionStatus?.connected;
+  
+  // Manual refresh function
+  const handleManualRefresh = () => {
+    refetchStatus();
+    toast({
+      title: "Refreshing connection status",
+      description: "Checking your Stripe account connection status...",
+    });
   };
 
   return (
