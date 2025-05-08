@@ -68,6 +68,7 @@ export default function PaymentConnectionsPage() {
   
   // Recovery process - attempt to recover a pending Stripe connection from the session
   const [isRecovering, setIsRecovering] = useState(false);
+  const [isForceResetting, setIsForceResetting] = useState(false);
   const [recoveryResult, setRecoveryResult] = useState<{
     recovered: boolean;
     message: string;
@@ -319,7 +320,6 @@ export default function PaymentConnectionsPage() {
   
   // State for tracking disconnect operation
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const [isForceResetting, setIsForceResetting] = useState(false);
   
   // Handle disconnecting from Stripe
   const handleDisconnectStripe = async () => {
@@ -528,6 +528,27 @@ export default function PaymentConnectionsPage() {
                       <>Disconnect Stripe Account</>
                     )}
                   </Button>
+                  
+                  {user && (user.role === "admin" || user.role === "super_admin") && (
+                    <Button
+                      variant="outline"
+                      className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                      onClick={handleForceReset}
+                      disabled={isForceResetting}
+                    >
+                      {isForceResetting ? (
+                        <>
+                          <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Resetting...
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-4 w-4 mr-2" />
+                          Force Reset Connection
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             ) : (

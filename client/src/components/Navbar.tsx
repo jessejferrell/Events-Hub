@@ -19,8 +19,18 @@ export default function Navbar() {
   const [location] = useLocation();
   const [stripeChecked, setStripeChecked] = useState(false);
   
+  // Define the type for Stripe status
+  interface StripeStatus {
+    connected: boolean;
+    accountId?: string;
+    detailsSubmitted?: boolean;
+    chargesEnabled?: boolean;
+    payoutsEnabled?: boolean;
+    message?: string;
+  }
+  
   // Fresh fetch of Stripe status, independent from any cached state
-  const { data: stripeStatus } = useQuery({
+  const { data: stripeStatus } = useQuery<StripeStatus>({
     queryKey: ['/api/stripe/account-status', Date.now()], // Force fresh check with timestamp
     enabled: !!user && (user.role === 'admin' || user.role === 'event_owner'),
     refetchInterval: 10000, // Check every 10 seconds
