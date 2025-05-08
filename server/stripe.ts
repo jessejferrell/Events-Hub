@@ -16,7 +16,7 @@ function getStripe() {
   // Always use the current environment variable, not the cached value
   const currentKey = process.env.STRIPE_SECRET_KEY || stripeSecretKey;
   return new Stripe(currentKey, {
-    apiVersion: "2025-04-30.basil", // Using latest Basil API version as upgraded
+    apiVersion: "2025-04-30.basil" as any, // Using latest Basil API version as upgraded
   });
 }
 
@@ -255,22 +255,22 @@ export function setupStripeRoutes(app: Express) {
       const idPrefix = stripeClientId.substring(0, 8);
       log(`Using Stripe Client ID starting with: ${idPrefix}...`, "stripe");
 
-      // USING EXACTLY THE SAME URLs THAT ARE REGISTERED IN STRIPE DASHBOARD FOR BOTH WEBHOOKS AND OAUTH
-      let registeredRedirectUri;
+      // Use different URLs for OAuth redirect vs webhooks
+      let redirectUri;
       
       // In development on Replit, use events-manager.replit.app
       if (process.env.NODE_ENV !== 'production') {
-        // USING THE EXACT REGISTERED URL FROM STRIPE DASHBOARD
-        registeredRedirectUri = "https://events-manager.replit.app/api/stripe/webhook";
-        log(`Using EXACT REGISTERED URL: ${registeredRedirectUri}`, "stripe");
+        // OAuth redirect URL (different from webhook)
+        redirectUri = "https://events-manager.replit.app/api/stripe/oauth-callback";
+        log(`Using development redirect URL: ${redirectUri}`, "stripe");
       } else {
-        // In production, use the EXACT REGISTERED URL FROM STRIPE DASHBOARD
-        registeredRedirectUri = "https://events.mosspointmainstreet.org/api/stripe/webhook";
-        log(`Using EXACT REGISTERED URL: ${registeredRedirectUri}`, "stripe");
+        // In production
+        redirectUri = "https://events.mosspointmainstreet.org/api/stripe/oauth-callback";
+        log(`Using production redirect URL: ${redirectUri}`, "stripe");
       }
       
       // Log a clear message about URLs
-      log(`CRITICAL: Using the EXACT same URL for both webhook endpoint AND OAuth redirect`, "stripe");
+      log(`Using appropriate OAuth redirect URLs (separate from webhook endpoints)`, "stripe");
       
       // Generate a unique identifier based on user ID and timestamp
       // This will be stored to disk as a fallback mechanism
@@ -292,8 +292,7 @@ export function setupStripeRoutes(app: Express) {
         // Continue anyway as this is just a backup
       }
       
-      // Use the calculated redirect URI
-      const redirectUri = registeredRedirectUri;
+      // We already have our redirect URI set above
       log(`Final redirect URI: ${redirectUri}`, "stripe");
       
       // Create a direct Connect link with your Stripe client ID
@@ -531,8 +530,63 @@ export function setupStripeRoutes(app: Express) {
     }
   });
   
-  // DIRECT APPROACH: Ultra-simplified Stripe OAuth callback endpoint
-  // OAuth callback handler
+  // Add the specific OAuth callback route we're setting as redirect_uri
+  app.get("/api/stripe/oauth-callback", async (req, res) => {
+    log(`OAuth callback received at /api/stripe/oauth-callback: ${JSON.stringify(req.query)}`, "stripe");
+    
+    // Extract the code and state
+    const { code, state } = req.query;
+    
+    if (!code) {
+      return res.redirect('/payment-connections?error=true&message=' + 
+        encodeURIComponent('Authorization failed or was denied'));
+    }
+    
+    // Exchange the code for an account ID
+    try {
+      const secretKey = process.env.STRIPE_SECRET_KEY;
+      if (!secretKey) {
+        return res.redirect('/payment-connections?error=true&message=' + 
+          encodeURIComponent('Server configuration error. Missing API key.'));
+      }
+      
+      // Create a fresh Stripe instance
+      const freshStripe = new Stripe(secretKey, {
+        apiVersion: "2025-04-30.basil",
+      });
+      
+      // Exchange the code for a token
+      const tokenResponse = await freshStripe.oauth.token({
+        grant_type: 'authorization_code',
+        code: code as string,
+      });
+      
+      if (!tokenResponse.stripe_user_id) {
+        return res.redirect('/payment-connections?error=true&message=' + 
+          encodeURIComponent('Invalid response from Stripe. The account ID was missing.'));
+      }
+      
+      const connectedAccountId = tokenResponse.stripe_user_id;
+      
+      // Save the account ID to the user
+      if (req.isAuthenticated()) {
+        await storage.updateUserStripeAccount(req.user.id, connectedAccountId);
+        return res.redirect('/payment-connections?success=true');
+      } else {
+        // Not authenticated, save to session and redirect to login
+        (req.session as any).pendingStripeAccountId = connectedAccountId;
+        req.session.save();
+        return res.redirect('/auth?message=' + 
+          encodeURIComponent('Please login to complete Stripe connection'));
+      }
+    } catch (error: any) {
+      log(`Error in OAuth callback: ${error.message}`, "stripe");
+      return res.redirect('/payment-connections?error=true&message=' + 
+        encodeURIComponent(error.message || 'Failed to connect Stripe account'));
+    }
+  });
+  
+  // LEGACY: Old broader debug endpoint
   app.get("/api/stripe/oauth/callback", async (req, res) => {
     // First, write everything to a file to ensure we capture it
     log(`STRIPE OAUTH CALLBACK RECEIVED: ${new Date().toISOString()}`, "stripe");
