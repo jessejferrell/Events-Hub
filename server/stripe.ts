@@ -16,7 +16,7 @@ function getStripe() {
   // Always use the current environment variable, not the cached value
   const currentKey = process.env.STRIPE_SECRET_KEY || stripeSecretKey;
   return new Stripe(currentKey, {
-    apiVersion: "2023-10-16", // Using standard stable API version
+    apiVersion: "2025-04-30.basil", // Using latest Basil API version as upgraded
   });
 }
 
@@ -90,7 +90,7 @@ export function setupStripeRoutes(app: Express) {
       try {
         console.log("TEST 1: Using Stripe SDK directly");
         const stripeTest = new Stripe(secretKey, {
-          apiVersion: "2023-10-16",
+          apiVersion: "2025-04-30.basil",
         });
         
         // Try to do a token exchange with a fake code
@@ -424,7 +424,7 @@ export function setupStripeRoutes(app: Express) {
         
         // Create a fresh Stripe instance with latest key
         const freshStripe = new Stripe(secretKey, {
-          apiVersion: "2023-10-16",
+          apiVersion: "2025-04-30.basil",
         });
         
         log(`Created fresh Stripe instance for token exchange`, "stripe");
@@ -646,7 +646,7 @@ export function setupStripeRoutes(app: Express) {
       try {
         // Get a completely fresh Stripe instance with the latest key
         const freshStripe = new Stripe(secretKey, {
-          apiVersion: "2023-10-16",
+          apiVersion: "2025-04-30.basil",
         });
         
         console.error("Created fresh Stripe instance with key format:", 
@@ -768,7 +768,7 @@ export function setupStripeRoutes(app: Express) {
           console.log("Using key format:", secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
           
           const freshStripe = new Stripe(secretKey, {
-            apiVersion: "2023-10-16",
+            apiVersion: "2025-04-30.basil",
           });
           
           // Exchange the code for an account ID
@@ -1694,7 +1694,7 @@ export function setupStripeRoutes(app: Express) {
       try {
         console.log("Attempting token exchange using Stripe SDK...");
         const freshStripe = new Stripe(secretKey, {
-          apiVersion: "2023-10-16",
+          apiVersion: "2025-04-30.basil",
         });
         
         const tokenResponse = await freshStripe.oauth.token({
