@@ -53,17 +53,47 @@ export default function PaymentConnectionsPage() {
     queryKey: ["/api/stripe/account-status"],
     queryFn: async () => {
       console.log("Fetching Stripe account status...");
-      const res = await fetch("/api/stripe/account-status");
-      if (!res.ok) throw new Error("Failed to fetch Stripe account status");
-      const data = await res.json();
-      console.log("Received connection status:", data);
-      return data;
+      // For reliability, use custom retry logic with exponential backoff
+      let retries = 0;
+      const maxRetries = 3;
+      
+      while (retries <= maxRetries) {
+        try {
+          const res = await fetch("/api/stripe/account-status");
+          if (!res.ok) {
+            throw new Error(`Failed to fetch Stripe account status: ${res.status}`);
+          }
+          const data = await res.json();
+          console.log("Received connection status:", data);
+          
+          // Extra validation to ensure we have valid data
+          if (typeof data?.connected !== 'boolean') {
+            console.warn("Invalid connection status format, missing 'connected' field:", data);
+            throw new Error("Invalid connection status format");
+          }
+          
+          return data;
+        } catch (error) {
+          retries++;
+          console.error(`Stripe status check failed (attempt ${retries}/${maxRetries + 1}):`, error);
+          
+          if (retries > maxRetries) {
+            throw error;
+          }
+          
+          // Wait before retrying with exponential backoff
+          await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retries)));
+        }
+      }
+      
+      throw new Error("Failed to fetch Stripe account status after multiple attempts");
     },
     enabled: !!user,
     // Force refresh more frequently and don't keep stale data
     staleTime: 10 * 1000, // 10 seconds
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    refetchInterval: 15 * 1000, // Periodically refresh every 15 seconds
   });
   
   // Recovery process - attempt to recover a pending Stripe connection from the session
@@ -307,7 +337,25 @@ export default function PaymentConnectionsPage() {
     }
   }, [toast, connectionStatus?.connected]);
   
-  const isConnected = connectionStatus?.connected;
+  // Multiple validation layers to ensure the connection status is accurate
+  // This makes the code work consistently in both production and development
+  const isConnected = (() => {
+    // If we have connection data, trust the connected field as source of truth
+    if (connectionStatus && typeof connectionStatus.connected === 'boolean') {
+      return connectionStatus.connected;
+    }
+    
+    // If we have an account ID and either no status field 
+    // or a truthy connected field despite prior check failing
+    if (connectionStatus?.accountId) {
+      // Having a non-empty accountId is a strong signal that we're connected
+      console.log("Secondary connection validation - using accountId presence as fallback");
+      return true;
+    }
+
+    // Return false if we have neither a clear connection status nor an account ID
+    return false;
+  })();
   
   // Manual refresh function
   const handleManualRefresh = () => {
