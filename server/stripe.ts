@@ -3,6 +3,15 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { log } from "./vite";
 
+// Extend the Stripe API version type to include Basil version
+declare module 'stripe' {
+  namespace Stripe {
+    interface StripeConfig {
+      apiVersion: string;
+    }
+  }
+}
+
 // Initialize Stripe with the secret key
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_example";
 const stripePublicKey = process.env.VITE_STRIPE_PUBLIC_KEY || "pk_test_example";
@@ -90,7 +99,7 @@ export function setupStripeRoutes(app: Express) {
       try {
         console.log("TEST 1: Using Stripe SDK directly");
         const stripeTest = new Stripe(secretKey, {
-          apiVersion: "2025-04-30.basil",
+          apiVersion: "2025-04-30.basil" as any,
         });
         
         // Try to do a token exchange with a fake code
@@ -186,9 +195,13 @@ export function setupStripeRoutes(app: Express) {
     const replitAppDomain = "https://events-manager.replit.app";
     
     // THESE ARE THE EXACT URLS THAT MUST BE REGISTERED IN STRIPE DASHBOARD
-    // FOR BOTH WEBHOOKS AND OAUTH REDIRECTS
-    const prodUrl = `${productionDomain}/api/stripe/webhook`;
-    const devUrl = `${replitAppDomain}/api/stripe/webhook`;
+    // Webhook endpoints
+    const prodWebhookUrl = `${productionDomain}/api/stripe/webhook`;
+    const devWebhookUrl = `${replitAppDomain}/api/stripe/webhook`;
+    
+    // OAuth redirect endpoints (separate from webhooks)
+    const prodOAuthRedirectUrl = `${productionDomain}/api/stripe/oauth-callback`;
+    const devOAuthRedirectUrl = `${replitAppDomain}/api/stripe/oauth-callback`;
     
     // Generate sample OAuth URLs to verify
     const stripeOAuthUrl = new URL('https://dashboard.stripe.com/oauth/authorize');
@@ -198,11 +211,11 @@ export function setupStripeRoutes(app: Express) {
     
     // In development mode
     const devOAuthUrl = new URL(stripeOAuthUrl.toString());
-    devOAuthUrl.searchParams.append('redirect_uri', devUrl);
+    devOAuthUrl.searchParams.append('redirect_uri', devOAuthRedirectUrl);
     
     // In production mode
     const prodOAuthUrl = new URL(stripeOAuthUrl.toString());
-    prodOAuthUrl.searchParams.append('redirect_uri', prodUrl);
+    prodOAuthUrl.searchParams.append('redirect_uri', prodOAuthRedirectUrl);
     
     res.json({
       clientId: clientId ? clientId.substring(0, 4) + '...' + clientId.substring(clientId.length - 4) : 'missing',
@@ -211,10 +224,14 @@ export function setupStripeRoutes(app: Express) {
       replitAppDomain,
       currentDomain: req.protocol + '://' + req.get('host'),
       replit_domains: process.env.REPLIT_DOMAINS || '',
-      // The EXACT URLs to register in Stripe Dashboard for both Webhooks and OAuth redirects
-      registeredUrls: [
-        prodUrl,
-        devUrl
+      // The EXACT URLs to register in Stripe Dashboard
+      webhookUrls: [
+        prodWebhookUrl,
+        devWebhookUrl
+      ],
+      oauthRedirectUrls: [
+        prodOAuthRedirectUrl,
+        devOAuthRedirectUrl
       ],
       // Sample OAuth URLs for verification (with sensitive data removed)
       devOAuthUrlExample: devOAuthUrl.toString().replace(/client_id=[^&]+/, 'client_id=HIDDEN'),
@@ -423,7 +440,7 @@ export function setupStripeRoutes(app: Express) {
         
         // Create a fresh Stripe instance with latest key
         const freshStripe = new Stripe(secretKey, {
-          apiVersion: "2025-04-30.basil",
+          apiVersion: "2025-04-30.basil" as any,
         });
         
         log(`Created fresh Stripe instance for token exchange`, "stripe");
@@ -552,7 +569,7 @@ export function setupStripeRoutes(app: Express) {
       
       // Create a fresh Stripe instance
       const freshStripe = new Stripe(secretKey, {
-        apiVersion: "2025-04-30.basil",
+        apiVersion: "2025-04-30.basil" as any,
       });
       
       // Exchange the code for a token
@@ -700,7 +717,7 @@ export function setupStripeRoutes(app: Express) {
       try {
         // Get a completely fresh Stripe instance with the latest key
         const freshStripe = new Stripe(secretKey, {
-          apiVersion: "2025-04-30.basil",
+          apiVersion: "2025-04-30.basil" as any,
         });
         
         console.error("Created fresh Stripe instance with key format:", 
@@ -822,7 +839,7 @@ export function setupStripeRoutes(app: Express) {
           console.log("Using key format:", secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
           
           const freshStripe = new Stripe(secretKey, {
-            apiVersion: "2025-04-30.basil",
+            apiVersion: "2025-04-30.basil" as any,
           });
           
           // Exchange the code for an account ID
@@ -1748,7 +1765,7 @@ export function setupStripeRoutes(app: Express) {
       try {
         console.log("Attempting token exchange using Stripe SDK...");
         const freshStripe = new Stripe(secretKey, {
-          apiVersion: "2025-04-30.basil",
+          apiVersion: "2025-04-30.basil" as any,
         });
         
         const tokenResponse = await freshStripe.oauth.token({
