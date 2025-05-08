@@ -309,14 +309,82 @@ export default function PaymentConnectionsPage() {
       description: "Checking your Stripe account connection status...",
     });
   };
+  
+  // State for tracking disconnect operation
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  
+  // Handle disconnecting from Stripe
+  const handleDisconnectStripe = async () => {
+    if (!window.confirm("Are you sure you want to disconnect your Stripe account? You will need to reconnect to process payments.")) {
+      return;
+    }
+    
+    setIsDisconnecting(true);
+    
+    try {
+      const response = await fetch("/api/stripe/disconnect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        toast({
+          title: "Account disconnected",
+          description: "Your Stripe account has been disconnected successfully",
+        });
+        
+        // Refresh the connection status
+        refetchStatus();
+      } else {
+        toast({
+          title: "Disconnect failed",
+          description: data.message || "Failed to disconnect your Stripe account",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error disconnecting Stripe account:", error);
+      toast({
+        title: "Disconnect failed",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       
       <main className="flex-grow container mx-auto px-4 py-6">
-        <div className="mb-6">
+        <div className="mb-6 flex flex-wrap justify-between items-center">
           <h1 className="text-2xl font-bold">Payment Connections</h1>
+          
+          {!isLoading && !isLoadingConnection && (
+            <div className={`px-4 py-2 rounded-full flex items-center ${
+              isConnected 
+                ? "bg-green-100 text-green-800 border border-green-300" 
+                : "bg-amber-100 text-amber-800 border border-amber-300"
+            }`}>
+              {isConnected ? (
+                <>
+                  <BadgeCheck className="h-5 w-5 mr-2 text-green-600" />
+                  <span className="font-medium">Connected to Stripe</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-5 w-5 mr-2 text-amber-600" />
+                  <span className="font-medium">Not connected to Stripe</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Stripe Connect Card */}
@@ -380,13 +448,29 @@ export default function PaymentConnectionsPage() {
                     </span>
                   )}
                 </p>
-                <div className="flex space-x-4">
+                <div className="flex flex-wrap gap-4">
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => window.open("https://dashboard.stripe.com", "_blank")}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
                     Open Stripe Dashboard
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    className="text-red-700 border-red-300 hover:bg-red-100"
+                    onClick={handleDisconnectStripe}
+                    disabled={isDisconnecting}
+                  >
+                    {isDisconnecting ? (
+                      <>
+                        <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Disconnecting...
+                      </>
+                    ) : (
+                      <>Disconnect Stripe Account</>
+                    )}
                   </Button>
                 </div>
               </div>
