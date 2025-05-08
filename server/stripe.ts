@@ -992,6 +992,41 @@ export function setupStripeRoutes(app: Express) {
   });
 
   // Endpoint to check the status of a Stripe account
+  // Add endpoint to disconnect a Stripe account
+  app.post("/api/stripe/disconnect", async (req, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ 
+          success: false,
+          message: "Not authenticated" 
+        });
+      }
+      
+      if (!user.stripeAccountId) {
+        return res.status(400).json({
+          success: false,
+          message: "No Stripe account connected"
+        });
+      }
+      
+      // Remove the connection in our database
+      await storage.updateUserStripeAccount(user.id, null);
+      
+      return res.json({
+        success: true,
+        message: "Successfully disconnected Stripe account"
+      });
+    } catch (error) {
+      log(`Error disconnecting Stripe account: ${getErrorMessage(error)}`, "stripe");
+      return res.status(500).json({
+        success: false,
+        message: "Failed to disconnect account",
+        error: getErrorMessage(error)
+      });
+    }
+  });
+
   app.get("/api/stripe/account-status", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
