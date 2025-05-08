@@ -122,6 +122,8 @@ export default function PaymentConnectionsPage() {
             title: "Already connected",
             description: "Your account is already connected to Stripe.",
           });
+          // Invalidate to ensure fresh data
+          queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
           refetchStatus();
           setIsRedirecting(false);
         } else if (data.url) {
@@ -204,6 +206,7 @@ export default function PaymentConnectionsPage() {
         
         // Still refresh status to ensure UI is consistent
         console.log("Account already connected - updating status");
+        queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
         await refetchStatus();
       } else {
         toast({
@@ -360,6 +363,7 @@ export default function PaymentConnectionsPage() {
   
   // Manual refresh function
   const handleManualRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
     refetchStatus();
     toast({
       title: "Refreshing connection status",
@@ -394,7 +398,8 @@ export default function PaymentConnectionsPage() {
           description: "Your Stripe account has been disconnected successfully",
         });
         
-        // Refresh the connection status
+        // Invalidate and refresh the connection status
+        queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
         refetchStatus();
       } else {
         toast({
@@ -505,177 +510,115 @@ export default function PaymentConnectionsPage() {
                     </span>
                   )}
                 </p>
-                <div className="flex flex-wrap gap-4">
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => window.open("https://dashboard.stripe.com", "_blank")}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Open Stripe Dashboard
+                
+                <div className="flex flex-wrap gap-3">
+                  <Button asChild variant="outline">
+                    <a 
+                      href="https://dashboard.stripe.com/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1.5" />
+                      Open Stripe Dashboard
+                    </a>
                   </Button>
                   
-                  <Button
-                    variant="outline"
-                    className="text-red-700 border-red-300 hover:bg-red-100"
-                    onClick={handleDisconnectStripe}
-                    disabled={isDisconnecting}
-                  >
-                    {isDisconnecting ? (
-                      <>
-                        <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        Disconnecting...
-                      </>
-                    ) : (
-                      <>Disconnect Stripe Account</>
-                    )}
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" className="text-red-600 border-red-200 hover:text-red-700 hover:bg-red-50 hover:border-red-300">
+                        Disconnect Account
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Disconnect Stripe Account?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action will disconnect your Stripe account from City Event Hub. 
+                          You will need to reconnect to process payments. Are you sure?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDisconnectStripe}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                          disabled={isDisconnecting}
+                        >
+                          {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             ) : (
-              <>
-                {connectionStatus && (
+              <div>
+                {stripeConfig?.hasOAuthKey ? (
                   <div className="mb-4 p-3 border rounded-md bg-amber-50 border-amber-200">
                     <div className="flex items-center gap-2">
                       <AlertCircle className="h-5 w-5 text-amber-600" />
-                      <p className="text-amber-800 font-medium">
-                        {connectionStatus.connected 
-                          ? "Your account is already connected to Stripe" 
-                          : "Your account is not connected to Stripe"}
+                      <p className="text-amber-800">Your account is not connected to Stripe</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-4 p-3 border rounded-md bg-amber-50 border-amber-200">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-600" />
+                      <p className="text-amber-800">
+                        Stripe OAuth is not properly configured. Please contact support.
                       </p>
                     </div>
-                    {connectionStatus.connected && (
-                      <div className="mt-2">
-                        <p className="text-sm text-amber-700 mb-2">Account ID: {connectionStatus.accountId}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="text-amber-700 border-amber-300 hover:bg-amber-100"
-                            onClick={handleManualRefresh}
-                          >
-                            <RefreshCw className="h-4 w-4 mr-1" />
-                            Refresh Status
-                          </Button>
-                          
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="text-red-700 border-red-300 hover:bg-red-100"
-                            onClick={handleDisconnectStripe}
-                          >
-                            Disconnect
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
                 
-                <p className="text-neutral-600 mb-4">
-                  By connecting with Stripe, you can accept credit and debit card payments directly to your bank account. 
-                  Stripe charges standard processing fees of 2.9% + 30¢ per successful transaction.
+                <p className="text-neutral-600 mb-6">
+                  By connecting with Stripe, you can accept credit and debit card payments directly to your bank account,
+                  while City Event Hub handles the processing fee of 1.5% + 30¢ per successful transaction.
                 </p>
                 
-                {/* Connection error alert */}
-                {window.location.search.includes('error=true') && (
-                  <div className="mb-4 p-4 bg-amber-50 rounded-md border border-amber-200">
-                    <h3 className="text-lg font-medium text-amber-800 mb-2 flex items-center">
-                      <AlertCircle className="h-5 w-5 mr-2" />
-                      Connection Issue
-                    </h3>
-                    <p className="text-sm text-amber-700 mb-2">
-                      We received an error message during the connection process, but this may be incorrect.
-                    </p>
-                    <ul className="text-sm text-amber-700 list-disc list-inside mb-3">
-                      <li>If you completed the Stripe authorization, try the "Recover Connection" button</li>
-                      <li>If you see "Connection Failed" but Stripe confirmed your account setup, this is likely a session issue that can be fixed automatically</li>
-                    </ul>
-                    <div className="flex flex-wrap gap-3">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleRecoverConnection}
-                        disabled={isRecovering}
-                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
-                      >
-                        {isRecovering ? (
-                          <>
-                            <div className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                            Recovering...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-1" />
-                            Recover Connection
-                          </>
-                        )}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleManualRefresh}
-                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Check Status
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.history.replaceState({}, document.title, window.location.pathname)}
-                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
-                      >
-                        Clear Message
-                      </Button>
-                    </div>
-                    
-                    {/* Show recovery result if available */}
-                    {recoveryResult && (
-                      <div className={`mt-3 p-3 rounded-md ${
-                        recoveryResult.recovered 
-                          ? "bg-green-100 border border-green-200 text-green-800"
-                          : "bg-amber-100 border border-amber-200 text-amber-800"
-                      }`}>
-                        <p className="text-sm font-medium">
-                          {recoveryResult.recovered 
-                            ? "Successfully recovered your Stripe connection!"
-                            : "Recovery not needed"}
-                        </p>
-                        <p className="text-xs mt-1">
-                          {recoveryResult.message}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      className="bg-indigo-600 hover:bg-indigo-700"
-                      disabled={isRedirecting}
-                    >
-                      {isRedirecting ? "Redirecting..." : "Connect with Stripe"}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Connect with Stripe</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        You will be redirected to Stripe to complete the connection process. 
-                        After connecting, payments for your events will be sent directly to your bank account.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleConnectStripe}>Continue</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
+                <Button 
+                  onClick={handleConnectStripe} 
+                  disabled={isRedirecting || !stripeConfig?.hasOAuthKey}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {isRedirecting ? 'Connecting...' : 'Connect with Stripe'}
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
+        
+        {/* Additional Information */}
+        <div className="mt-10 max-w-3xl">
+          <h2 className="text-xl font-semibold mb-4">Frequently Asked Questions</h2>
+          
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-medium mb-2">How does payment processing work?</h3>
+              <p className="text-neutral-600">
+                City Event Hub uses Stripe Connect to allow event organizers to accept payments directly to their own bank accounts. 
+                Payments are processed securely through Stripe and deposited to your connected bank account.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="font-medium mb-2">What if I don't have a Stripe account?</h3>
+              <p className="text-neutral-600">
+                Don't worry! You'll be guided through the Stripe account creation process when you click "Connect with Stripe". 
+                The setup is quick and straightforward.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="font-medium mb-2">How long does it take to receive funds?</h3>
+              <p className="text-neutral-600">
+                Typically, funds are available in your bank account within 2 business days after a successful transaction, 
+                but this can vary based on your Stripe account settings and bank processing times.
+              </p>
+            </div>
+          </div>
+        </div>
       </main>
       
       <Footer />
