@@ -392,6 +392,33 @@ export default function PaymentConnectionsPage() {
               </div>
             ) : (
               <>
+                {connectionStatus && (
+                  <div className="mb-4 p-3 border rounded-md bg-amber-50 border-amber-200">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-600" />
+                      <p className="text-amber-800 font-medium">
+                        {connectionStatus.connected 
+                          ? "Your account is already connected to Stripe" 
+                          : "Your account is not connected to Stripe"}
+                      </p>
+                    </div>
+                    {connectionStatus.connected && (
+                      <div className="mt-2">
+                        <p className="text-sm text-amber-700 mb-2">Account ID: {connectionStatus.accountId}</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                          onClick={handleManualRefresh}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                          Refresh Status
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <p className="text-neutral-600 mb-4">
                   By connecting with Stripe, you can accept credit and debit card payments directly to your bank account. 
                   Stripe charges standard processing fees of 2.9% + 30¢ per successful transaction.
