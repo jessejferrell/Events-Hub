@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "wouter";
-import { LogOut, User, Settings, Mail, AlertCircle, BadgeCheck } from "lucide-react";
+import { LogOut, User, Settings, Mail, AlertCircle, BadgeCheck, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { CartWidget } from "@/components/cart/CartWidget";
 import { useQuery } from "@tanstack/react-query";
@@ -31,25 +31,21 @@ export default function Navbar() {
   
   // Fresh fetch of Stripe status, independent from any cached state
   const { data: stripeStatus } = useQuery<StripeStatus>({
-    queryKey: ['/api/stripe/account-status', Date.now()], // Force fresh check with timestamp
+    queryKey: ['/api/stripe/account-status'],
     enabled: !!user && (user.role === 'admin' || user.role === 'event_owner'),
     refetchInterval: 10000, // Check every 10 seconds
+    staleTime: 0, // Never consider the data fresh
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
   
-  // Fresh stripe status check whenever page is loaded
+  // We don't need this separate fetch since we have the query above
+  // that will properly handle status updates with refetching
   useEffect(() => {
     if (user && (user.role === 'admin' || user.role === 'event_owner')) {
-      fetch('/api/stripe/account-status')
-        .then(res => res.json())
-        .then(data => {
-          setStripeChecked(true);
-          console.log('Navbar direct Stripe status check:', data);
-        })
-        .catch(err => {
-          console.error('Error checking Stripe status in Navbar:', err);
-        });
+      setStripeChecked(true);
     }
-  }, [user]);
+  }, [user, stripeStatus]);
 
   const handleLogout = useCallback(() => {
     logoutMutation.mutate();
@@ -230,15 +226,22 @@ export default function Navbar() {
             {/* Stripe connection status indicator */}
             {user && (user.role === "event_owner" || user.role === "admin") && (
               <div className="flex items-center ml-auto">
-                {stripeStatus && stripeStatus.connected ? (
-                  <div className="flex items-center text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full">
-                    <BadgeCheck className="h-3 w-3 mr-1 text-green-600" />
-                    <span>Stripe Connected</span>
-                  </div>
+                {stripeStatus ? (
+                  stripeStatus.connected ? (
+                    <div className="flex items-center text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full">
+                      <BadgeCheck className="h-3 w-3 mr-1 text-green-600" />
+                      <span>Stripe Connected</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
+                      <AlertCircle className="h-3 w-3 mr-1 text-amber-600" />
+                      <span>Not Connected</span>
+                    </div>
+                  )
                 ) : (
-                  <div className="flex items-center text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
-                    <AlertCircle className="h-3 w-3 mr-1 text-amber-600" />
-                    <span>Not Connected</span>
+                  <div className="flex items-center text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    <span>Checking...</span>
                   </div>
                 )}
               </div>
