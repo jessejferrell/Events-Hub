@@ -1087,28 +1087,29 @@ export function setupStripeRoutes(app: Express) {
       
       log(`Account status check - Retrieving account ${req.user.stripeAccountId} for user ${req.user.id}`, "stripe");
       
-      // Retrieve the account to get its current status
-      const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
-      
-      // Log detailed account information for debugging
-      log(`Account status check - Retrieved account ${account.id}, details_submitted: ${account.details_submitted}`, "stripe");
-      
-      const response = {
-        connected: true,
-        accountId: account.id,
-        detailsSubmitted: account.details_submitted,
-        chargesEnabled: account.charges_enabled,
-        payoutsEnabled: account.payouts_enabled
-      };
-      
-      // Log the response
-      log(`Account status check - Responding with: ${JSON.stringify(response)}`, "stripe");
-      
-      return res.json(response);
-    } catch (error: any) {
-      // If the account doesn't exist in Stripe, clear the connection
-      if (error.code === 'account_invalid' || error.code === 'resource_missing' || error.type === 'invalid_request_error') {
-        log(`Account status check - Invalid account ID ${req.user.stripeAccountId}, clearing connection`, "stripe");
+      try {
+        // Retrieve the account to get its current status
+        const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
+        
+        // Log detailed account information for debugging
+        log(`Account status check - Retrieved account ${account.id}, details_submitted: ${account.details_submitted}`, "stripe");
+        
+        const response = {
+          connected: true,
+          accountId: account.id,
+          detailsSubmitted: account.details_submitted,
+          chargesEnabled: account.charges_enabled,
+          payoutsEnabled: account.payouts_enabled
+        };
+        
+        // Log the response
+        log(`Account status check - Responding with: ${JSON.stringify(response)}`, "stripe");
+        
+        return res.json(response);
+      } catch (accountError: any) {
+        // If the account doesn't exist in Stripe, clear the connection
+        log(`Account status check - Error retrieving account: ${accountError.message}`, "stripe");
+        log(`Account status check - Clearing invalid account ID ${req.user.stripeAccountId}`, "stripe");
         
         // Clear the stored account ID since it's invalid
         await storage.updateUserStripeAccount(req.user.id, "");
@@ -1119,12 +1120,51 @@ export function setupStripeRoutes(app: Express) {
           clearedInvalidAccount: true
         });
       }
-      
-      log(`Error retrieving Stripe account: ${error.message}`, "stripe");
+    } catch (error: any) {
+      log(`Error in account status check: ${error.message}`, "stripe");
       log(`Error details: ${JSON.stringify(error)}`, "stripe");
       
       return res.status(500).json({ 
         message: "Failed to retrieve Stripe account status",
+        error: error.message
+      });
+    }
+  });
+  
+  // Force reset endpoint for admins to clear invalid Stripe state
+  app.post("/api/stripe/force-reset", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    try {
+      const userId = req.user.id;
+      log(`Force reset - Admin ${userId} is resetting Stripe connection`, "stripe");
+      
+      // Clear the account ID completely
+      await storage.updateUserStripeAccount(userId, "");
+      
+      // Clear any session data related to Stripe
+      if (req.session) {
+        (req.session as any).pendingStripeAccountId = null;
+        (req.session as any).stripeConnectState = null;
+        req.session.save();
+      }
+      
+      return res.json({
+        success: true,
+        message: "Stripe connection has been forcibly reset"
+      });
+    } catch (error: any) {
+      log(`Error during force reset: ${error.message}`, "stripe");
+      
+      return res.status(500).json({
+        success: false,
+        message: "Failed to reset Stripe connection",
         error: error.message
       });
     }

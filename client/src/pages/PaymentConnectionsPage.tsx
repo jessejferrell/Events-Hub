@@ -319,6 +319,7 @@ export default function PaymentConnectionsPage() {
   
   // State for tracking disconnect operation
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isForceResetting, setIsForceResetting] = useState(false);
   
   // Handle disconnecting from Stripe
   const handleDisconnectStripe = async () => {
@@ -345,7 +346,10 @@ export default function PaymentConnectionsPage() {
         });
         
         // Refresh the connection status
-        refetchStatus();
+        setTimeout(() => {
+          refetchStatus();
+          window.location.reload(); // Force a full page reload to clear any cached state
+        }, 1000);
       } else {
         toast({
           title: "Disconnect failed",
@@ -362,6 +366,51 @@ export default function PaymentConnectionsPage() {
       });
     } finally {
       setIsDisconnecting(false);
+    }
+  };
+  
+  // Handle force reset (admin only)
+  const handleForceReset = async () => {
+    if (!window.confirm("⚠️ WARNING: This will completely reset your Stripe connection state. Only use this if you're experiencing connection issues. Continue?")) {
+      return;
+    }
+    
+    setIsForceResetting(true);
+    
+    try {
+      const response = await fetch("/api/stripe/force-reset", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        toast({
+          title: "Connection reset",
+          description: "Your Stripe connection has been completely reset. You can now reconnect.",
+        });
+        
+        // Force a full page reload to clear any cached state
+        window.location.reload();
+      } else {
+        toast({
+          title: "Reset failed",
+          description: data.message || "Failed to reset your Stripe account",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error resetting Stripe connection:", error);
+      toast({
+        title: "Reset failed",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsForceResetting(false);
     }
   };
 
@@ -577,6 +626,28 @@ export default function PaymentConnectionsPage() {
                       >
                         Clear Message
                       </Button>
+                      
+                      {user?.role === 'admin' || user?.role === 'super_admin' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleForceReset}
+                          disabled={isForceResetting}
+                          className="text-red-700 border-red-300 hover:bg-red-100"
+                        >
+                          {isForceResetting ? (
+                            <>
+                              <div className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              Resetting...
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="h-4 w-4 mr-1" />
+                              Force Reset Connection
+                            </>
+                          )}
+                        </Button>
+                      ) : null}
                     </div>
                     
                     {/* Show recovery result if available */}
