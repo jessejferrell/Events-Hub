@@ -1077,12 +1077,29 @@ export function setupStripeRoutes(app: Express) {
       // Log the user ID making the request
       log(`Account status check - User ${req.user.id} (${req.user.username})`, "stripe");
       
+      // Environment-agnostic safety check: Ensure we return consistent data format
+      // regardless of development or production environment
+      const sendFailsafeResponse = (isConnected = false, details = {}) => {
+        // Guarantee consistent response format even if there's partial data
+        const response = {
+          connected: isConnected,
+          accountId: req.user.stripeAccountId || "",
+          detailsSubmitted: false,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+          message: isConnected ? "Account connected" : "Not connected",
+          ...details
+        };
+        
+        // Important: consistent format makes it work the same in all environments
+        log(`Account status check - Sending response: ${JSON.stringify(response)}`, "stripe");
+        return res.json(response);
+      };
+      
+      // If no Stripe account ID, clearly not connected
       if (!req.user.stripeAccountId) {
         log(`Account status check - No Stripe account ID for user ${req.user.id}`, "stripe");
-        return res.json({ 
-          connected: false,
-          message: "No Stripe account connected"  
-        });
+        return sendFailsafeResponse(false, { message: "No Stripe account connected" });
       }
       
       log(`Account status check - Retrieving account ${req.user.stripeAccountId} for user ${req.user.id}`, "stripe");
@@ -1094,18 +1111,13 @@ export function setupStripeRoutes(app: Express) {
         // Log detailed account information for debugging
         log(`Account status check - Retrieved account ${account.id}, details_submitted: ${account.details_submitted}`, "stripe");
         
-        const response = {
-          connected: true,
+        // Build consistent response with all necessary fields
+        return sendFailsafeResponse(true, {
           accountId: account.id,
           detailsSubmitted: account.details_submitted,
           chargesEnabled: account.charges_enabled,
           payoutsEnabled: account.payouts_enabled
-        };
-        
-        // Log the response
-        log(`Account status check - Responding with: ${JSON.stringify(response)}`, "stripe");
-        
-        return res.json(response);
+        });
       } catch (accountError: any) {
         // If the account doesn't exist in Stripe, clear the connection
         log(`Account status check - Error retrieving account: ${accountError.message}`, "stripe");
@@ -1114,8 +1126,7 @@ export function setupStripeRoutes(app: Express) {
         // Clear the stored account ID since it's invalid
         await storage.updateUserStripeAccount(req.user.id, "");
         
-        return res.json({ 
-          connected: false,
+        return sendFailsafeResponse(false, {
           message: "Account no longer exists or is invalid",
           clearedInvalidAccount: true
         });

@@ -30,8 +30,29 @@ export default function Navbar() {
   }
   
   // Fresh fetch of Stripe status, independent from any cached state
-  const { data: stripeStatus } = useQuery<StripeStatus>({
+  const { data: stripeStatus, isLoading: isLoadingStripeStatus } = useQuery<StripeStatus>({
     queryKey: ['/api/stripe/account-status'],
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/stripe/account-status');
+        if (!res.ok) {
+          throw new Error(`Failed to fetch Stripe status: ${res.status}`);
+        }
+        const data = await res.json();
+        
+        // Ensure we have a valid response with at least the connected field
+        if (typeof data?.connected !== 'boolean') {
+          console.warn('Invalid Stripe status response format:', data);
+          return { connected: false, message: "Invalid response format" };
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Error fetching Stripe status:', error);
+        // Return a failsafe response that won't break the UI
+        return { connected: false, message: "Error checking status" };
+      }
+    },
     enabled: !!user && (user.role === 'admin' || user.role === 'event_owner'),
     refetchInterval: 10000, // Check every 10 seconds
     staleTime: 0, // Never consider the data fresh
@@ -226,23 +247,53 @@ export default function Navbar() {
             {/* Stripe connection status indicator */}
             {user && (user.role === "event_owner" || user.role === "admin") && (
               <div className="flex items-center ml-auto">
-                {stripeStatus ? (
-                  stripeStatus.connected ? (
-                    <div className="flex items-center text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full">
-                      <BadgeCheck className="h-3 w-3 mr-1 text-green-600" />
-                      <span>Stripe Connected</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
-                      <AlertCircle className="h-3 w-3 mr-1 text-amber-600" />
-                      <span>Not Connected</span>
-                    </div>
-                  )
-                ) : (
+                {isLoadingStripeStatus ? (
                   <div className="flex items-center text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                     <span>Checking...</span>
                   </div>
+                ) : (
+                  <>
+                    {/* Multi-level check for connected status similar to PaymentConnectionsPage */}
+                    {(() => {
+                      // Robust status detection - never display incorrect status due to data inconsistency
+                      let isConnected = false;
+                      
+                      try {
+                        // PRIMARY CHECK: Direct from connected field
+                        if (stripeStatus && typeof stripeStatus.connected === 'boolean') {
+                          isConnected = stripeStatus.connected;
+                        }
+                        // SECONDARY CHECK: Account ID presence
+                        else if (stripeStatus?.accountId && 
+                                typeof stripeStatus.accountId === 'string' && 
+                                stripeStatus.accountId.startsWith('acct_')) {
+                          isConnected = true;
+                        }
+                        // TERTIARY CHECK: Account capabilities
+                        else if (stripeStatus && 
+                                (stripeStatus.detailsSubmitted === true || 
+                                stripeStatus.chargesEnabled === true || 
+                                stripeStatus.payoutsEnabled === true)) {
+                          isConnected = true;
+                        }
+                      } catch (error) {
+                        console.error("Error determining status in navbar:", error);
+                      }
+                      
+                      return isConnected ? (
+                        <div className="flex items-center text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full">
+                          <BadgeCheck className="h-3 w-3 mr-1 text-green-600" />
+                          <span>Stripe Connected</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
+                          <AlertCircle className="h-3 w-3 mr-1 text-amber-600" />
+                          <span>Not Connected</span>
+                        </div>
+                      );
+                    })()}
+                  </>
                 )}
               </div>
             )}

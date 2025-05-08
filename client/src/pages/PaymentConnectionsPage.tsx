@@ -340,21 +340,44 @@ export default function PaymentConnectionsPage() {
   // Multiple validation layers to ensure the connection status is accurate
   // This makes the code work consistently in both production and development
   const isConnected = (() => {
-    // If we have connection data, trust the connected field as source of truth
-    if (connectionStatus && typeof connectionStatus.connected === 'boolean') {
-      return connectionStatus.connected;
-    }
+    // Always log the raw data we're working with for debugging
+    console.log("=== STRIPE CONNECTION STATUS DATA ===");
+    console.log("Raw status data:", connectionStatus);
+    console.log("Environment:", process.env.NODE_ENV || "development");
+    console.log("====================================");
     
-    // If we have an account ID and either no status field 
-    // or a truthy connected field despite prior check failing
-    if (connectionStatus?.accountId) {
-      // Having a non-empty accountId is a strong signal that we're connected
-      console.log("Secondary connection validation - using accountId presence as fallback");
-      return true;
+    try {
+      // PRIMARY CHECK: If we have connection data, trust the connected field as source of truth
+      if (connectionStatus && typeof connectionStatus.connected === 'boolean') {
+        console.log("Primary validation successful: using connected field =", connectionStatus.connected);
+        return connectionStatus.connected;
+      }
+      
+      // SECONDARY CHECK: If we have an account ID that's a valid format, we're connected
+      if (connectionStatus?.accountId && 
+          typeof connectionStatus.accountId === 'string' && 
+          connectionStatus.accountId.startsWith('acct_')) {
+        console.log("Secondary validation: using accountId presence as indicator");
+        return true;
+      }
+      
+      // TERTIARY CHECK: Look for other signals of connection status
+      if (connectionStatus && 
+          (connectionStatus.detailsSubmitted === true || 
+           connectionStatus.chargesEnabled === true || 
+           connectionStatus.payoutsEnabled === true)) {
+        console.log("Tertiary validation: connected based on account capabilities");
+        return true;
+      }
+      
+      // FALLBACK: No positive indicators found
+      console.log("No connection indicators found - assuming not connected");
+      return false;
+    } catch (error) {
+      // FAIL-SAFE: If anything goes wrong in our logic, assume not connected for safety
+      console.error("Error determining connection status:", error);
+      return false;
     }
-
-    // Return false if we have neither a clear connection status nor an account ID
-    return false;
   })();
   
   // Manual refresh function
