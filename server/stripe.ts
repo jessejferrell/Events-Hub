@@ -3,11 +3,13 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { log } from "./vite";
 
-// Extend the Stripe API version type to include Basil version
+// NOTE: We only need this extension if we're using a non-standard API version
+// Otherwise, the normal type definitions work fine
+// This fixes the TypeScript LSP errors related to the apiVersion
 declare module 'stripe' {
   namespace Stripe {
     interface StripeConfig {
-      apiVersion: string;
+      apiVersion: string | "2023-10-16" | "2022-11-15" | "2024-01-01" | "2025-03-31.basil" | "2025-04-30.basil";
     }
   }
 }
@@ -109,7 +111,7 @@ export function setupStripeRoutes(app: Express) {
             code: 'fake_code_for_testing',
           });
           console.log("Unexpectedly got success response from SDK:", tokenResult);
-        } catch (sdkError) {
+        } catch (sdkError: any) {
           // Should fail with invalid_grant error which is expected and correct
           console.log("SDK test got expected error:", sdkError.message);
         }
@@ -169,11 +171,11 @@ export function setupStripeRoutes(app: Express) {
           }
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("OAuth TEST FAILED:", error);
       return res.status(500).json({
         success: false,
-        error: error.message,
+        error: error.message || String(error),
         stack: error.stack
       });
     }
@@ -787,9 +789,9 @@ export function setupStripeRoutes(app: Express) {
           });
           return res.redirect('/auth?redirect=/payment-connections&pendingStripeConnection=true');
         }
-      } catch (exchangeError) {
+      } catch (exchangeError: any) {
         console.error("CRITICAL ERROR during token exchange:", exchangeError);
-        return res.redirect('/payment-connections?error=true&message=Network+error+connecting+to+Stripe');
+        return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent(exchangeError.message || 'Network error connecting to Stripe'));
       }
     } catch (outerError) {
       console.error("UNCAUGHT EXCEPTION in OAuth callback:", outerError);
@@ -871,7 +873,7 @@ export function setupStripeRoutes(app: Express) {
           
           // Update req.body for the rest of the function to use
           req.body.stripeAccountId = connectedAccountId;
-        } catch (exchangeError) {
+        } catch (exchangeError: any) {
           console.error("Error exchanging code:", exchangeError);
           return res.status(400).json({
             success: false,
@@ -2081,8 +2083,8 @@ export function setupStripeRoutes(app: Express) {
         error: "All token exchange methods failed",
         message: "Failed to exchange code for token using multiple approaches"
       });
-    } catch (error) {
-      console.error(`Error in direct token exchange: ${error.message}`, error);
+    } catch (error: any) {
+      console.error(`Error in direct token exchange: ${error.message || "Unknown error"}`, error);
       return res.status(500).json({ error: error.message || "Unknown error occurred" });
     }
   });
