@@ -561,14 +561,17 @@ export function setupStripeRoutes(app: Express) {
     
     // Exchange the code for an account ID
     try {
-      const secretKey = process.env.STRIPE_SECRET_KEY;
-      if (!secretKey) {
+      // First try to use a restricted key for OAuth if available
+      const oauthKey = process.env.STRIPE_OAUTH_KEY || process.env.STRIPE_SECRET_KEY;
+      if (!oauthKey) {
         return res.redirect('/payment-connections?error=true&message=' + 
           encodeURIComponent('Server configuration error. Missing API key.'));
       }
       
-      // Create a fresh Stripe instance
-      const freshStripe = new Stripe(secretKey, {
+      log(`Using OAuth key: ${oauthKey.substring(0, 7)}...`, "stripe");
+      
+      // Create a fresh Stripe instance with the OAuth key
+      const freshStripe = new Stripe(oauthKey, {
         apiVersion: "2025-04-30.basil" as any,
       });
       
@@ -705,9 +708,10 @@ export function setupStripeRoutes(app: Express) {
       
       // Get credentials for API call
       const clientId = process.env.STRIPE_CLIENT_ID;
-      const secretKey = process.env.STRIPE_SECRET_KEY;
+      // First try to use a restricted key for OAuth if available
+      const oauthKey = process.env.STRIPE_OAUTH_KEY || process.env.STRIPE_SECRET_KEY;
       
-      if (!clientId || !secretKey) {
+      if (!clientId || !oauthKey) {
         console.error("MISSING CREDENTIALS");
         return res.redirect('/payment-connections?error=true&message=Server+configuration+error');
       }
@@ -716,12 +720,12 @@ export function setupStripeRoutes(app: Express) {
       
       try {
         // Get a completely fresh Stripe instance with the latest key
-        const freshStripe = new Stripe(secretKey, {
+        const freshStripe = new Stripe(oauthKey, {
           apiVersion: "2025-04-30.basil" as any,
         });
         
         console.error("Created fresh Stripe instance with key format:", 
-          secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
+          oauthKey.substring(0, 7) + "..." + oauthKey.substring(oauthKey.length - 4));
         
         // IMPORTANT: Use the Stripe SDK directly for OAuth token exchange
         // This bypasses any issues with fetch and ensures the correct authentication method
@@ -831,14 +835,15 @@ export function setupStripeRoutes(app: Express) {
         
         try {
           // Get a completely fresh Stripe instance with the latest key
-          const secretKey = process.env.STRIPE_SECRET_KEY;
-          if (!secretKey) {
+          // First try to use a restricted key for OAuth if available
+          const oauthKey = process.env.STRIPE_OAUTH_KEY || process.env.STRIPE_SECRET_KEY;
+          if (!oauthKey) {
             return res.redirect('/payment-connections?error=true&message=' + encodeURIComponent('Missing Stripe secret key'));
           }
           
-          console.log("Using key format:", secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
+          console.log("Using key format:", oauthKey.substring(0, 7) + "..." + oauthKey.substring(oauthKey.length - 4));
           
-          const freshStripe = new Stripe(secretKey, {
+          const freshStripe = new Stripe(oauthKey, {
             apiVersion: "2025-04-30.basil" as any,
           });
           
