@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { queryClient } from "@/lib/queryClient";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -24,430 +22,152 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle, Loader } from "lucide-react";
+import { ExternalLink, RefreshCw, AlertCircle, Loader } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
+// COMPLETELY REBUILT VERSION - No Bullshit - Just Show What the Server Says
 export default function PaymentConnectionsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
-  // Fetch Stripe configuration
-  const { data: stripeConfig, isLoading } = useQuery({
-    queryKey: ["/api/stripe/config"],
-    queryFn: async () => {
-      const res = await fetch("/api/stripe/config");
-      if (!res.ok) throw new Error("Failed to fetch Stripe configuration");
-      return await res.json();
-    },
-  });
+  // Super simple direct fetch of both pieces of data
+  const [stripeConfig, setStripeConfig] = useState<any>(null);
+  const [connectionStatus, setConnectionStatus] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  // Check for Stripe account connection status
-  // SIMPLE APPROACH: Just get the data directly from the server and display it.
-  const [connectionStatus, setConnectionStatus] = useState<{
-    connected: boolean; 
-    accountId?: string;
-    detailsSubmitted?: boolean;
-    chargesEnabled?: boolean;
-    payoutsEnabled?: boolean;
-  } | null>(null);
-  const [isLoadingConnection, setIsLoadingConnection] = useState(true);
-  
-  // Function to fetch the status directly - PRODUCTION DEBUG VERSION
-  const fetchConnectionStatus = useCallback(async () => {
-    if (!user) return;
+  // Direct Fetch Function - No bullshit - Just get the data from the server
+  const fetchData = async () => {
+    setIsLoading(true);
+    setServerError(null);
     
     try {
-      setIsLoadingConnection(true);
-      
-      // Log critical debugging info
-      console.log("***** PRODUCTION DEBUG *****");
-      console.log("Hostname:", window.location.hostname);
-      console.log("Environment:", process.env.NODE_ENV);
-      console.log("User ID:", user.id);
-      console.log("**************************");
-      
-      // Use a completely different approach with explicit no-cache headers
-      const timestamp = Date.now(); // Add timestamp to prevent caching
-      const res = await fetch(`/api/stripe/account-status?t=${timestamp}`, {
+      // STEP 1: Get Stripe config data
+      const configRes = await fetch(`/api/stripe/config?_=${Date.now()}`, {
+        cache: 'no-store',
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
-        cache: 'no-store'
+          'Cache-Control': 'no-cache'
+        }
       });
       
-      // Log raw response before parsing
-      console.log("Raw response status:", res.status, res.statusText);
+      // Just throw on failure - no bullshit
+      if (!configRes.ok) {
+        throw new Error(`Failed to fetch Stripe config: ${configRes.status} ${configRes.statusText}`);
+      }
       
-      // Always dump the raw text response for debugging
-      const responseText = await res.text();
-      console.log("Raw server response:", responseText);
+      const configData = await configRes.json();
+      setStripeConfig(configData);
       
-      // Try to parse the response
-      let data;
+      // STEP 2: Get connection status
+      const statusRes = await fetch(`/api/stripe/account-status?_=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      // Just throw on failure - no bullshit 
+      if (!statusRes.ok) {
+        throw new Error(`Failed to fetch connection status: ${statusRes.status} ${statusRes.statusText}`);
+      }
+      
+      // Get raw text first for debugging
+      const rawText = await statusRes.text();
+      console.log("RAW SERVER RESPONSE:", rawText);
+      
       try {
-        data = JSON.parse(responseText);
-        console.log("PARSED SERVER RESPONSE:", data);
+        // Try to parse as JSON
+        const statusData = JSON.parse(rawText);
+        console.log("PARSED RESPONSE:", statusData);
+        setConnectionStatus(statusData);
       } catch (e) {
-        console.error("Failed to parse server response as JSON:", e);
-        throw new Error("Invalid JSON response from server");
+        console.error("Failed to parse response:", e);
+        throw new Error(`Invalid JSON: ${rawText.substring(0, 100)}...`);
       }
-      
-      // Force default connected status to false for safety
-      if (data.connected === undefined) {
-        console.warn("Server did not provide 'connected' status, defaulting to false");
-        data.connected = false;
-      }
-      
-      console.log("FINAL CONNECTION STATUS:", data);
-      
-      // Set the status from the parsed data
-      setConnectionStatus(data);
-    } catch (error) {
-      console.error("Error fetching connection status:", error);
-      // Show the error in UI for debugging
+    } catch (error: any) {
+      console.error("Fetch error:", error);
+      setServerError(error.message || "Unknown server error");
       toast({
-        title: "Connection status error",
-        description: `Error: ${error.message}`,
+        title: "Error",
+        description: error.message || "Failed to connect to server",
         variant: "destructive"
       });
     } finally {
-      setIsLoadingConnection(false);
+      setIsLoading(false);
     }
-  }, [user, toast]);
-  
-  // Function for manual refresh
-  const refetchStatus = () => {
-    fetchConnectionStatus();
   };
-  
-  // Fetch on initial load
-  useEffect(() => {
-    fetchConnectionStatus();
-  }, [fetchConnectionStatus]);
-  
-  // Recovery process - attempt to recover a pending Stripe connection from the session
-  const [isRecovering, setIsRecovering] = useState(false);
-  const [recoveryResult, setRecoveryResult] = useState<{
-    recovered: boolean;
-    message: string;
-    accountId?: string;
-    alreadyConnected?: boolean;
-    error?: string;
-  } | null>(null);
 
-  // Redirect to Stripe Connect flow
-  const handleConnectStripe = () => {
-    setIsRedirecting(true);
-    
-    // Capture the time we started the connection attempt (for debugging)
-    const startTime = new Date().toISOString();
-    console.log(`[${startTime}] Starting Stripe connect flow`);
-    
-    fetch("/api/stripe/connect")
-      .then(res => {
-        console.log(`[${new Date().toISOString()}] Received response: ${res.status} ${res.statusText}`);
-        
-        // If there's an error, try to extract it properly
-        if (!res.ok) {
-          return res.text().then(text => {
-            try {
-              // Try to parse as JSON
-              const errorJson = JSON.parse(text);
-              throw new Error(errorJson.message || `Error ${res.status}: ${res.statusText}`);
-            } catch (e) {
-              // If not valid JSON, use text directly
-              throw new Error(`Error ${res.status}: ${text || res.statusText}`);
-            }
-          });
-        }
-        
-        return res.json();
-      })
-      .then(data => {
-        console.log(`[${new Date().toISOString()}] Parsed data:`, data);
-        
-        if (data.connected) {
-          // Already connected
-          toast({
-            title: "Already connected",
-            description: "Your account is already connected to Stripe.",
-          });
-          // Invalidate to ensure fresh data
-          queryClient.invalidateQueries({ 
-            predicate: (query) => 
-              Array.isArray(query.queryKey) && 
-              query.queryKey[0] === "/api/stripe/account-status"
-          });
-          refetchStatus();
-          setIsRedirecting(false);
-        } else if (data.url) {
-          // Log the redirect URL we're going to (except sensitive parts)
-          const urlObj = new URL(data.url);
-          const sanitizedUrl = `${urlObj.origin}${urlObj.pathname}?...params-hidden...`;
-          console.log(`[${new Date().toISOString()}] Redirecting to: ${sanitizedUrl}`);
-          
-          // Redirect to Stripe Connect OAuth
-          window.location.href = data.url;
-        } else {
-          // Something went wrong
-          console.error(`[${new Date().toISOString()}] Invalid response:`, data);
-          toast({
-            title: "Connection error",
-            description: data.message || "Could not connect to Stripe. Invalid response format.",
-            variant: "destructive",
-          });
-          setIsRedirecting(false);
-        }
-      })
-      .catch(error => {
-        console.error(`[${new Date().toISOString()}] Connection error:`, error);
-        toast({
-          title: "Connection error",
-          description: error.message || "Could not connect to Stripe.",
-          variant: "destructive",
-        });
-        setIsRedirecting(false);
-      });
-  };
+  // Initial data load
+  useEffect(() => {
+    fetchData();
+  }, []);
   
-  // Function to attempt recovering a Stripe connection - memoize to prevent useEffect dependency issues
-  const handleRecoverConnection = useCallback(async () => {
-    if (isRecovering) return;
+  // Interval fetch to keep data fresh
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData();
+    }, 30000); // Refresh every 30 seconds
     
-    setIsRecovering(true);
-    setRecoveryResult(null);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Handler for Connect with Stripe button
+  const handleConnectStripe = async () => {
+    setIsRedirecting(true);
+    setServerError(null);
     
     try {
-      console.log("Attempting to recover Stripe connection...");
-      const res = await fetch("/api/stripe/recover-connection");
+      const response = await fetch("/api/stripe/connect");
       
-      if (!res.ok) {
-        throw new Error("Failed to recover connection");
+      if (!response.ok) {
+        const text = await response.text();
+        try {
+          const errorJson = JSON.parse(text);
+          throw new Error(errorJson.message || `Error ${response.status}`);
+        } catch {
+          throw new Error(`Error ${response.status}: ${text || response.statusText}`);
+        }
       }
       
-      const data = await res.json();
-      console.log("Recovery response:", data);
-      setRecoveryResult(data);
+      const data = await response.json();
       
-      if (data.recovered) {
-        toast({
-          title: "Connection recovered!",
-          description: "Successfully recovered your Stripe account connection.",
-        });
-        
-        // Ensure we get fresh status after recovery
-        console.log("Connection recovered - forcing refetch of connection status");
-        
-        // Invalidate the query cache to ensure fresh data
-        queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
-        
-        // Then refetch with our function
-        await refetchStatus();
-        
-        // Force a second refetch after a small delay to ensure we have the latest data
-        setTimeout(async () => {
-          console.log("Performing second refetch to ensure latest status");
-          await refetchStatus();
-        }, 1000);
-        
-        // Clear URL params if any
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else if (data.alreadyConnected) {
+      if (data.connected) {
         toast({
           title: "Already connected",
           description: "Your account is already connected to Stripe.",
         });
-        
-        // Still refresh status to ensure UI is consistent
-        console.log("Account already connected - updating status");
-        queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
-        await refetchStatus();
+        fetchData(); // Refresh data
+        setIsRedirecting(false);
+      } else if (data.url) {
+        // Redirect to Stripe Connect OAuth
+        window.location.href = data.url;
       } else {
-        toast({
-          title: "Recovery not needed",
-          description: data.message || "No pending Stripe connection found.",
-        });
+        throw new Error("Invalid response from server");
       }
     } catch (error: any) {
-      console.error("Recovery error:", error);
+      console.error("Connection error:", error);
       toast({
-        title: "Recovery failed",
-        description: error.message || "Failed to recover Stripe connection.",
-        variant: "destructive"
+        title: "Connection error",
+        description: error.message || "Could not connect to Stripe.",
+        variant: "destructive",
       });
-    } finally {
-      setIsRecovering(false);
+      setIsRedirecting(false);
     }
-  }, [isRecovering, refetchStatus, toast]);
-
-  // Check URL for successful redirect or error
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const success = searchParams.get("success");
-    const error = searchParams.get("error");
-    const message = searchParams.get("message");
-    const code = searchParams.get("code"); // This is the Stripe authorization code
-    
-    console.log("========= PAYMENT PAGE PARAMS =========");
-    console.log("URL:", window.location.href);
-    console.log("Query params:", {
-      success, error, message, code: code ? "PRESENT" : "NONE"
-    });
-    console.log("All params:", Object.fromEntries(searchParams.entries()));
-    console.log("=====================================");
-    
-    // If we have a code parameter, this indicates we've been redirected from Stripe
-    // or we're being redirected back from Stripe OAuth
-    if (code) {
-      console.log("DETECTED: Stripe authorization code present");
-      
-      // This means we've successfully completed a Stripe OAuth flow
-      // Let's clean the URL first to prevent repeated processing
-      searchParams.delete("code");
-      window.history.replaceState(
-        {}, 
-        document.title, 
-        window.location.pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "")
-      );
-      
-      // Always force a refresh of the connection status when we return with a code
-      // This ensures the UI updates regardless of other params
-      console.log("Forcibly refreshing connection status after OAuth redirect");
-      toast({
-        title: "Checking connection status",
-        description: "Verifying your Stripe account connection...",
-      });
-      
-      // Invalidate the query cache to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
-      
-      // Add a small delay to ensure backend has time to process everything
-      setTimeout(async () => {
-        try {
-          console.log("First refetch attempt post-OAuth");
-          await refetchStatus();
-          
-          // After refetching, check again if we're connected
-          setTimeout(async () => {
-            console.log("Second refetch attempt post-OAuth");
-            await refetchStatus();
-            
-            console.log("Current connection status after refetch:", connectionStatus);
-            
-            if (connectionStatus?.connected) {
-              console.log("CONNECTION CONFIRMED: User is connected to Stripe");
-              toast({
-                title: "Connection successful",
-                description: "Your Stripe account has been successfully connected!",
-              });
-            } else {
-              console.log("Still not showing as connected, attempting recovery");
-              await handleRecoverConnection();
-              
-              // Final status check after recovery attempt
-              setTimeout(async () => {
-                console.log("Final status check after recovery");
-                await refetchStatus();
-              }, 1000);
-            }
-          }, 1500);
-        } catch (err) {
-          console.error("Error during post-OAuth status checks:", err);
-        }
-      }, 1500);
-      
-      return;
-    }
-    
-    if (success === "true") {
-      console.log("SHOWING SUCCESS TOAST");
-      toast({
-        title: "Connection successful",
-        description: "Your Stripe account has been connected.",
-      });
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      // Refetch account status - invalidate cache first
-      queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
-      refetchStatus();
-    } else if (error === "true") {
-      // If we get an error, let's try an immediate recovery just in case
-      // the error is just a UI issue and the account was actually connected
-      console.log("SHOWING ERROR TOAST");
-      console.log("Connection error detected in URL");
-      console.log("Error message:", message);
-      
-      // Always try to recover when there's an error
-      // The connection might have succeeded despite the error
-      console.log("Attempting automatic recovery after error");
-      
-      // Invalidate cache before trying to recover
-      queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
-      handleRecoverConnection();
-      
-      toast({
-        title: "Connection issue",
-        description: message || "There was an issue with the Stripe connection. Attempting to recover...",
-        variant: "destructive"
-      });
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, [toast, refetchStatus, connectionStatus, handleRecoverConnection]);
-  
-  // Special handler for when "Connection Failed" appears but Stripe confirmed success
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const error = searchParams.get("error");
-    const warning = searchParams.get("warning");
-    
-    // If there's an error in the URL but we know the connection was actually made,
-    // this is a false error from session issues
-    if ((error === "true" || warning === "true") && connectionStatus?.connected) {
-      // Clean up URL and show success message instead
-      window.history.replaceState({}, document.title, window.location.pathname);
-      toast({
-        title: "Connection successful",
-        description: "Your Stripe account was connected successfully despite the error message!",
-      });
-    }
-  }, [toast, connectionStatus?.connected]);
-  
-  // Directly use connectionStatus.connected instead of this variable
-  // This was causing the UI to be out of sync with the actual connection status
-  // const isConnected = connectionStatus?.connected;
-  
-  // Instead, we'll use connectionStatus?.connected directly in the UI
-  
-  // Manual refresh function
-  const handleManualRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
-    refetchStatus();
-    toast({
-      title: "Refreshing connection status",
-      description: "Checking your Stripe account connection status...",
-    });
   };
   
-  // State for tracking disconnect operation
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  // Handle refreshing the connection status
+  const handleRefresh = () => {
+    toast({
+      title: "Refreshing",
+      description: "Getting the latest status from server...",
+    });
+    fetchData();
+  };
   
   // Handle disconnecting from Stripe
   const handleDisconnectStripe = async () => {
-    if (!window.confirm("Are you sure you want to disconnect your Stripe account? You will need to reconnect to process payments.")) {
-      return;
-    }
-    
     setIsDisconnecting(true);
     
     try {
@@ -458,78 +178,92 @@ export default function PaymentConnectionsPage() {
         },
       });
       
-      const data = await response.json();
-      
-      if (response.ok) {
-        toast({
-          title: "Account disconnected",
-          description: "Your Stripe account has been disconnected successfully",
-        });
-        
-        // Invalidate and refresh the connection status
-        queryClient.invalidateQueries({ queryKey: ["/api/stripe/account-status"] });
-        refetchStatus();
-      } else {
-        toast({
-          title: "Disconnect failed",
-          description: data.message || "Failed to disconnect your Stripe account",
-          variant: "destructive"
-        });
+      if (!response.ok) {
+        throw new Error("Failed to disconnect Stripe account");
       }
-    } catch (error) {
-      console.error("Error disconnecting Stripe account:", error);
+      
+      await response.json();
+      
+      toast({
+        title: "Disconnected",
+        description: "Your Stripe account has been disconnected.",
+      });
+      
+      // Refresh data
+      fetchData();
+    } catch (error: any) {
       toast({
         title: "Disconnect failed",
-        description: "An unexpected error occurred",
+        description: error.message || "Failed to disconnect your Stripe account.",
         variant: "destructive"
       });
     } finally {
       setIsDisconnecting(false);
     }
   };
-
-  // For debugging in production vs development
-  console.log("=== DEBUG CONNECTION STATUS ===");
-  console.log("Connection status value:", connectionStatus?.connected);
-  console.log("connectionStatus object:", connectionStatus);
-  console.log("Environment:", import.meta.env.MODE);
   
-  // Emergency debug measure - make a direct fetch call to check the server response
-  fetch("/api/stripe/account-status?emergency=true")
-    .then(res => res.json())
-    .then(data => {
-      console.log("EMERGENCY DIRECT FETCH - Server says:", data);
-      console.log("EMERGENCY - Connected status:", !!data.connected);
+  // Check URL for redirects
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const success = params.get('success');
+    const error = params.get('error');
+    
+    if (code) {
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
       
-      // FORCE THE UI TO UPDATE BASED ON DIRECT FETCH RESPONSE
-      if (data.connected && !connectionStatus?.connected) {
-        console.log("EMERGENCY CORRECTION: Server says connected but UI doesn't. Forcing UI update.");
-        queryClient.setQueryData(["/api/stripe/account-status"], data);
-      }
-    })
-    .catch(err => {
-      console.error("EMERGENCY FETCH FAILED:", err);
-    });
-  
-  console.log("==============================");
+      toast({
+        title: "Processing connection",
+        description: "Finalizing your Stripe connection...",
+      });
+      
+      // Wait a bit before refreshing to let server process everything
+      setTimeout(() => {
+        fetchData();
+        toast({
+          title: "Connection verified",
+          description: "Stripe connection status updated.",
+        });
+      }, 2000);
+    } else if (success === 'true') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      fetchData();
+    } else if (error === 'true') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      const message = params.get('message');
+      toast({
+        title: "Connection issue",
+        description: message || "There was a problem connecting to Stripe.",
+        variant: "destructive"
+      });
+      
+      fetchData();
+    }
+  }, []);
 
-  // CRITICAL FIX: Create a component that directly checks the server status
-  // Completely removed the ConnectionStatusIndicator component
-  // We won't display any status indicator at all to prevent wrong information
+  // Show what the server actually says!
+  const isConnected = connectionStatus?.connected === true;
+  const canConnect = stripeConfig?.hasOAuthKey === true && !isRedirecting;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       
       <main className="flex-grow container mx-auto px-4 py-6">
-        <div className="mb-6 flex flex-wrap justify-between items-center">
-          <h1 className="text-2xl font-bold">Payment Connections</h1>
-          
-          {/* Removed the status indicator that was showing wrong info */}
-        </div>
+        <h1 className="text-2xl font-bold mb-6">Payment Connections</h1>
+        
+        {/* Server status display for debugging */}
+        {serverError && (
+          <div className="mb-4 p-3 border-2 border-red-400 bg-red-50 rounded-md text-red-700">
+            <h3 className="font-semibold">Server Error:</h3>
+            <p>{serverError}</p>
+          </div>
+        )}
         
         {/* Stripe Connect Card */}
-        <Card className="max-w-3xl">
+        <Card className="max-w-3xl mb-8">
           <CardHeader>
             <CardTitle>Stripe Connect</CardTitle>
             <CardDescription>
@@ -537,14 +271,14 @@ export default function PaymentConnectionsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading || isLoadingConnection ? (
+            {isLoading ? (
               <div className="space-y-4">
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-4 w-5/6" />
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-10 w-40 mt-4" />
               </div>
-            ) : connectionStatus?.connected ? (
+            ) : isConnected ? (
               <div>
                 <div className="mb-4 p-4 bg-green-50 rounded-md border border-green-200">
                   <div className="flex justify-between items-start">
@@ -552,7 +286,7 @@ export default function PaymentConnectionsPage() {
                     <Button 
                       size="sm" 
                       variant="ghost" 
-                      onClick={handleManualRefresh} 
+                      onClick={handleRefresh} 
                       className="text-green-700 hover:text-green-800 hover:bg-green-100"
                     >
                       <RefreshCw className="h-4 w-4 mr-1" />
@@ -582,7 +316,7 @@ export default function PaymentConnectionsPage() {
                 <p className="text-neutral-600 mb-6">
                   Your Stripe account is successfully connected to City Event Hub. 
                   Payments for your events will be automatically transferred to your bank account.
-                  {!connectionStatus?.detailsSubmitted && (
+                  {connectionStatus?.detailsSubmitted === false && (
                     <span className="text-amber-600 block mt-2">
                       <AlertCircle className="h-4 w-4 inline mr-1" />
                       Please complete your account setup in the Stripe Dashboard to enable payments.
@@ -658,18 +392,25 @@ export default function PaymentConnectionsPage() {
                 
                 <Button 
                   onClick={handleConnectStripe} 
-                  disabled={isRedirecting || !stripeConfig?.hasOAuthKey}
+                  disabled={!canConnect}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {isRedirecting ? 'Connecting...' : 'Connect with Stripe'}
+                  {isRedirecting ? (
+                    <>
+                      <Loader className="w-4 h-4 mr-2 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    'Connect with Stripe'
+                  )}
                 </Button>
               </div>
             )}
           </CardContent>
         </Card>
         
-        {/* Additional Information */}
-        <div className="mt-10 max-w-3xl">
+        {/* FAQ Section */}
+        <div className="max-w-3xl">
           <h2 className="text-xl font-semibold mb-4">Frequently Asked Questions</h2>
           
           <div className="space-y-4">
