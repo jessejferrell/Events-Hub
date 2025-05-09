@@ -335,47 +335,6 @@ export default function PaymentConnectionsPage() {
           </div>
         )}
         
-        {/* Connection status debug display - always visible */}
-        <div className="mb-4 p-3 border border-gray-200 bg-gray-50 rounded-md text-xs font-mono">
-          <h3 className="font-semibold text-sm mb-1">Debug Information:</h3>
-          <div>
-            <span className="font-semibold">Connection Status: </span>
-            <span className={connectionStatus?.connected ? "text-green-600" : "text-red-600"}>
-              {connectionStatus?.connected ? "CONNECTED" : "NOT CONNECTED"}
-            </span>
-          </div>
-          <div>
-            <span className="font-semibold">Account ID: </span>
-            <span>{connectionStatus?.accountId || "none"}</span>
-          </div>
-          <div>
-            <span className="font-semibold">Last Updated: </span>
-            <span>{connectionStatus?.debug?.timestamp || new Date().toISOString()}</span>
-          </div>
-          <div>
-            <span className="font-semibold">View State: </span>
-            <code>{JSON.stringify({ isConnected, hasOAuthKey, canConnect, isLoading })}</code>
-          </div>
-          <div className="mt-2">
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={() => fetchData(true, true)}
-              className="text-xs h-7 px-2"
-            >
-              Refresh Data
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={() => window.location.reload()}
-              className="text-xs h-7 px-2 ml-2"
-            >
-              Reload Page
-            </Button>
-          </div>
-        </div>
-        
         {/* Stripe Connect Card */}
         <Card className="max-w-3xl mb-8">
           <CardHeader>
