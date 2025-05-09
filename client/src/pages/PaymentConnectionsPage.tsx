@@ -38,50 +38,70 @@ export default function PaymentConnectionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // Direct Fetch Function - No bullshit - Just get the data from the server
+  // Enhanced Fetch Function with comprehensive debugging
   const fetchData = async (showSuccessToast = false, forceRefresh = false) => {
+    const requestId = Date.now(); // Unique ID for tracking this request
+    const timestamp = new Date().toISOString();
+    
+    console.log(`[${timestamp}] FETCH_DATA (${requestId}) - Starting with params:`, { 
+      showSuccessToast, 
+      forceRefresh,
+      currentConnectionStatus: connectionStatus?.connected
+    });
+    
     setIsLoading(true);
     setServerError(null);
     
     try {
-      // STEP 1: Get Stripe config data
-      const configRes = await fetch(`/api/stripe/config?_=${Date.now()}`, {
+      // STEP 1: Get Stripe config data with cache-busting params
+      const configUrl = `/api/stripe/config?_=${requestId}`;
+      console.log(`[${timestamp}] FETCH_DATA (${requestId}) - Requesting Stripe config:`, configUrl);
+      
+      const configRes = await fetch(configUrl, {
         cache: 'no-store',
         headers: {
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         }
       });
       
-      // Just throw on failure - no bullshit
       if (!configRes.ok) {
         throw new Error(`Failed to fetch Stripe config: ${configRes.status} ${configRes.statusText}`);
       }
       
       const configData = await configRes.json();
-      console.log("STRIPE CONFIG RESPONSE:", JSON.stringify(configData));
+      console.log(`[${timestamp}] FETCH_DATA (${requestId}) - STRIPE CONFIG RESPONSE:`, JSON.stringify(configData));
       setStripeConfig(configData);
       
-      // STEP 2: Get connection status - force a refresh if requested
-      const statusRes = await fetch(`/api/stripe/account-status?force_refresh=${forceRefresh}&_=${Date.now()}`, {
+      // STEP 2: Get connection status with aggressive cache prevention
+      const statusUrl = `/api/stripe/account-status?force_refresh=true&_=${requestId}`;
+      console.log(`[${timestamp}] FETCH_DATA (${requestId}) - Requesting status:`, statusUrl);
+      
+      const statusRes = await fetch(statusUrl, {
         cache: 'no-store',
         headers: {
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         }
       });
       
-      // Just throw on failure - no bullshit 
       if (!statusRes.ok) {
         throw new Error(`Failed to fetch connection status: ${statusRes.status} ${statusRes.statusText}`);
       }
       
       // Get raw text first for debugging
       const rawText = await statusRes.text();
-      console.log("RAW SERVER RESPONSE:", rawText);
+      console.log(`[${timestamp}] FETCH_DATA (${requestId}) - RAW SERVER RESPONSE:`, rawText);
       
       try {
         // Try to parse as JSON
         const statusData = JSON.parse(rawText);
-        console.log("PARSED RESPONSE:", statusData);
+        console.log(`[${timestamp}] FETCH_DATA (${requestId}) - PARSED RESPONSE:`, statusData);
+        
+        // Compare with previous state for debugging
+        console.log(`[${timestamp}] FETCH_DATA (${requestId}) - STATE CHANGE: ${connectionStatus?.connected} -> ${statusData.connected}`);
         
         // Update UI state with the server response
         setConnectionStatus(statusData);
@@ -101,11 +121,11 @@ export default function PaymentConnectionsPage() {
           }
         }
       } catch (e) {
-        console.error("Failed to parse response:", e);
+        console.error(`[${timestamp}] FETCH_DATA (${requestId}) - Failed to parse response:`, e);
         throw new Error(`Invalid JSON: ${rawText.substring(0, 100)}...`);
       }
     } catch (error: any) {
-      console.error("Fetch error:", error);
+      console.error(`[${timestamp}] FETCH_DATA (${requestId}) - Fetch error:`, error);
       setServerError(error.message || "Unknown server error");
       toast({
         title: "Error",
@@ -113,20 +133,23 @@ export default function PaymentConnectionsPage() {
         variant: "destructive"
       });
     } finally {
+      console.log(`[${timestamp}] FETCH_DATA (${requestId}) - Completed`);
       setIsLoading(false);
     }
   };
 
-  // Initial data load
+  // Initial data load with timestamp information to help debug
   useEffect(() => {
+    console.log("INITIAL DATA LOAD:", new Date().toISOString());
     fetchData();
   }, []);
   
-  // Interval fetch to keep data fresh
+  // Interval fetch to keep data fresh - using more frequent updates
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchData();
-    }, 30000); // Refresh every 30 seconds
+      console.log("INTERVAL DATA REFRESH:", new Date().toISOString());
+      fetchData(false, true); // Always force refresh on interval updates
+    }, 10000); // Refresh every 10 seconds
     
     return () => clearInterval(interval);
   }, []);
@@ -309,6 +332,47 @@ export default function PaymentConnectionsPage() {
           </div>
         )}
         
+        {/* Connection status debug display - always visible */}
+        <div className="mb-4 p-3 border border-gray-200 bg-gray-50 rounded-md text-xs font-mono">
+          <h3 className="font-semibold text-sm mb-1">Debug Information:</h3>
+          <div>
+            <span className="font-semibold">Connection Status: </span>
+            <span className={connectionStatus?.connected ? "text-green-600" : "text-red-600"}>
+              {connectionStatus?.connected ? "CONNECTED" : "NOT CONNECTED"}
+            </span>
+          </div>
+          <div>
+            <span className="font-semibold">Account ID: </span>
+            <span>{connectionStatus?.accountId || "none"}</span>
+          </div>
+          <div>
+            <span className="font-semibold">Last Updated: </span>
+            <span>{connectionStatus?.debug?.timestamp || new Date().toISOString()}</span>
+          </div>
+          <div>
+            <span className="font-semibold">View State: </span>
+            <code>{JSON.stringify({ isConnected, hasOAuthKey, canConnect, isLoading })}</code>
+          </div>
+          <div className="mt-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => fetchData(true, true)}
+              className="text-xs h-7 px-2"
+            >
+              Refresh Data
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => window.location.reload()}
+              className="text-xs h-7 px-2 ml-2"
+            >
+              Reload Page
+            </Button>
+          </div>
+        </div>
+        
         {/* Stripe Connect Card */}
         <Card className="max-w-3xl mb-8">
           <CardHeader>
@@ -414,11 +478,12 @@ export default function PaymentConnectionsPage() {
               </div>
             ) : (
               <div>
-                <div className="mb-4 p-3 border rounded-md bg-amber-50 border-amber-200">
+                <div className="mb-4 p-3 border rounded-md bg-amber-50 border-amber-200" key={`connection-status-${Date.now()}`}>
                   <div className="flex items-center gap-2">
                     <AlertCircle className="h-5 w-5 text-amber-600" />
                     <p className="text-amber-800">Your account is not connected to Stripe</p>
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">Status last checked: {new Date().toLocaleTimeString()}</p>
                 </div>
                 
                 <p className="text-neutral-600 mb-6">
