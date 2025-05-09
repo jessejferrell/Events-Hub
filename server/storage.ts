@@ -43,7 +43,8 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   updateUserRole(userId: number, role: string): Promise<User>;
   updateUserPassword(userId: number, password: string): Promise<User>;
-  updateUserStripeAccount(userId: number, stripeAccountId: string): Promise<User>;
+  updateUserStripeAccount(userId: number, stripeAccountId: string | null): Promise<User>;
+  getUserById(userId: number): Promise<User | undefined>;
   updateUserStripeCustomer(userId: number, stripeCustomerId: string): Promise<User>;
   updateUserStripeSubscription(userId: number, stripeSubscriptionId: string): Promise<User>;
   updateUserProfile(userId: number, userData: Partial<InsertUser>): Promise<User>;

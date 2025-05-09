@@ -1039,42 +1039,87 @@ export function setupStripeRoutes(app: Express) {
     }
 
     try {
-      log(`Checking Stripe account status for user ${req.user.id}`, "stripe");
-      log(`User stripeAccountId from server: "${req.user.stripeAccountId || 'NONE'}"`, "stripe");
+      const userId = req.user.id;
+      const hostname = req.hostname;
+      const isProduction = process.env.NODE_ENV === 'production';
+      const forceRefresh = !!req.query.force_refresh;
+      
+      log(`*** ACCOUNT STATUS CHECK ***`, "stripe");
+      log(`User: ${userId}`, "stripe");
+      log(`Hostname: ${hostname}`, "stripe");
+      log(`Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`, "stripe");
+      log(`Force refresh: ${forceRefresh}`, "stripe");
+      
+      // CRITICAL DEBUGGING - Always directly pull the user from storage too
+      const freshUserData = await storage.getUserById(userId);
+      const storageAccountId = freshUserData?.stripeAccountId || 'NONE';
+      const sessionAccountId = req.user.stripeAccountId || 'NONE';
+      
+      log(`User ${userId} stripeAccountId:`, "stripe");
+      log(`- From session: "${sessionAccountId}"`, "stripe");
+      log(`- From storage: "${storageAccountId}"`, "stripe");
+      
+      // Use fresh data from storage for maximum reliability
+      const accountId = storageAccountId !== 'NONE' ? storageAccountId : sessionAccountId;
       
       // If the stripeAccountId is empty string, null, or undefined, return not connected
-      if (!req.user.stripeAccountId || req.user.stripeAccountId === "") {
-        log(`User ${req.user.id} has no Stripe account connected`, "stripe");
+      if (!accountId || accountId === "" || accountId === 'NONE') {
+        log(`User ${userId} has no Stripe account connected`, "stripe");
+        
+        // Add detailed debug info to help diagnose production issues
         return res.json({ 
           connected: false,
           accountId: "",
           detailsSubmitted: false,
           chargesEnabled: false,
           payoutsEnabled: false,
-          message: "No Stripe account connected"
+          message: "No Stripe account connected",
+          debug: {
+            timestamp: new Date().toISOString(),
+            user_id: userId,
+            hostname: hostname,
+            environment: isProduction ? 'production' : 'development',
+            session_account_id: sessionAccountId,
+            storage_account_id: storageAccountId
+          }
         });
       }
       
       // Retrieve the account to get its current status
-      log(`Retrieving account details for ${req.user.stripeAccountId}`, "stripe");
+      log(`Retrieving account details for ${accountId}`, "stripe");
       try {
-        const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
+        const account = await stripe.accounts.retrieve(accountId);
         
         log(`Successfully retrieved account ${account.id}`, "stripe");
-        return res.json({
+        log(`ACCOUNT DETAILS:`, "stripe");
+        log(`- details_submitted: ${account.details_submitted}`, "stripe");
+        log(`- charges_enabled: ${account.charges_enabled}`, "stripe");
+        log(`- payouts_enabled: ${account.payouts_enabled}`, "stripe");
+        
+        // CRITICAL: Ensure this is serializable and exactly the format expected by the UI
+        const response = {
           connected: true,
           accountId: account.id,
           detailsSubmitted: account.details_submitted,
           chargesEnabled: account.charges_enabled,
-          payoutsEnabled: account.payouts_enabled
-        });
+          payoutsEnabled: account.payouts_enabled,
+          debug: {
+            timestamp: new Date().toISOString(),
+            user_id: userId,
+            hostname: hostname,
+            environment: isProduction ? 'production' : 'development'
+          }
+        };
+        
+        log(`SENDING RESPONSE: ${JSON.stringify(response)}`, "stripe");
+        return res.json(response);
       } catch (stripeError: any) {
         // If the account doesn't exist or is invalid, update our database to clear it
-        log(`Error retrieving Stripe account ${req.user.stripeAccountId}: ${stripeError.message}`, "stripe");
+        log(`Error retrieving Stripe account ${accountId}: ${stripeError.message}`, "stripe");
         
         if (stripeError.code === 'account_invalid' || stripeError.code === 'resource_missing') {
           log(`Account invalid or missing, clearing from database`, "stripe");
-          await storage.updateUserStripeAccount(req.user.id, null);
+          await storage.updateUserStripeAccount(userId, null);
         }
         
         return res.json({ 
@@ -1083,7 +1128,17 @@ export function setupStripeRoutes(app: Express) {
           detailsSubmitted: false,
           chargesEnabled: false,
           payoutsEnabled: false,
-          message: stripeError.message
+          message: stripeError.message,
+          error: {
+            code: stripeError.code,
+            message: stripeError.message
+          },
+          debug: {
+            timestamp: new Date().toISOString(),
+            user_id: userId,
+            hostname: hostname,
+            environment: isProduction ? 'production' : 'development'
+          }
         });
       }
     } catch (error: any) {

@@ -60,23 +60,70 @@ export default function PaymentConnectionsPage() {
   } | null>(null);
   const [isLoadingConnection, setIsLoadingConnection] = useState(true);
   
-  // Function to fetch the status directly
+  // Function to fetch the status directly - PRODUCTION DEBUG VERSION
   const fetchConnectionStatus = useCallback(async () => {
     if (!user) return;
     
     try {
       setIsLoadingConnection(true);
-      const res = await fetch("/api/stripe/account-status");
-      if (!res.ok) throw new Error("Failed to fetch Stripe account status");
-      const data = await res.json();
-      console.log("SERVER SAYS:", data);
+      
+      // Log critical debugging info
+      console.log("***** PRODUCTION DEBUG *****");
+      console.log("Hostname:", window.location.hostname);
+      console.log("Environment:", process.env.NODE_ENV);
+      console.log("User ID:", user.id);
+      console.log("**************************");
+      
+      // Use a completely different approach with explicit no-cache headers
+      const timestamp = Date.now(); // Add timestamp to prevent caching
+      const res = await fetch(`/api/stripe/account-status?t=${timestamp}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        cache: 'no-store'
+      });
+      
+      // Log raw response before parsing
+      console.log("Raw response status:", res.status, res.statusText);
+      
+      // Always dump the raw text response for debugging
+      const responseText = await res.text();
+      console.log("Raw server response:", responseText);
+      
+      // Try to parse the response
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log("PARSED SERVER RESPONSE:", data);
+      } catch (e) {
+        console.error("Failed to parse server response as JSON:", e);
+        throw new Error("Invalid JSON response from server");
+      }
+      
+      // Force default connected status to false for safety
+      if (data.connected === undefined) {
+        console.warn("Server did not provide 'connected' status, defaulting to false");
+        data.connected = false;
+      }
+      
+      console.log("FINAL CONNECTION STATUS:", data);
+      
+      // Set the status from the parsed data
       setConnectionStatus(data);
     } catch (error) {
       console.error("Error fetching connection status:", error);
+      // Show the error in UI for debugging
+      toast({
+        title: "Connection status error",
+        description: `Error: ${error.message}`,
+        variant: "destructive"
+      });
     } finally {
       setIsLoadingConnection(false);
     }
-  }, [user]);
+  }, [user, toast]);
   
   // Function for manual refresh
   const refetchStatus = () => {
