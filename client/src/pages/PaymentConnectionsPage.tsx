@@ -308,13 +308,14 @@ export default function PaymentConnectionsPage() {
     }
   }, []);
 
-  // Show what the server actually says!
+  // Status check with extra validation to prevent state conflicts
   // IMPORTANT: This is the source of truth for connection status
-  const isConnected = connectionStatus?.connected === true;
+  const isConnected = connectionStatus?.connected === true && 
+                      connectionStatus?.accountId !== undefined && 
+                      connectionStatus?.accountId !== null;
   
   // IMPORTANT: Always assume OAuth is properly configured
-  // The server is experiencing an issue reporting hasOAuthKey correctly
-  const hasOAuthKey = true; // Force to true always
+  const hasOAuthKey = stripeConfig?.hasOAuthKey === true;
   const canConnect = hasOAuthKey && !isRedirecting;
 
   // Force UI re-render with key based on connection status
