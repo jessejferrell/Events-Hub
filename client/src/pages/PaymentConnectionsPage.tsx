@@ -514,76 +514,166 @@ export default function PaymentConnectionsPage() {
   console.log("==============================");
 
   // CRITICAL FIX: Create a component that directly checks the server status
-  // This will ensure we always show the correct connection status regardless of caching issues
+  // BRUTE FORCE VERSION: This will absolutely show the correct status direct from server with no caching
   const ConnectionStatusIndicator = () => {
-    const [serverStatus, setServerStatus] = useState<{connected: boolean} | null>(null);
-    const [isChecking, setIsChecking] = useState(false);
+    const [directServerStatus, setDirectServerStatus] = useState<{connected: boolean} | null>(null);
+    const [isChecking, setIsChecking] = useState(true);
+    const [lastChecked, setLastChecked] = useState<string>("Never");
+    const [rawResponse, setRawResponse] = useState<string>("");
+    const [errorMessage, setErrorMessage] = useState<string>("");
     
-    useEffect(() => {
-      // Only run this once on mount
-      const checkServerDirectly = async () => {
+    // Function to directly fetch from server with zero caching
+    const forceCheckServerDirectly = useCallback(async () => {
+      setIsChecking(true);
+      setErrorMessage("");
+      
+      try {
+        // Generate unique parameters to force a fresh request
+        const uniqueParams = new URLSearchParams({
+          force_refresh: "true",
+          _t: Date.now().toString(),
+          _r: Math.random().toString(),
+          _nocache: "true"
+        }).toString();
+        
+        console.log("🔴 DIRECT SERVER CHECK - BYPASSING ALL CACHING");
+        
+        // Maximum anti-cache measures
+        const response = await fetch(`/api/stripe/account-status?${uniqueParams}`, {
+          method: "GET",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Force-Fresh": "true"
+          },
+          // Ensure browser doesn't use cached version
+          cache: "no-store"
+        });
+        
+        // Log detailed response info
+        console.log("Response status:", response.status);
+        console.log("Response headers:", Object.fromEntries([...response.headers.entries()]));
+        
+        // Get raw text first to help with debugging
+        const rawText = await response.clone().text();
+        setRawResponse(rawText);
+        console.log("Raw server response:", rawText);
+        
+        // Parse the data
         try {
-          setIsChecking(true);
-          // Add a unique timestamp to prevent any caching
-          const timestamp = Date.now();
-          const response = await fetch(`/api/stripe/account-status?force_refresh=true&_t=${timestamp}`, {
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0'
-            }
-          });
+          const data = JSON.parse(rawText);
+          console.log("✅ Parsed status data:", data);
           
-          if (response.ok) {
-            const data = await response.json();
-            console.log("Direct check received:", data);
-            setServerStatus(data);
-            
-            // If there's a mismatch between what we're showing and what the server says,
-            // force an update to the query cache
-            if (data.connected !== connectionStatus?.connected) {
-              console.log("FIXING CRITICAL STATUS MISMATCH - Forcing correct display");
-              queryClient.setQueryData(["/api/stripe/account-status"], data);
-            }
+          // Explicitly extract the connected status with fallbacks
+          const isConnected = data?.connected === true;
+          console.log("⚠️ CONNECTED STATUS:", isConnected);
+          
+          // Update state with the parsed data
+          setDirectServerStatus(data);
+          
+          // Also force update the main app's status to fix any discrepancies
+          setConnectionStatus(data);
+          
+          // If there's a mismatch with what React Query thinks, fix it
+          if (data.connected !== connectionStatus?.connected) {
+            console.log("🔄 FIXING DATA MISMATCH - Force updating React Query cache");
+            queryClient.setQueryData(["/api/stripe/account-status"], data);
           }
-        } catch (error) {
-          console.error("Error checking server directly:", error);
-        } finally {
-          setIsChecking(false);
+          
+          // Record the timestamp
+          setLastChecked(new Date().toLocaleTimeString());
+        } catch (parseError) {
+          console.error("Failed to parse response JSON:", parseError);
+          setErrorMessage(`Parse error: ${parseError.message}`);
+          // Don't update status on parse error
         }
-      };
-      
-      // Run immediately and then again after a short delay to ensure we have latest data
-      checkServerDirectly();
-      const timer = setTimeout(checkServerDirectly, 1000);
-      
-      return () => clearTimeout(timer);
+      } catch (networkError) {
+        console.error("Network error during status check:", networkError);
+        setErrorMessage(`Network error: ${networkError.message}`);
+      } finally {
+        setIsChecking(false);
+      }
     }, []);
     
-    // Always trust the direct server check over the query result if available
-    const isConnected = serverStatus?.connected ?? connectionStatus?.connected;
+    // Run the check on component mount and periodically
+    useEffect(() => {
+      // Initial check
+      forceCheckServerDirectly();
+      
+      // Setup interval to recheck every 10 seconds
+      const intervalId = setInterval(forceCheckServerDirectly, 10000);
+      
+      return () => clearInterval(intervalId);
+    }, [forceCheckServerDirectly]);
+    
+    // Always use directServerStatus as the source of truth when available
+    // This bypasses any stale data in the main app state
+    const isConnected = directServerStatus?.connected === true;
+    
+    // Include raw debug info for production troubleshooting
+    const showDebugInfo = process.env.NODE_ENV === 'development' || true; // Always show for now
     
     return (
-      <div className={`px-4 py-2 rounded-full flex items-center ${
-        isConnected
-          ? "bg-green-100 text-green-800 border border-green-300" 
-          : "bg-amber-100 text-amber-800 border border-amber-300"
-      }`}>
-        {isChecking ? (
-          <>
-            <Loader className="h-5 w-5 mr-2 animate-spin text-neutral-600" />
-            <span className="font-medium">Checking connection...</span>
-          </>
-        ) : isConnected ? (
-          <>
-            <BadgeCheck className="h-5 w-5 mr-2 text-green-600" />
-            <span className="font-medium">Connected to Stripe</span>
-          </>
-        ) : (
-          <>
-            <AlertCircle className="h-5 w-5 mr-2 text-amber-600" />
-            <span className="font-medium">Not connected to Stripe</span>
-          </>
+      <div className="space-y-2">
+        <div className={`px-4 py-2 rounded-full flex items-center ${
+          isConnected
+            ? "bg-green-100 text-green-800 border border-green-300" 
+            : "bg-amber-100 text-amber-800 border border-amber-300"
+        }`}>
+          {isChecking ? (
+            <>
+              <Loader className="h-5 w-5 mr-2 animate-spin text-neutral-600" />
+              <span className="font-medium">Checking direct server status...</span>
+            </>
+          ) : isConnected ? (
+            <>
+              <BadgeCheck className="h-5 w-5 mr-2 text-green-600" />
+              <span className="font-medium">
+                Connected to Stripe{showDebugInfo && ` (Direct server check: ${lastChecked})`}
+              </span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="ml-2" 
+                onClick={() => forceCheckServerDirectly()}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="h-5 w-5 mr-2 text-amber-600" />
+              <span className="font-medium">
+                Not connected to Stripe{showDebugInfo && ` (Direct server check: ${lastChecked})`}
+              </span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="ml-2" 
+                onClick={() => forceCheckServerDirectly()}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+        
+        {/* Debug info section for troubleshooting */}
+        {showDebugInfo && errorMessage && (
+          <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+            Error: {errorMessage}
+          </div>
+        )}
+        
+        {/* Only show raw data in dev environment */}
+        {process.env.NODE_ENV === 'development' && showDebugInfo && rawResponse && (
+          <div className="text-xs bg-gray-100 p-2 rounded border border-gray-200 max-h-32 overflow-auto">
+            <details>
+              <summary className="font-semibold">Raw server response</summary>
+              <pre className="whitespace-pre-wrap break-all">{rawResponse}</pre>
+            </details>
+          </div>
         )}
       </div>
     );
