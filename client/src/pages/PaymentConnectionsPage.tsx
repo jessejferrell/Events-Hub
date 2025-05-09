@@ -25,7 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
+import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle, Loader } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Tooltip,
@@ -50,36 +50,43 @@ export default function PaymentConnectionsPage() {
   });
 
   // Check for Stripe account connection status
-  // Generate a unique query key that changes on each render to force fresh data
-  const queryTimestamp = Date.now();
-
-  const { data: connectionStatus, isLoading: isLoadingConnection, refetch: refetchStatus } = useQuery({
-    queryKey: ["/api/stripe/account-status", queryTimestamp],
-    queryFn: async () => {
-      console.log("Fetching connection status from server...");
-      // Generate a unique timestamp to absolutely prevent any caching issues
-      const timestamp = Date.now();
-      const res = await fetch(`/api/stripe/account-status?_t=${timestamp}`, {
-        // Add aggressive cache prevention headers
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
-        // Force fetch to bypass all caches
-        cache: 'no-store'
-      });
+  // SIMPLE APPROACH: Just get the data directly from the server and display it.
+  const [connectionStatus, setConnectionStatus] = useState<{
+    connected: boolean; 
+    accountId?: string;
+    detailsSubmitted?: boolean;
+    chargesEnabled?: boolean;
+    payoutsEnabled?: boolean;
+  } | null>(null);
+  const [isLoadingConnection, setIsLoadingConnection] = useState(true);
+  
+  // Function to fetch the status directly
+  const fetchConnectionStatus = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoadingConnection(true);
+      const res = await fetch("/api/stripe/account-status");
       if (!res.ok) throw new Error("Failed to fetch Stripe account status");
       const data = await res.json();
-      console.log("Received connection status:", data);
-      return data;
-    },
-    enabled: !!user,
-    // Force a refetch on window focus to ensure updated status
-    refetchOnWindowFocus: true,
-    // Don't cache the result for long - we want fresh data
-    staleTime: 2000,
-  });
+      console.log("SERVER SAYS:", data);
+      setConnectionStatus(data);
+    } catch (error) {
+      console.error("Error fetching connection status:", error);
+    } finally {
+      setIsLoadingConnection(false);
+    }
+  }, [user]);
+  
+  // Function for manual refresh
+  const refetchStatus = () => {
+    fetchConnectionStatus();
+  };
+  
+  // Fetch on initial load
+  useEffect(() => {
+    fetchConnectionStatus();
+  }, [fetchConnectionStatus]);
   
   // Recovery process - attempt to recover a pending Stripe connection from the session
   const [isRecovering, setIsRecovering] = useState(false);
@@ -517,7 +524,7 @@ export default function PaymentConnectionsPage() {
       }`}>
         {isChecking ? (
           <>
-            <Loader2 className="h-5 w-5 mr-2 animate-spin text-neutral-600" />
+            <Loader className="h-5 w-5 mr-2 animate-spin text-neutral-600" />
             <span className="font-medium">Checking connection...</span>
           </>
         ) : isConnected ? (
