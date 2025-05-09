@@ -185,13 +185,24 @@ export function setupStripeRoutes(app: Express) {
     const oauthKey = process.env.STRIPE_OAUTH_KEY;
     const clientId = process.env.STRIPE_CLIENT_ID;
     
-    // Log what we're sending for debugging
-    log(`Stripe config request - hasOAuthKey: ${!!oauthKey && !!clientId}`, "stripe");
+    // CRITICAL FLAG: This is what the frontend checks for to determine if OAuth is configured
+    const hasOAuthKey = !!oauthKey && !!clientId;
     
-    res.json({ 
+    // Log what we're sending for debugging - INCLUDE ALL VALUES
+    log(`Stripe config request:`, "stripe");
+    log(`- publishableKey: ${publishableKey ? "present (starts with " + publishableKey.substring(0, 6) + "...)" : "MISSING"}`, "stripe");
+    log(`- oauthKey: ${oauthKey ? "present" : "MISSING"}`, "stripe");
+    log(`- clientId: ${clientId ? "present (starts with " + clientId.substring(0, 6) + "...)" : "MISSING"}`, "stripe");
+    log(`- hasOAuthKey: ${hasOAuthKey}`, "stripe");
+    
+    const response = { 
       publishableKey: publishableKey,
-      hasOAuthKey: !!oauthKey && !!clientId 
-    });
+      hasOAuthKey: hasOAuthKey 
+    };
+    
+    log(`Sending response: ${JSON.stringify(response)}`, "stripe");
+    
+    res.json(response);
   });
   
   // Debug endpoint to check Stripe settings
