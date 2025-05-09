@@ -45,8 +45,7 @@ function Router() {
       
       {/* Event owner features */}
       <ProtectedRoute path="/my-events" component={MyEventsPage} roles={["event_owner"]} />
-      <ProtectedRoute path="/payment-connections" component={StripeConnectionPage} roles={["event_owner"]} />
-      <ProtectedRoute path="/payment-connections-old" component={PaymentConnectionsPage} roles={["event_owner"]} />
+      <ProtectedRoute path="/payment-connections" component={PaymentConnectionsPage} roles={["event_owner"]} />
       <ProtectedRoute path="/events/:id/edit" component={MyEventsPage} />
       <ProtectedRoute path="/events/:id/tickets" component={MyEventsPage} />
       

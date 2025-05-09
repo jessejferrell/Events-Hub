@@ -58,6 +58,7 @@ export default function PaymentConnectionsPage() {
       }
       
       const configData = await configRes.json();
+      console.log("STRIPE CONFIG RESPONSE:", JSON.stringify(configData));
       setStripeConfig(configData);
       
       // STEP 2: Get connection status
