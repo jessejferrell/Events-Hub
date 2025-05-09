@@ -308,15 +308,30 @@ export default function PaymentConnectionsPage() {
     }
   }, []);
 
-  // Status check with extra validation to prevent state conflicts
-  // IMPORTANT: This is the source of truth for connection status
+  // HARD DEBUGGING - Log entire connection state to browser console
+  console.log("CONNECTION STATUS OBJECT:", connectionStatus);
+  console.log("STRIPE CONFIG OBJECT:", stripeConfig);
+  console.log(`CONNECTION STATUS VALUES: connected=${connectionStatus?.connected}, accountId=${connectionStatus?.accountId}`);
+  
+  // Status check with strong validation to ensure accurate state representation
   const isConnected = connectionStatus?.connected === true && 
-                      connectionStatus?.accountId !== undefined && 
-                      connectionStatus?.accountId !== null;
+                     !!connectionStatus?.accountId; // Double !! to force a boolean evaluation
+  
+  // Debug log the final connected state decision
+  console.log(`FINAL CONNECTION DECISION: isConnected=${isConnected}`);
   
   // IMPORTANT: Always assume OAuth is properly configured
   const hasOAuthKey = stripeConfig?.hasOAuthKey === true;
   const canConnect = hasOAuthKey && !isRedirecting;
+  
+  // Force window reload if false display is detected
+  useEffect(() => {
+    // If we have a connected account ID but aren't showing as connected, force a page reload
+    if (connectionStatus?.accountId && !isConnected) {
+      console.log("CRITICAL: Inconsistent connected state detected, triggering reload");
+      setTimeout(() => window.location.reload(), 500);
+    }
+  }, [connectionStatus]);
 
   // Force UI re-render with key based on connection status
   const renderKey = `stripe-connection-${isConnected ? 'connected' : 'not-connected'}-${Date.now()}`;
