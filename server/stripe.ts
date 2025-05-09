@@ -1041,7 +1041,15 @@ export function setupStripeRoutes(app: Express) {
     try {
       const userId = req.user.id;
       const hostname = req.hostname;
-      const isProduction = process.env.NODE_ENV === 'production';
+      
+      // CRITICAL FIX: Always treat the environment as production when it's not explicitly development
+      // This handles Replit's production environment correctly
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      const isProduction = !isDevelopment;
+      
+      // Log environment variable to debug
+      console.log(`NODE_ENV=${process.env.NODE_ENV}, isDevelopment=${isDevelopment}, isProduction=${isProduction}`);
+      
       const forceRefresh = !!req.query.force_refresh;
       
       log(`*** ACCOUNT STATUS CHECK ***`, "stripe");
