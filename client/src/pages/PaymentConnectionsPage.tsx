@@ -39,7 +39,7 @@ export default function PaymentConnectionsPage() {
   const [serverError, setServerError] = useState<string | null>(null);
 
   // Direct Fetch Function - No bullshit - Just get the data from the server
-  const fetchData = async () => {
+  const fetchData = async (showSuccessToast = false, forceRefresh = false) => {
     setIsLoading(true);
     setServerError(null);
     
@@ -61,8 +61,8 @@ export default function PaymentConnectionsPage() {
       console.log("STRIPE CONFIG RESPONSE:", JSON.stringify(configData));
       setStripeConfig(configData);
       
-      // STEP 2: Get connection status
-      const statusRes = await fetch(`/api/stripe/account-status?_=${Date.now()}`, {
+      // STEP 2: Get connection status - force a refresh if requested
+      const statusRes = await fetch(`/api/stripe/account-status?forceRefresh=${forceRefresh}&_=${Date.now()}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache'
@@ -82,7 +82,24 @@ export default function PaymentConnectionsPage() {
         // Try to parse as JSON
         const statusData = JSON.parse(rawText);
         console.log("PARSED RESPONSE:", statusData);
+        
+        // Update UI state with the server response
         setConnectionStatus(statusData);
+        
+        if (showSuccessToast) {
+          if (statusData.connected) {
+            toast({
+              title: "Connected to Stripe",
+              description: "Your account is connected to Stripe successfully.",
+            });
+          } else {
+            toast({
+              title: "Not Connected",
+              description: "Your account is not connected to Stripe.",
+              variant: "destructive"
+            });
+          }
+        }
       } catch (e) {
         console.error("Failed to parse response:", e);
         throw new Error(`Invalid JSON: ${rawText.substring(0, 100)}...`);
@@ -116,6 +133,24 @@ export default function PaymentConnectionsPage() {
   
   // Handler for Connect with Stripe button
   const handleConnectStripe = async () => {
+    // Check if we're already connected - if so, just tell the user and refresh the page
+    if (connectionStatus?.connected) {
+      toast({
+        title: "Already connected",
+        description: "Your account is already connected to Stripe.",
+      });
+      
+      // Force refresh all data
+      fetchData();
+      
+      // Refresh the entire page to ensure UI is in sync
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+      return;
+    }
+
     setIsRedirecting(true);
     setServerError(null);
     
@@ -141,6 +176,11 @@ export default function PaymentConnectionsPage() {
         });
         fetchData(); // Refresh data
         setIsRedirecting(false);
+        
+        // Ensure UI is in sync with data by reloading the page
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } else if (data.url) {
         // Redirect to Stripe Connect OAuth
         window.location.href = data.url;
@@ -164,7 +204,8 @@ export default function PaymentConnectionsPage() {
       title: "Refreshing",
       description: "Getting the latest status from server...",
     });
-    fetchData();
+    // Force a data refresh and show results to user
+    fetchData(true, true);
   };
   
   // Handle disconnecting from Stripe
@@ -245,11 +286,12 @@ export default function PaymentConnectionsPage() {
   }, []);
 
   // Show what the server actually says!
+  // IMPORTANT: This is the source of truth for connection status
   const isConnected = connectionStatus?.connected === true;
   
   // IMPORTANT: Always assume OAuth is properly configured
   // The server is experiencing an issue reporting hasOAuthKey correctly
-  const hasOAuthKey = stripeConfig?.hasOAuthKey === true || true; // Force to true for now
+  const hasOAuthKey = true; // Force to true always
   const canConnect = hasOAuthKey && !isRedirecting;
 
   return (
