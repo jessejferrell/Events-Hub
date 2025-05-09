@@ -308,30 +308,53 @@ export default function PaymentConnectionsPage() {
     }
   }, []);
 
-  // HARD DEBUGGING - Log entire connection state to browser console
-  console.log("CONNECTION STATUS OBJECT:", connectionStatus);
-  console.log("STRIPE CONFIG OBJECT:", stripeConfig);
-  console.log(`CONNECTION STATUS VALUES: connected=${connectionStatus?.connected}, accountId=${connectionStatus?.accountId}`);
+  // CRITICAL DATA VALIDATION - Always render from source of truth 
+  console.log("SERVER CONNECTION RESPONSE:", connectionStatus);
+  console.log("SERVER CONFIG RESPONSE:", stripeConfig);
   
-  // Status check with strong validation to ensure accurate state representation
-  const isConnected = connectionStatus?.connected === true && 
-                     !!connectionStatus?.accountId; // Double !! to force a boolean evaluation
+  // Additional protection from inconsistent UI state
+  // Timestamp to prove these values are fresh
+  const timestamp = new Date().toISOString();
   
-  // Debug log the final connected state decision
-  console.log(`FINAL CONNECTION DECISION: isConnected=${isConnected}`);
+  // Log raw important values as received from the server
+  console.log(`[${timestamp}] RAW CONNECTION VALUES: connected=${connectionStatus?.connected}, accountId=${connectionStatus?.accountId}`);
   
-  // IMPORTANT: Always assume OAuth is properly configured
+  // Strict validation of connection status - must have BOTH a true connected flag AND a valid accountId
+  const serverConnected = connectionStatus?.connected === true;
+  const hasAccountId = !!connectionStatus?.accountId;
+  
+  // Final connection state determination - both flags must be true
+  const isConnected = serverConnected && hasAccountId;
+  
+  console.log(`[${timestamp}] CONNECTION STATE DETERMINATION:
+    -> serverConnected = ${serverConnected}
+    -> hasAccountId = ${hasAccountId}
+    -> FINAL isConnected = ${isConnected}`);
+  
+  // Always use server values for OAuth configuration
   const hasOAuthKey = stripeConfig?.hasOAuthKey === true;
   const canConnect = hasOAuthKey && !isRedirecting;
   
-  // Force window reload if false display is detected
+  // AGGRESSIVE COUNTERMEASURES against stale UI:
+  
+  // 1. Auto-reload if we detect an inconsistent state
   useEffect(() => {
-    // If we have a connected account ID but aren't showing as connected, force a page reload
-    if (connectionStatus?.accountId && !isConnected) {
-      console.log("CRITICAL: Inconsistent connected state detected, triggering reload");
-      setTimeout(() => window.location.reload(), 500);
+    // If the server says we're connected but the UI doesn't fully reflect this, force reload 
+    if ((serverConnected && !isConnected) || (hasAccountId && !isConnected)) {
+      console.log("CRITICAL: Inconsistent connection state detected; RELOADING PAGE");
+      window.location.reload();
     }
-  }, [connectionStatus]);
+  }, [connectionStatus, serverConnected, hasAccountId, isConnected]);
+  
+  // 2. Periodic full page refresh to ensure latest state
+  useEffect(() => {
+    const refreshTimer = setTimeout(() => {
+      console.log("PERIODIC FULL PAGE REFRESH");
+      window.location.reload();
+    }, 300000); // Force refresh every 5 minutes
+    
+    return () => clearTimeout(refreshTimer);
+  }, []);
 
   // Force UI re-render with key based on connection status
   const renderKey = `stripe-connection-${isConnected ? 'connected' : 'not-connected'}-${Date.now()}`;
