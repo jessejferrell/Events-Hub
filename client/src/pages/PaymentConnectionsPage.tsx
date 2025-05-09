@@ -62,7 +62,7 @@ export default function PaymentConnectionsPage() {
       setStripeConfig(configData);
       
       // STEP 2: Get connection status - force a refresh if requested
-      const statusRes = await fetch(`/api/stripe/account-status?forceRefresh=${forceRefresh}&_=${Date.now()}`, {
+      const statusRes = await fetch(`/api/stripe/account-status?force_refresh=${forceRefresh}&_=${Date.now()}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache'
