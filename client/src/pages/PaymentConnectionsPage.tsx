@@ -317,8 +317,11 @@ export default function PaymentConnectionsPage() {
   const hasOAuthKey = true; // Force to true always
   const canConnect = hasOAuthKey && !isRedirecting;
 
+  // Force UI re-render with key based on connection status
+  const renderKey = `stripe-connection-${isConnected ? 'connected' : 'not-connected'}-${Date.now()}`;
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col" key={renderKey}>
       <Navbar />
       
       <main className="flex-grow container mx-auto px-4 py-6">
@@ -383,14 +386,14 @@ export default function PaymentConnectionsPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="space-y-4">
+              <div className="space-y-4" key="loading-state">
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-4 w-5/6" />
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-10 w-40 mt-4" />
               </div>
             ) : isConnected ? (
-              <div>
+              <div key={`connected-state-${Date.now()}`}>
                 <div className="mb-4 p-4 bg-green-50 rounded-md border border-green-200">
                   <div className="flex justify-between items-start">
                     <h3 className="text-lg font-medium text-green-800 mb-2">Connection Details</h3>
@@ -477,8 +480,8 @@ export default function PaymentConnectionsPage() {
                 </div>
               </div>
             ) : (
-              <div>
-                <div className="mb-4 p-3 border rounded-md bg-amber-50 border-amber-200" key={`connection-status-${Date.now()}`}>
+              <div key={`not-connected-state-${Date.now()}`}>
+                <div className="mb-4 p-3 border rounded-md bg-amber-50 border-amber-200">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="h-5 w-5 text-amber-600" />
                     <p className="text-amber-800">Your account is not connected to Stripe</p>
