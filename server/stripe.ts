@@ -42,26 +42,19 @@ export function setupStripeRoutes(app: Express) {
   // Test endpoint for Stripe API connectivity
   app.get("/api/stripe/test-connection", async (req, res) => {
     try {
-      // First test if we can make any HTTP request
-      log("Testing basic HTTP connectivity...", "stripe");
-      const testResponse = await fetch("https://httpbin.org/get");
-      const testData = await testResponse.json();
-      
-      // Now test Stripe API specifically
+      // Test Stripe API connectivity directly
       log("Testing Stripe API connectivity...", "stripe");
-      const account = await stripe.accounts.retrieve();
+      
+      // Use Stripe's own API for testing, which is more secure than third-party services
+      const balance = await stripe.balance.retrieve();
       
       res.json({
         success: true,
-        httpTest: { 
-          success: true, 
-          statusCode: testResponse.status
-        },
-        stripeTest: {
-          success: true,
-          accountId: account.id,
-          detailsSubmitted: account.details_submitted,
-          chargesEnabled: account.charges_enabled
+        message: "Stripe API is connected and working properly",
+        balance: {
+          available: balance.available.length,
+          pending: balance.pending.length,
+          object: balance.object
         }
       });
     } catch (error) {
