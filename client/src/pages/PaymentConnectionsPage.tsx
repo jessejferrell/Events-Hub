@@ -138,6 +138,51 @@ export default function PaymentConnectionsPage() {
       });
   };
   
+  // State for disconnect processing
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  
+  // Handle disconnecting from Stripe
+  const handleDisconnectStripe = async () => {
+    setIsDisconnecting(true);
+    console.log('Disconnecting Stripe account');
+    
+    try {
+      const response = await fetch("/api/stripe/disconnect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        toast({
+          title: "Account disconnected",
+          description: "Your Stripe account has been disconnected successfully",
+        });
+        
+        // Refresh the connection status
+        refetchStatus();
+      } else {
+        toast({
+          title: "Disconnect failed",
+          description: data.message || "Failed to disconnect your Stripe account",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error disconnecting Stripe account:", error);
+      toast({
+        title: "Disconnect failed",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+  
   // Function to attempt recovering a Stripe connection - memoize to prevent useEffect dependency issues
   const handleRecoverConnection = useCallback(async () => {
     if (isRecovering) return;
@@ -416,14 +461,40 @@ export default function PaymentConnectionsPage() {
                             Refresh Status
                           </Button>
                           
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="text-red-700 border-red-300 hover:bg-red-100"
-                            onClick={handleDisconnectStripe}
-                          >
-                            Disconnect
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="text-red-700 border-red-300 hover:bg-red-100"
+                              >
+                                Disconnect
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Disconnect Stripe Account</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to disconnect your Stripe account? 
+                                  You will need to reconnect to process payments for your events.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={handleDisconnectStripe}
+                                  disabled={isDisconnecting}
+                                >
+                                  {isDisconnecting ? (
+                                    <>
+                                      <div className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                      Disconnecting...
+                                    </>
+                                  ) : "Disconnect"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     )}
