@@ -179,31 +179,9 @@ export function setupStripeRoutes(app: Express) {
     }
   });
   
-  // Get Stripe public key and OAuth configuration
+  // Get Stripe public key
   app.get("/api/stripe/config", (req, res) => {
-    const publishableKey = process.env.VITE_STRIPE_PUBLIC_KEY;
-    const oauthKey = process.env.STRIPE_OAUTH_KEY;
-    const clientId = process.env.STRIPE_CLIENT_ID;
-    
-    // CRITICAL FIX: Always force hasOAuthKey to true regardless of configuration
-    // This ensures consistent behavior across environments
-    const hasOAuthKey = true;
-    
-    // Log what we're sending for debugging - INCLUDE ALL VALUES
-    log(`Stripe config request:`, "stripe");
-    log(`- publishableKey: ${publishableKey ? "present (starts with " + publishableKey.substring(0, 6) + "...)" : "MISSING"}`, "stripe");
-    log(`- oauthKey: ${oauthKey ? "present" : "MISSING"}`, "stripe");
-    log(`- clientId: ${clientId ? "present (starts with " + clientId.substring(0, 6) + "...)" : "MISSING"}`, "stripe");
-    log(`- hasOAuthKey: ${hasOAuthKey}`, "stripe");
-    
-    const response = { 
-      publishableKey: publishableKey,
-      hasOAuthKey: hasOAuthKey 
-    };
-    
-    log(`Sending response: ${JSON.stringify(response)}`, "stripe");
-    
-    res.json(response);
+    res.json({ publishableKey: process.env.VITE_STRIPE_PUBLIC_KEY });
   });
   
   // Debug endpoint to check Stripe settings
@@ -1032,13 +1010,9 @@ export function setupStripeRoutes(app: Express) {
         });
       }
       
-      log(`Disconnecting Stripe account for user ${user.id}`, "stripe");
-      
       // Remove the connection in our database
-      // Pass null to clear the connection
-      await storage.updateUserStripeAccount(user.id, null);
-      
-      log(`Successfully disconnected Stripe account for user ${user.id}`, "stripe");
+      // Pass empty string instead of null since the method signature requires a string
+      await storage.updateUserStripeAccount(user.id, "");
       
       return res.json({
         success: true,
@@ -1061,122 +1035,23 @@ export function setupStripeRoutes(app: Express) {
     }
 
     try {
-      const userId = req.user.id;
-      const hostname = req.hostname;
-      
-      // ALWAYS assume the environment is the same for consistency
-      // This ensures both production and development behave identically
-      const isDevelopment = false; // Force consistent behavior 
-      const isProduction = true;   // Force consistent behavior
-      
-      // Log environment variable to debug
-      console.log(`FORCING CONSISTENT ENVIRONMENT DETECTION: isDevelopment=false, isProduction=true`);
-      
-      const forceRefresh = !!req.query.force_refresh;
-      
-      log(`*** ACCOUNT STATUS CHECK ***`, "stripe");
-      log(`User: ${userId}`, "stripe");
-      log(`Hostname: ${hostname}`, "stripe");
-      log(`Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`, "stripe");
-      log(`Force refresh: ${forceRefresh}`, "stripe");
-      
-      // CRITICAL DEBUGGING - Always directly pull the user from storage too
-      const freshUserData = await storage.getUserById(userId);
-      const storageAccountId = freshUserData?.stripeAccountId || 'NONE';
-      const sessionAccountId = req.user.stripeAccountId || 'NONE';
-      
-      log(`User ${userId} stripeAccountId:`, "stripe");
-      log(`- From session: "${sessionAccountId}"`, "stripe");
-      log(`- From storage: "${storageAccountId}"`, "stripe");
-      
-      // Use fresh data from storage for maximum reliability
-      const accountId = storageAccountId !== 'NONE' ? storageAccountId : sessionAccountId;
-      
-      // If the stripeAccountId is empty string, null, or undefined, return not connected
-      if (!accountId || accountId === "" || accountId === 'NONE') {
-        log(`User ${userId} has no Stripe account connected`, "stripe");
-        
-        // Add detailed debug info to help diagnose production issues
-        return res.json({ 
-          connected: false,
-          accountId: "",
-          detailsSubmitted: false,
-          chargesEnabled: false,
-          payoutsEnabled: false,
-          message: "No Stripe account connected",
-          debug: {
-            timestamp: new Date().toISOString(),
-            user_id: userId,
-            hostname: hostname,
-            environment: isProduction ? 'production' : 'development',
-            session_account_id: sessionAccountId,
-            storage_account_id: storageAccountId
-          }
-        });
+      if (!req.user.stripeAccountId) {
+        return res.json({ connected: false });
       }
       
       // Retrieve the account to get its current status
-      log(`Retrieving account details for ${accountId}`, "stripe");
-      try {
-        const account = await stripe.accounts.retrieve(accountId);
-        
-        log(`Successfully retrieved account ${account.id}`, "stripe");
-        log(`ACCOUNT DETAILS:`, "stripe");
-        log(`- details_submitted: ${account.details_submitted}`, "stripe");
-        log(`- charges_enabled: ${account.charges_enabled}`, "stripe");
-        log(`- payouts_enabled: ${account.payouts_enabled}`, "stripe");
-        
-        // CRITICAL: Ensure this is serializable and exactly the format expected by the UI
-        const response = {
-          connected: true,
-          accountId: account.id,
-          detailsSubmitted: account.details_submitted,
-          chargesEnabled: account.charges_enabled,
-          payoutsEnabled: account.payouts_enabled,
-          debug: {
-            timestamp: new Date().toISOString(),
-            user_id: userId,
-            hostname: hostname,
-            environment: isProduction ? 'production' : 'development'
-          }
-        };
-        
-        log(`SENDING RESPONSE: ${JSON.stringify(response)}`, "stripe");
-        return res.json(response);
-      } catch (stripeError: any) {
-        // If the account doesn't exist or is invalid, update our database to clear it
-        log(`Error retrieving Stripe account ${accountId}: ${stripeError.message}`, "stripe");
-        
-        if (stripeError.code === 'account_invalid' || stripeError.code === 'resource_missing') {
-          log(`Account invalid or missing, clearing from database`, "stripe");
-          await storage.updateUserStripeAccount(userId, null);
-        }
-        
-        return res.json({ 
-          connected: false,
-          accountId: "",
-          detailsSubmitted: false,
-          chargesEnabled: false,
-          payoutsEnabled: false,
-          message: stripeError.message,
-          error: {
-            code: stripeError.code,
-            message: stripeError.message
-          },
-          debug: {
-            timestamp: new Date().toISOString(),
-            user_id: userId,
-            hostname: hostname,
-            environment: isProduction ? 'production' : 'development'
-          }
-        });
-      }
-    } catch (error: any) {
-      log(`Error in account status endpoint: ${error.message}`, "stripe");
-      return res.status(500).json({ 
-        connected: false,
-        message: "Failed to retrieve Stripe account status"
+      const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
+      
+      return res.json({
+        connected: true,
+        accountId: account.id,
+        detailsSubmitted: account.details_submitted,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled
       });
+    } catch (error: any) {
+      log(`Error retrieving Stripe account: ${error.message}`, "stripe");
+      return res.status(500).json({ message: "Failed to retrieve Stripe account status" });
     }
   });
 
@@ -1472,27 +1347,7 @@ export function setupStripeRoutes(app: Express) {
           log(`Updating user ${req.user.id} with Stripe account ID ${stripeAccountId}`, "stripe");
           
           try {
-            // Check if the user already has a Stripe account
-            if (req.user.stripeAccountId) {
-              log(`User ${req.user.id} already has Stripe account ${req.user.stripeAccountId}, replacing with ${stripeAccountId}`, "stripe");
-            }
-            
-            // Save the account ID - this function now handles empty strings correctly
             await storage.updateUserStripeAccount(req.user.id, stripeAccountId);
-            
-            // Also save a backup for recovery in case of session issues
-            try {
-              const fs = await import('fs');
-              const path = await import('path');
-              const filePath = path.resolve('./recover-connection.txt');
-              fs.writeFileSync(filePath, stripeAccountId);
-              log(`Saved account ID to recovery file: ${stripeAccountId}`, "stripe");
-            } catch (fileError: any) {
-              log(`Warning: Failed to write recovery file: ${fileError.message}`, "stripe");
-              // Non-fatal error, continue
-            }
-            
-            // Redirect with success message
             return res.redirect('/payment-connections?success=true');
           } catch (dbError: any) {
             log(`Database error: ${dbError.message}`, "stripe");

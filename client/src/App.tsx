@@ -18,7 +18,6 @@ import VolunteerRegistrationPage from "@/pages/VolunteerRegistrationPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 
 import PaymentConnectionsPage from "@/pages/PaymentConnectionsPage";
-import StripeConnectionPage from "@/pages/StripeConnectionPage";
 import UserProfilePage from "@/pages/UserProfilePage";
 import EmailNotificationsPage from "@/pages/EmailNotificationsPage";
 import PrivacyPolicyPage from "@/pages/PrivacyPolicyPage";

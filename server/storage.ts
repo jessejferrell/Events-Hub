@@ -43,8 +43,7 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   updateUserRole(userId: number, role: string): Promise<User>;
   updateUserPassword(userId: number, password: string): Promise<User>;
-  updateUserStripeAccount(userId: number, stripeAccountId: string | null): Promise<User>;
-  getUserById(userId: number): Promise<User | undefined>;
+  updateUserStripeAccount(userId: number, stripeAccountId: string): Promise<User>;
   updateUserStripeCustomer(userId: number, stripeCustomerId: string): Promise<User>;
   updateUserStripeSubscription(userId: number, stripeSubscriptionId: string): Promise<User>;
   updateUserProfile(userId: number, userData: Partial<InsertUser>): Promise<User>;
@@ -207,11 +206,6 @@ export class DatabaseStorage implements IStorage {
     const result = await db.select().from(users).where(eq(users.id, id));
     return result[0];
   }
-  
-  // Alias of getUser for code clarity
-  async getUserById(id: number): Promise<User | undefined> {
-    return this.getUser(id);
-  }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
@@ -267,19 +261,10 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateUserStripeAccount(userId: number, stripeAccountId: string | null): Promise<User> {
-    // If we get an empty string, treat it as null
-    const normalizedStripeAccountId = stripeAccountId === "" ? null : stripeAccountId;
-    
-    // Log what we're doing to help with debugging
-    log(`Setting stripe account ID for user ${userId} to ${normalizedStripeAccountId || "NULL"}`, "storage");
-    
+  async updateUserStripeAccount(userId: number, stripeAccountId: string): Promise<User> {
     const result = await db
       .update(users)
-      .set({ 
-        stripeAccountId: normalizedStripeAccountId, 
-        updatedAt: new Date() 
-      })
+      .set({ stripeAccountId, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
     
