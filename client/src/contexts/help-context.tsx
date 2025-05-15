@@ -36,6 +36,12 @@ type HelpTopicValue = typeof HELP_TOPICS[HelpTopicKey];
 
 // Predefined help items
 export const helpItems: Record<HelpTopicValue, HelpItem> = {
+  [HELP_TOPICS.MY_EVENTS]: {
+    id: HELP_TOPICS.MY_EVENTS,
+    title: "My Events Dashboard",
+    content: "Manage all your events in one place. Create new events, edit existing ones, duplicate successful events, or view detailed analytics to track your performance.",
+    illustration: eventIllustration
+  },
   [HELP_TOPICS.STRIPE_CONNECT]: {
     id: HELP_TOPICS.STRIPE_CONNECT,
     title: "Stripe Connect",

@@ -127,19 +127,25 @@ export default function MyEventsPage() {
       
       <main className="flex-grow container mx-auto px-4 py-6">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold mb-1">My Events</h1>
-            <p className="text-neutral-500">
-              Manage your events and view analytics
-            </p>
+          <div className="flex items-start">
+            <div>
+              <h1 className="text-2xl font-bold mb-1">My Events</h1>
+              <p className="text-neutral-500">
+                Manage your events and view analytics
+              </p>
+            </div>
+            <ContextualHelp helpTopic={HELP_TOPICS.MY_EVENTS} placement="right" />
           </div>
-          <Button 
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="bg-secondary hover:bg-secondary/90"
-          >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Create Event
-          </Button>
+          <div className="relative">
+            <ContextualHelp helpTopic={HELP_TOPICS.EVENT_CREATION} placement="left" />
+            <Button 
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="bg-secondary hover:bg-secondary/90"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create Event
+            </Button>
+          </div>
         </div>
         
         {isLoading ? (
