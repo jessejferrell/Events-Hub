@@ -510,23 +510,29 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
                       Upload an image (1920 x 1080 recommended) or enter an image URL.
                     </FormDescription>
                   </div>
-                  <div className="flex items-center justify-center border rounded-md p-2 h-[150px] bg-muted/20">
+                  <div className="flex items-center justify-center border rounded-md p-2 h-[300px] bg-muted/20 overflow-hidden">
                     {field.value ? (
-                      <img 
-                        src={field.value} 
-                        alt="Event preview" 
-                        className="max-h-full max-w-full object-contain"
-                        onError={(e) => {
-                          // Handle image load error
-                          (e.target as HTMLImageElement).src = '';
-                          (e.target as HTMLImageElement).style.display = 'none';
-                          e.currentTarget.parentElement?.querySelector('.fallback')?.classList.remove('hidden');
-                        }}
-                      />
+                      <div className="relative w-full h-full">
+                        <img 
+                          src={field.value} 
+                          alt="Event preview" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Handle image load error
+                            (e.target as HTMLImageElement).src = '';
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            e.currentTarget.parentElement?.parentElement?.querySelector('.fallback')?.classList.remove('hidden');
+                          }}
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 text-center">
+                          Image preview (actual size will be scaled to fit)
+                        </div>
+                      </div>
                     ) : (
                       <div className="text-center text-muted-foreground flex flex-col items-center fallback">
                         <ImageIcon className="h-8 w-8 mb-2" />
                         <span>Image preview</span>
+                        <span className="text-xs mt-1">Recommended size: 1920 x 1080</span>
                       </div>
                     )}
                   </div>
