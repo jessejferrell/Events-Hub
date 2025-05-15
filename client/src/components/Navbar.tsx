@@ -12,6 +12,7 @@ import { Link, useLocation } from "wouter";
 import { LogOut, User, Settings, Mail } from "lucide-react";
 import { useCallback } from "react";
 import { CartWidget } from "@/components/cart/CartWidget";
+import { HelpToggleButton } from "@/components/ui/contextual-help";
 
 export default function Navbar() {
   const { user, logoutMutation } = useAuth();
@@ -46,6 +47,7 @@ export default function Navbar() {
         </Link>
         
         <div className="flex items-center space-x-4">
+          <HelpToggleButton />
           <CartWidget />
           
           {/* Guest buttons or User Menu */}

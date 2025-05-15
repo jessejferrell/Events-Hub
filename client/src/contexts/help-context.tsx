@@ -22,6 +22,8 @@ const HELP_TOPICS = {
   PAYMENT_PROCESSING: "payment_processing",
   VENDOR_REGISTRATION: "vendor_registration",
   ACCOUNT_SETTINGS: "account_settings",
+  EVENT_TICKETS: "event_tickets",
+  CHECKOUT: "checkout",
 } as const;
 
 export { HELP_TOPICS };

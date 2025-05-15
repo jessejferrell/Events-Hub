@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { ContextualHelp } from "@/components/ui/contextual-help";
+import { HELP_TOPICS } from "@/contexts/help-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/hooks/use-cart";
 import { apiRequest } from "@/lib/queryClient";
@@ -427,6 +429,7 @@ export default function EventDetailsPage() {
                                 <DollarSign className="h-5 w-5 mr-1 text-gray-500" />
                                 <span className="text-xl font-bold">${event.price.toFixed(2)}</span>
                                 <span className="ml-1 text-gray-600">per event ticket</span>
+                                <ContextualHelp topic={HELP_TOPICS.EVENT_TICKETS} className="ml-2" />
                               </div>
                               
                               {hasTickets ? (
@@ -476,13 +479,18 @@ export default function EventDetailsPage() {
                                     </div>
                                   </div>
                                   
-                                  <Button 
-                                    className="w-full bg-secondary hover:bg-secondary/90"
-                                    onClick={handleBuyTickets}
-                                    disabled={createCheckoutSession.isPending}
-                                  >
-                                    {createCheckoutSession.isPending ? "Processing..." : "Buy Tickets"}
-                                  </Button>
+                                  <div className="relative">
+                                    <Button 
+                                      className="w-full bg-secondary hover:bg-secondary/90"
+                                      onClick={handleBuyTickets}
+                                      disabled={createCheckoutSession.isPending}
+                                    >
+                                      {createCheckoutSession.isPending ? "Processing..." : "Buy Tickets"}
+                                    </Button>
+                                    <div className="absolute right-0 top-0 transform translate-x-1/2 -translate-y-1/2">
+                                      <ContextualHelp topic={HELP_TOPICS.CHECKOUT} />
+                                    </div>
+                                  </div>
                                 </>
                               )}
                             </>
