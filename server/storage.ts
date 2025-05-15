@@ -333,7 +333,7 @@ export class DatabaseStorage implements IStorage {
 
   // === EVENT OPERATIONS ===
 
-  async getEvents(filters: { type?: string; location?: string; search?: string; sortBy?: string; isUpcoming?: boolean; status?: string } = {}): Promise<Event[]> {
+  async getEvents(filters: { type?: string; location?: string; search?: string; sortBy?: string; isUpcoming?: boolean; status?: string; includeAllStatuses?: boolean } = {}): Promise<Event[]> {
     let queryBuilder = db.select().from(events);
     
     // Apply filters
@@ -360,17 +360,14 @@ export class DatabaseStorage implements IStorage {
       conditions.push(gte(events.endDate, new Date()));
     }
     
-    // Filter by status if provided
+    // Status filtering logic
     if (filters.status) {
+      // If a specific status is requested, filter by that status
       conditions.push(eq(events.status, filters.status));
-    } else {
-      // If no status filter is provided for public-facing views, exclude draft events
-      // This fixes the issue where draft events appear on home/events pages
-      if (!filters.status && !filters.search) {
-        conditions.push(
-          not(eq(events.status, 'draft'))
-        );
-      }
+    } else if (!filters.includeAllStatuses) {
+      // For public-facing views (like home page), exclude draft events
+      // When includeAllStatuses is true (admin pages), show all events
+      conditions.push(not(eq(events.status, 'draft')));
     }
     
     if (conditions.length > 0) {
