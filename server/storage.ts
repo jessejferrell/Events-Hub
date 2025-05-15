@@ -304,6 +304,24 @@ export class DatabaseStorage implements IStorage {
     
     return result[0];
   }
+  
+  // Analytics and diagnostic methods
+  async countUsersWithStripeAccounts(): Promise<number> {
+    try {
+      // Count users who have a non-empty Stripe account ID
+      const result = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(
+          sql`stripe_account_id IS NOT NULL AND stripe_account_id != ''`
+        );
+      
+      return Number(result[0]?.count) || 0;
+    } catch (error) {
+      console.error("Error counting users with Stripe accounts:", error);
+      return 0;
+    }
+  }
 
   async updateUserProfile(userId: number, userData: Partial<InsertUser>): Promise<User> {
     const result = await db
