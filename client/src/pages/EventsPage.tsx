@@ -28,6 +28,8 @@ import {
   Filter, 
   ChevronDown 
 } from "lucide-react";
+import { ContextualHelp } from "@/components/ui/contextual-help";
+import { HELP_TOPICS } from "@/contexts/help-context";
 
 // Event type options
 const eventTypes = [
@@ -126,7 +128,7 @@ export default function EventsPage() {
           </div>
           
           {/* View Toggle */}
-          <div className="flex bg-white border border-neutral-200 rounded-md overflow-hidden">
+          <div className="flex bg-white border border-neutral-200 rounded-md overflow-hidden relative">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
               className={`flex items-center justify-center px-4 py-2 ${
@@ -147,6 +149,9 @@ export default function EventsPage() {
               <CalendarIcon className="h-4 w-4 mr-1" />
               <span>Calendar</span>
             </Button>
+            <div className="absolute right-0 top-0 transform translate-x-1/3 -translate-y-1/3">
+              <ContextualHelp topic={HELP_TOPICS.EVENT_CALENDAR} />
+            </div>
           </div>
           
           {/* Filters Button */}

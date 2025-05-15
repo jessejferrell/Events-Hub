@@ -24,6 +24,8 @@ const HELP_TOPICS = {
   ACCOUNT_SETTINGS: "account_settings",
   EVENT_TICKETS: "event_tickets",
   CHECKOUT: "checkout",
+  EVENT_CALENDAR: "event_calendar",
+  EVENT_FILTERING: "event_filtering",
 } as const;
 
 export { HELP_TOPICS };
@@ -80,6 +82,18 @@ export const helpItems: Record<HelpTopicValue, HelpItem> = {
     title: "Checkout",
     content: "Complete your purchase securely with our streamlined checkout process. Your payment information is protected by Stripe's secure payment processing.",
     illustration: paymentIllustration
+  },
+  [HELP_TOPICS.EVENT_CALENDAR]: {
+    id: HELP_TOPICS.EVENT_CALENDAR,
+    title: "Event Calendar",
+    content: "View events in a calendar format to easily plan your schedule. Switch between calendar and list views to find the best way to browse events.",
+    illustration: eventIllustration
+  },
+  [HELP_TOPICS.EVENT_FILTERING]: {
+    id: HELP_TOPICS.EVENT_FILTERING,
+    title: "Filter Events",
+    content: "Narrow down events by type, location, and date to find exactly what you're looking for. Use the search box to quickly find specific events.",
+    illustration: eventIllustration
   }
 };
 
