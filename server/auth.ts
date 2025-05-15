@@ -54,9 +54,9 @@ export function setupAuth(app: Express) {
     store: storage.sessionStore,
     cookie: {
       httpOnly: true,
-      secure: app.get("env") === "production",
+      secure: false, // Set to false to work in all environments
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
-      sameSite: app.get("env") === "production" ? 'none' : 'lax', // More compatible sameSite setting
+      sameSite: 'lax', // More compatible sameSite setting for all environments
     },
   };
 
