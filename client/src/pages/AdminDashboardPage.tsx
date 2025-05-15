@@ -396,7 +396,12 @@ export default function AdminDashboardPage() {
       // Use the dedicated admin events endpoint which always shows all events including drafts
       const res = await fetch(`/api/admin/events?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch events");
-      return await res.json();
+      const data = await res.json();
+      
+      // Log the events for debugging
+      console.log('Admin Events Data:', data);
+      
+      return data;
     },
     enabled: activeTab === "events"
   });
