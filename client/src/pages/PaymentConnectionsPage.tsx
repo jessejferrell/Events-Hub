@@ -24,7 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
+import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle, Terminal, RefreshCcw, Check, ArrowRight, Link } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Tooltip,
@@ -392,27 +392,79 @@ export default function PaymentConnectionsPage() {
     try {
       setDiagnosticData("Loading...");
       
-      // Fetch connection status directly
-      const statusRes = await fetch("/api/stripe/account-status");
-      const statusData = await statusRes.json();
+      // Collect all diagnostic data in a structured way
+      const diagnostics: Record<string, any> = {};
       
-      // Get environment info
-      const envInfo = {
+      // 1. Environment info
+      diagnostics.environment = {
         hostname: window.location.hostname,
         protocol: window.location.protocol,
         pathname: window.location.pathname,
         userAgent: navigator.userAgent,
         timestamp: new Date().toISOString(),
+        href: window.location.href,
+        isProduction: window.location.hostname.includes('mosspointmainstreet.org'),
+        screenWidth: window.innerWidth,
+        screenHeight: window.innerHeight,
       };
       
-      setDiagnosticData({
-        connectionStatus: statusData,
-        environment: envInfo,
-      });
+      // 2. Stripe Account Status
+      try {
+        const statusRes = await fetch("/api/stripe/account-status");
+        const statusText = await statusRes.text();
+        
+        try {
+          diagnostics.connectionStatus = JSON.parse(statusText);
+        } catch (parseError) {
+          diagnostics.connectionStatus = {
+            error: "Failed to parse JSON response",
+            rawResponse: statusText,
+            statusCode: statusRes.status
+          };
+        }
+      } catch (statusError) {
+        diagnostics.connectionStatus = {
+          error: statusError instanceof Error ? statusError.message : String(statusError),
+          fetchFailed: true
+        };
+      }
+      
+      // 3. Stripe Config
+      try {
+        const configRes = await fetch("/api/stripe/config");
+        const configText = await configRes.text();
+        
+        try {
+          diagnostics.stripeConfig = JSON.parse(configText);
+        } catch (parseError) {
+          diagnostics.stripeConfig = {
+            error: "Failed to parse JSON response",
+            rawResponse: configText,
+            statusCode: configRes.status
+          };
+        }
+      } catch (configError) {
+        diagnostics.stripeConfig = {
+          error: configError instanceof Error ? configError.message : String(configError),
+          fetchFailed: true
+        };
+      }
+      
+      // 4. User info (without sensitive data)
+      diagnostics.user = user ? {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        hasStripeAccount: !!user.stripeAccountId,
+        stripeAccountIdLength: user.stripeAccountId ? user.stripeAccountId.length : 0,
+      } : null;
+      
+      // Set all collected data
+      setDiagnosticData(diagnostics);
       
       toast({
         title: "Diagnostics complete",
-        description: "Diagnostic information has been collected",
+        description: "Comprehensive diagnostic information has been collected",
       });
     } catch (error) {
       console.error("Diagnostic error:", error);
@@ -509,7 +561,7 @@ export default function PaymentConnectionsPage() {
                   </div>
                 </div>
                 
-                <p className="text-neutral-600 mb-6">
+                <p className="text-neutral-600 mb-4">
                   Your Stripe account is successfully connected to City Event Hub. 
                   Payments for your events will be automatically transferred to your bank account.
                   {!connectionStatus?.detailsSubmitted && (
@@ -519,6 +571,112 @@ export default function PaymentConnectionsPage() {
                     </span>
                   )}
                 </p>
+                
+                {/* Diagnostic information */}
+                {showDiagnostics && (
+                  <div className="mt-2 mb-6 border border-gray-300 rounded-md p-3 bg-gray-50">
+                    <h3 className="text-sm font-medium mb-2">Diagnostic Information</h3>
+                    {diagnosticData === "Loading..." ? (
+                      <div className="flex items-center justify-center p-4">
+                        <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mr-2"></div>
+                        <p className="text-sm text-gray-500">Loading diagnostic information...</p>
+                      </div>
+                    ) : diagnosticData?.error ? (
+                      <div className="p-2 bg-red-50 border border-red-200 rounded-md">
+                        <p className="text-sm text-red-600 font-medium">Error occurred during diagnostics:</p>
+                        <p className="text-sm text-red-500">{diagnosticData.error}</p>
+                      </div>
+                    ) : diagnosticData ? (
+                      <div className="text-sm text-gray-700">
+                        <div className="mb-4">
+                          <p className="font-medium flex items-center">
+                            <span className="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full">Environment</span>
+                            {diagnosticData.environment?.isProduction ? 
+                              <span className="bg-amber-100 text-amber-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Production</span> : 
+                              <span className="bg-green-100 text-green-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Development</span>
+                            }
+                          </p>
+                          <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-1 mb-2 overflow-auto max-h-28">
+                            {JSON.stringify(diagnosticData.environment, null, 2)}
+                          </pre>
+                        </div>
+                        
+                        <div className="mb-4">
+                          <p className="font-medium flex items-center">
+                            <span className="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full">User Info</span>
+                            {diagnosticData.user?.hasStripeAccount ? 
+                              <span className="bg-green-100 text-green-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Stripe Connected</span> : 
+                              <span className="bg-red-100 text-red-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Not Connected</span>
+                            }
+                          </p>
+                          <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-1 mb-2 overflow-auto max-h-24">
+                            {JSON.stringify(diagnosticData.user, null, 2)}
+                          </pre>
+                        </div>
+                        
+                        <div className="mb-4">
+                          <p className="font-medium flex items-center">
+                            <span className="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full">Stripe Config</span>
+                            {diagnosticData.stripeConfig?.clientId ? 
+                              <span className="bg-green-100 text-green-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Config OK</span> : 
+                              <span className="bg-red-100 text-red-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Config Issue</span>
+                            }
+                          </p>
+                          <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-1 overflow-auto max-h-24">
+                            {JSON.stringify(diagnosticData.stripeConfig, null, 2)}
+                          </pre>
+                        </div>
+                        
+                        <div className="mb-4">
+                          <p className="font-medium flex items-center">
+                            <span className="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full">Connection Status</span>
+                            {diagnosticData.connectionStatus?.connected ? 
+                              <span className="bg-green-100 text-green-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Connected</span> : 
+                              <span className="bg-red-100 text-red-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Not Connected</span>
+                            }
+                          </p>
+                          <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-1 overflow-auto max-h-32">
+                            {JSON.stringify(diagnosticData.connectionStatus, null, 2)}
+                          </pre>
+                        </div>
+                        
+                        <div className="flex justify-between mt-3">
+                          <Button
+                            onClick={runDiagnostics}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <RefreshCw className="mr-1 h-3 w-3" />
+                            Refresh
+                          </Button>
+                          
+                          <Button
+                            onClick={() => {
+                              const diagData = JSON.stringify(diagnosticData, null, 2);
+                              const blob = new Blob([diagData], { type: 'application/json' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `stripe-diagnostics-${new Date().toISOString().slice(0,10)}.json`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                          >
+                            <ArrowRight className="mr-1 h-3 w-3" />
+                            Export
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No diagnostic data available</p>
+                    )}
+                  </div>
+                )}
                 <div className="flex space-x-4">
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white"
