@@ -6,6 +6,7 @@ import { setupStripeRoutes } from "./stripe";
 import { setupEmailRoutes } from "./email";
 import { upload } from "./uploads";
 import { log } from "./vite";
+import { getObject } from "./objectStorage";
 import { z } from "zod";
 import Stripe from "stripe";
 import fs from "fs";
@@ -2621,6 +2622,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching user volunteer assignments:', error);
       res.status(500).json({ message: 'Failed to fetch user volunteer assignments' });
+    }
+  });
+
+  // Object storage file serving route
+  app.get('/api/storage/:path(*)', async (req, res) => {
+    try {
+      const objectKey = req.params.path;
+      const objectData = await getObject(objectKey);
+      
+      if (!objectData) {
+        return res.status(404).send('File not found');
+      }
+
+      // Determine content type based on file extension
+      const extension = objectKey.split('.').pop()?.toLowerCase();
+      let contentType = 'application/octet-stream'; // Default binary type
+      
+      // Map common extensions to content types
+      const contentTypeMap: { [key: string]: string } = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'svg': 'image/svg+xml',
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'txt': 'text/plain',
+        'html': 'text/html',
+        'css': 'text/css',
+        'js': 'application/javascript',
+        'json': 'application/json',
+        'xml': 'application/xml',
+      };
+      
+      if (extension && contentTypeMap[extension]) {
+        contentType = contentTypeMap[extension];
+      }
+      
+      // Set appropriate headers
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for a year
+      
+      // Send the file
+      res.send(objectData);
+    } catch (error) {
+      console.error('Error serving file from object storage:', error);
+      res.status(500).send('Error retrieving file');
+    }
+  });
+  
+  // File upload route using object storage
+  app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      
+      const { 
+        buffer, 
+        originalname, 
+        mimetype 
+      } = req.file;
+      
+      // Upload to object storage
+      const { uploadFile } = await import('./objectStorage');
+      const fileUrl = await uploadFile(buffer, originalname, mimetype);
+      
+      res.status(201).json({ url: fileUrl });
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      res.status(500).json({ message: 'Failed to upload file' });
     }
   });
   

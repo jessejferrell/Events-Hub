@@ -1,33 +1,10 @@
-import { randomBytes } from 'crypto';
-import { promises as fs } from 'fs';
-import path from 'path';
 import multer from 'multer';
 import { Express, Request } from 'express';
+import { isObjectStorageReady } from './objectStorage';
 
-// Ensure the uploads directory exists
-const UPLOAD_DIR = './public/uploads';
-
-async function ensureUploadDirExists() {
-  try {
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
-    console.log('Upload directory is ready');
-  } catch (error) {
-    console.error('Error creating upload directory:', error);
-  }
-}
-
-// Configure multer for file storage
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, UPLOAD_DIR);
-  },
-  filename: (_req, file, cb) => {
-    // Generate a unique filename with the original extension
-    const uniqueSuffix = `${Date.now()}-${randomBytes(6).toString('hex')}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `${uniqueSuffix}${ext}`);
-  },
-});
+// Configure multer for memory storage (for object storage)
+// Instead of saving to disk, we'll keep files in memory and then upload to object storage
+const storage = multer.memoryStorage();
 
 // File filter to only accept image files
 const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
@@ -39,13 +16,23 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFil
 };
 
 export const upload = multer({
-  storage,
+  storage, // Using memory storage
   fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB max file size
   },
 });
 
+// Check if object storage is configured and accessible
 export async function setupUploads() {
-  await ensureUploadDirExists();
+  try {
+    const isReady = await isObjectStorageReady();
+    if (isReady) {
+      console.log('Object storage is ready for uploads');
+    } else {
+      console.warn('Object storage is not accessible. Uploads may fail.');
+    }
+  } catch (error) {
+    console.error('Error checking object storage:', error);
+  }
 }
