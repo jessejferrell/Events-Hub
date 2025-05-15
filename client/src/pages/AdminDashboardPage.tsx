@@ -2211,7 +2211,6 @@ export default function AdminDashboardPage() {
                               <th className="h-12 px-4 text-left align-middle font-medium">Event</th>
                               <th className="h-12 px-4 text-left align-middle font-medium">Date</th>
                               <th className="h-12 px-4 text-left align-middle font-medium">Location</th>
-                              <th className="h-12 px-4 text-left align-middle font-medium">Status</th>
                               <th className="h-12 px-4 text-left align-middle font-medium">Organizer</th>
                               <th className="h-12 px-4 text-left align-middle font-medium">Actions</th>
                             </tr>
@@ -2280,18 +2279,7 @@ export default function AdminDashboardPage() {
                                         }
                                       </div>
                                     </td>
-                                    <td className="p-4 align-middle">
-                                      <Badge 
-                                        variant={
-                                          event.status === "draft" 
-                                            ? "secondary" 
-                                            : "success"
-                                        }
-                                      >
-                                        {/* Simple Live/Draft indicator */}
-                                        {event.status === "draft" ? "Draft" : "Live"}
-                                      </Badge>
-                                    </td>
+
                                     <td className="p-4 align-middle">
                                       <div>Organizer ID: {event.ownerId}</div>
                                       <div className="text-xs text-muted-foreground">
