@@ -2321,26 +2321,7 @@ export default function AdminDashboardPage() {
                                         >
                                           <Ticket className="h-4 w-4" />
                                         </Button>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          title="Toggle status"
-                                          onClick={() => handleToggleEventStatus(event)}
-                                        >
-                                          {event.status === "draft" ? (
-                                            <Calendar className="h-4 w-4 text-emerald-500" />
-                                          ) : event.status === "upcoming" ? (
-                                            <CalendarCheck className="h-4 w-4 text-blue-500" />
-                                          ) : event.status === "active" ? (
-                                            <CheckCircle className="h-4 w-4 text-green-500" />
-                                          ) : event.status === "completed" ? (
-                                            <Clock className="h-4 w-4 text-amber-500" />
-                                          ) : event.status === "cancelled" ? (
-                                            <XCircle className="h-4 w-4 text-red-500" />
-                                          ) : (
-                                            <Calendar className="h-4 w-4 text-emerald-500" />
-                                          )}
-                                        </Button>
+
                                         <Button 
                                           variant="ghost" 
                                           size="icon" 
