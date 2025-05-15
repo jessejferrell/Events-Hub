@@ -134,10 +134,10 @@ export default function MyEventsPage() {
                 Manage your events and view analytics
               </p>
             </div>
-            <ContextualHelp helpTopic={HELP_TOPICS.MY_EVENTS} placement="right" />
+            <ContextualHelp topic={HELP_TOPICS.MY_EVENTS} side="right" />
           </div>
           <div className="relative">
-            <ContextualHelp helpTopic={HELP_TOPICS.EVENT_CREATION} placement="left" />
+            <ContextualHelp topic={HELP_TOPICS.EVENT_CREATION} placement="left" />
             <Button 
               onClick={() => setIsCreateDialogOpen(true)}
               className="bg-secondary hover:bg-secondary/90"
@@ -191,54 +191,86 @@ export default function MyEventsPage() {
                 </CardContent>
                 <CardFooter className="flex flex-col pt-2 gap-2">
                   <div className="flex justify-between w-full gap-2">
-                    <Button
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEditEvent(event)}
-                      className="flex-1"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="secondary" 
-                      size="sm"
-                      onClick={() => navigate(`/events/${event.id}`)}
-                      className="flex-1"
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
+                    <div className="relative flex-1">
+                      <ContextualHelp
+                        content="Update event details, ticket prices, and other settings"
+                        title="Edit Event"
+                        placement="top"
+                        variant="compact"
+                      />
+                      <Button
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleEditEvent(event)}
+                        className="w-full"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                    <div className="relative flex-1">
+                      <ContextualHelp
+                        content="Preview how your event appears to attendees"
+                        title="View Event"
+                        placement="top"
+                        variant="compact"
+                      />
+                      <Button
+                        variant="secondary" 
+                        size="sm"
+                        onClick={() => navigate(`/events/${event.id}`)}
+                        className="w-full"
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex justify-between w-full gap-2">
-                    <Button
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDuplicateEvent(event)}
-                      disabled={duplicateEventMutation.isPending}
-                      className="flex-1"
-                    >
-                      {duplicateEventMutation.isPending ? (
-                        <>
-                          <div className="h-4 w-4 mr-1 animate-spin border-2 border-t-transparent border-primary rounded-full" />
-                          Duplicating...
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4 mr-1" />
-                          Duplicate
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => handleDeleteEvent(event)}
-                      className="flex-1"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
+                    <div className="relative flex-1">
+                      <ContextualHelp
+                        content="Create a copy of this event with all settings intact"
+                        title="Duplicate Event"
+                        placement="bottom"
+                        variant="compact"
+                      />
+                      <Button
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleDuplicateEvent(event)}
+                        disabled={duplicateEventMutation.isPending}
+                        className="w-full"
+                      >
+                        {duplicateEventMutation.isPending ? (
+                          <>
+                            <div className="h-4 w-4 mr-1 animate-spin border-2 border-t-transparent border-primary rounded-full" />
+                            Duplicating...
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-1" />
+                            Duplicate
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <div className="relative flex-1">
+                      <ContextualHelp
+                        content="Permanently remove this event. This action cannot be undone."
+                        title="Delete Event"
+                        placement="bottom"
+                        variant="compact"
+                      />
+                      <Button
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => handleDeleteEvent(event)}
+                        className="w-full"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </CardFooter>
               </Card>

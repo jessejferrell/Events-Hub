@@ -7,43 +7,69 @@ type HelpTopicKey = keyof typeof HELP_TOPICS;
 type HelpTopicValue = typeof HELP_TOPICS[HelpTopicKey];
 
 interface ContextualHelpProps {
-  topic: HelpTopicValue;
+  topic?: HelpTopicValue;
+  title?: string;
+  content?: string;
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
   className?: string;
   iconSize?: number;
+  variant?: "default" | "compact";
+  placement?: string; // For compatibility with older code
 }
 
 export function ContextualHelp({ 
   topic, 
+  title,
+  content,
   side = "top", 
   align = "center", 
   className = "",
-  iconSize = 16
+  iconSize = 16,
+  variant = "default",
+  placement // For compatibility
 }: ContextualHelpProps) {
   const { isHelpEnabled, getHelpItem, showTooltips } = useHelp();
+  
+  // For backward compatibility, convert placement to side
+  const finalSide = placement || side;
   
   // If help is disabled, don't render anything
   if (!isHelpEnabled || !showTooltips) {
     return null;
   }
   
-  const helpItem = getHelpItem(topic);
+  let tooltipTitle = title;
+  let tooltipContent = content;
+  let illustration: string | undefined = undefined;
   
-  if (!helpItem) {
+  // If a topic is provided, it takes precedence over direct props
+  if (topic) {
+    const helpItem = getHelpItem(topic);
+    if (!helpItem) {
+      return null;
+    }
+    tooltipTitle = helpItem.title;
+    tooltipContent = helpItem.content;
+    illustration = helpItem.illustration;
+  }
+  
+  // We must have either topic or direct content
+  if (!tooltipTitle || !tooltipContent) {
     return null;
   }
   
   return (
     <IllustratedTooltip
-      title={helpItem.title}
-      content={helpItem.content}
-      illustration={helpItem.illustration}
-      side={side}
+      title={tooltipTitle || ""}
+      content={tooltipContent || ""}
+      illustration={illustration}
+      side={finalSide as "top" | "right" | "bottom" | "left"}
       align={align}
       className={className}
       iconSize={iconSize}
-      icon={<HelpCircle size={iconSize} className="text-primary hover:text-primary/80 transition-colors" />}
+      icon={<HelpCircle size={variant === "compact" ? (iconSize - 4) : iconSize} 
+        className={`text-primary hover:text-primary/80 transition-colors ${variant === "compact" ? "absolute -top-2 -right-2" : ""}`} />}
     />
   );
 }
