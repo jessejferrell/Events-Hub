@@ -20,7 +20,7 @@ import connectPg from "connect-pg-simple";
 import createMemoryStore from "memorystore";
 import { log } from "./vite";
 import { db, pool } from "./db";
-import { and, asc, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, not, or, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 
 const PostgresSessionStore = connectPg(session);
@@ -363,6 +363,14 @@ export class DatabaseStorage implements IStorage {
     // Filter by status if provided
     if (filters.status) {
       conditions.push(eq(events.status, filters.status));
+    } else {
+      // If no status filter is provided for public-facing views, exclude draft events
+      // This fixes the issue where draft events appear on home/events pages
+      if (!filters.status && !filters.search) {
+        conditions.push(
+          not(eq(events.status, 'draft'))
+        );
+      }
     }
     
     if (conditions.length > 0) {
