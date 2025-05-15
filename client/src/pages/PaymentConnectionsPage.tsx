@@ -356,15 +356,24 @@ export default function PaymentConnectionsPage() {
   
   // Show connection error alert if needed
   useEffect(() => {
-    if (connectionError) {
+    if (connectionError && !connectionStatus?.connected) {
       console.error("Connection status error:", connectionError);
-      toast({
-        title: "Connection status error",
-        description: "There was an issue checking your Stripe connection. Please try refreshing the page.",
-        variant: "destructive",
-      });
+      
+      // Add a short delay to avoid showing error if data is actually available
+      const errorTimer = setTimeout(() => {
+        // Double-check we still don't have connection status before showing error
+        if (!connectionStatus?.connected) {
+          toast({
+            title: "Connection status error",
+            description: "There was an issue checking your Stripe connection. Please try refreshing the page.",
+            variant: "destructive",
+          });
+        }
+      }, 1500); // 1.5 second delay
+      
+      return () => clearTimeout(errorTimer);
     }
-  }, [connectionError, toast]);
+  }, [connectionError, connectionStatus, toast]);
   
   // Manual refresh function
   const handleManualRefresh = () => {
