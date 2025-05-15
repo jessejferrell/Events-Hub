@@ -32,8 +32,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ContextualHelp, HelpToggleButton } from "@/components/ui/contextual-help";
-import { HELP_TOPICS } from "@/contexts/help-context";
+import { ContextualHelp } from "@/components/ui/contextual-help";
 
 export default function PaymentConnectionsPage() {
   const { user } = useAuth();
@@ -387,7 +386,15 @@ export default function PaymentConnectionsPage() {
               Connect your Stripe account to receive payments directly
             </p>
           </div>
-          <HelpToggleButton />
+          <div>
+            <Button
+              variant="ghost"
+              className="text-primary hover:bg-primary/10 rounded-full p-2"
+              onClick={() => window.open("https://stripe.com/docs/connect", "_blank")}
+            >
+              <ExternalLink size={20} />
+            </Button>
+          </div>
         </div>
         
         <div className="flex flex-col md:flex-row gap-6">
