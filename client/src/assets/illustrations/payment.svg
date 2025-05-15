@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200px" height="150px" viewBox="0 0 200 150" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+    <g transform="translate(20, 10)">
+      <!-- Credit card -->
+      <rect x="10" y="30" width="140" height="90" rx="8" fill="#6366F1" />
+      <rect x="25" y="60" width="50" height="10" rx="2" fill="#FFFFFF" opacity="0.7" />
+      <rect x="25" y="80" width="30" height="10" rx="2" fill="#FFFFFF" opacity="0.7" />
+      <rect x="60" y="80" width="30" height="10" rx="2" fill="#FFFFFF" opacity="0.7" />
+      <rect x="95" y="80" width="30" height="10" rx="2" fill="#FFFFFF" opacity="0.7" />
+      <circle cx="120" cy="50" r="15" fill="#FCD34D" opacity="0.9" />
+      <circle cx="130" cy="50" r="15" fill="#F59E0B" opacity="0.9" />
+      
+      <!-- Money symbols -->
+      <circle cx="30" cy="20" r="18" fill="#4ADE80" opacity="0.9" />
+      <text x="30" y="26" font-family="Arial" font-size="20" fill="#064E3B" text-anchor="middle">$</text>
+      
+      <circle cx="150" cy="100" r="18" fill="#4ADE80" opacity="0.9" />
+      <text x="150" y="106" font-family="Arial" font-size="20" fill="#064E3B" text-anchor="middle">$</text>
+      
+      <!-- Happy face -->
+      <circle cx="80" cy="15" r="12" fill="#FCD34D" />
+      <circle cx="75" cy="12" r="2" fill="#1E293B" />
+      <circle cx="85" cy="12" r="2" fill="#1E293B" />
+      <path d="M74,18 Q80,22 86,18" stroke="#1E293B" stroke-width="2" fill="none" />
+    </g>
+  </g>
+</svg>
