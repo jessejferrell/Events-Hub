@@ -7,7 +7,7 @@ import { log } from "./vite";
 declare module 'stripe' {
   namespace Stripe {
     interface StripeConfig {
-      apiVersion: string | "2025-04-30.basil";
+      apiVersion?: string;
     }
   }
 }
@@ -682,11 +682,11 @@ export function setupStripeRoutes(app: Express) {
           
           // Update req.body for the rest of the function to use
           req.body.stripeAccountId = connectedAccountId;
-        } catch (exchangeError) {
+        } catch (exchangeError: unknown) {
           console.error("Error exchanging code:", exchangeError);
           return res.status(400).json({
             success: false,
-            error: exchangeError.message || "Failed to exchange code for token"
+            error: exchangeError instanceof Error ? exchangeError.message : "Failed to exchange code for token"
           });
         }
       } else {

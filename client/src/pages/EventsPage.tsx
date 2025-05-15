@@ -188,7 +188,10 @@ export default function EventsPage() {
         {/* Expanded Filters */}
         {showFilters && (
           <div className="mb-6 p-4 border border-gray-200 rounded-md bg-white">
-            <h3 className="font-medium mb-3">Filter Options</h3>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="font-medium">Filter Options</h3>
+              <ContextualHelp topic={HELP_TOPICS.EVENT_FILTERING} />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm mb-1">Event Type</label>
