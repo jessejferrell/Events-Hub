@@ -376,9 +376,7 @@ export function setupStripeRoutes(app: Express) {
       log(`Using OAuth key: ${oauthKey.substring(0, 7)}...`, "stripe");
       
       // Create a fresh Stripe instance with the OAuth key
-      const freshStripe = new Stripe(oauthKey, {
-        apiVersion: "2023-10-16",
-      });
+      const freshStripe = createStripeInstance(oauthKey);
       
       // Exchange the code for a token
       const tokenResponse = await freshStripe.oauth.token({
@@ -525,9 +523,7 @@ export function setupStripeRoutes(app: Express) {
       
       try {
         // Get a completely fresh Stripe instance with the latest key
-        const freshStripe = new Stripe(oauthKey, {
-          apiVersion: "2023-10-16",
-        });
+        const freshStripe = createStripeInstance(oauthKey);
         
         console.error("Created fresh Stripe instance with key format:", 
           oauthKey.substring(0, 7) + "..." + oauthKey.substring(oauthKey.length - 4));
@@ -648,9 +644,7 @@ export function setupStripeRoutes(app: Express) {
           
           console.log("Using key format:", oauthKey.substring(0, 7) + "..." + oauthKey.substring(oauthKey.length - 4));
           
-          const freshStripe = new Stripe(oauthKey, {
-            apiVersion: "2023-10-16",
-          });
+          const freshStripe = createStripeInstance(oauthKey);
           
           // Exchange the code for an account ID
           console.log("Exchanging code using Stripe SDK...");
@@ -1617,9 +1611,7 @@ export function setupStripeRoutes(app: Express) {
       // First method: SDK approach
       try {
         console.log("Attempting token exchange using Stripe SDK...");
-        const freshStripe = new Stripe(secretKey, {
-          apiVersion: "2023-10-16",
-        });
+        const freshStripe = createStripeInstance(secretKey);
         
         const tokenResponse = await freshStripe.oauth.token({
           grant_type: 'authorization_code',
