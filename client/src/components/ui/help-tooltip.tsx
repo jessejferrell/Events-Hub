@@ -41,7 +41,7 @@ export function HelpTooltip({
 }
 
 interface IllustratedTooltipProps extends HelpTooltipProps {
-  illustration: string;
+  illustration?: string;
   altText?: string;
   title?: string;
 }
@@ -58,13 +58,15 @@ export function IllustratedTooltip({
       content={
         <>
           {title && <h4 className="font-medium text-primary mb-1">{title}</h4>}
-          <div className="rounded-md overflow-hidden mb-2 max-w-[200px] mx-auto">
-            <img 
-              src={illustration} 
-              alt={altText}
-              className="w-full h-auto object-contain"
-            />
-          </div>
+          {illustration && (
+            <div className="rounded-md overflow-hidden mb-2 max-w-[200px] mx-auto">
+              <img 
+                src={illustration} 
+                alt={altText}
+                className="w-full h-auto object-contain"
+              />
+            </div>
+          )}
           <div className="text-sm text-gray-700">{content}</div>
         </>
       }

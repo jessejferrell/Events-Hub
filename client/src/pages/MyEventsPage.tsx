@@ -277,7 +277,15 @@ export default function MyEventsPage() {
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center relative">
+            <div className="absolute top-2 right-2">
+              <ContextualHelp
+                title="Create Your First Event"
+                content="Click the button below to create your first event. You'll be able to set details like date, location, ticket prices, and more."
+                side="top"
+                variant="compact"
+              />
+            </div>
             <h3 className="text-xl font-medium mb-2">No events created yet</h3>
             <p className="text-gray-500 mb-6">Get started by creating your first event</p>
             <Button 
