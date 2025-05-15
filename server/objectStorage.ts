@@ -1,4 +1,4 @@
-import * as objectStorage from "@replit/object-storage";
+import { Client } from "@replit/object-storage";
 import { randomBytes } from "crypto";
 import { promisify } from "util";
 import path from "path";
@@ -6,8 +6,10 @@ import path from "path";
 // Create a randomBytes function that returns a Promise
 const randomBytesAsync = promisify(randomBytes);
 
-// Object storage bucket name
-const BUCKET_NAME = "replit-objstore-59539edf-f9e5-470f-b744-2fd4b1b3c6f6";
+// Initialize object storage client
+const objectStorage = new Client({
+  bucketName: "replit-objstore-59539edf-f9e5-470f-b744-2fd4b1b3c6f6"
+});
 
 /**
  * Generate a unique file name for storage
@@ -46,9 +48,13 @@ export async function uploadFile(
     const objectKey = `uploads/${uniqueFileName}`;
     
     // Upload to object storage
-    await objectStorage.putObject(BUCKET_NAME, objectKey, fileBuffer, {
-      contentType,
+    const uploadResult = await objectStorage.upload(objectKey, fileBuffer, {
+      contentType: contentType,
     });
+    
+    if (uploadResult.err) {
+      throw new Error(`Upload failed: ${uploadResult.err.message}`);
+    }
     
     // Get the public URL
     const hostUrl = process.env.NODE_ENV === 'production' 
@@ -78,7 +84,13 @@ export async function deleteFile(fileUrl: string): Promise<boolean> {
     const objectKey = pathParts.slice(startIndex).join('/');
     
     // Delete from object storage
-    await objectStorage.deleteObject(BUCKET_NAME, objectKey);
+    const deleteResult = await objectStorage.delete(objectKey);
+    
+    if (deleteResult.err) {
+      console.error(`Delete failed: ${deleteResult.err.message}`);
+      return false;
+    }
+    
     return true;
   } catch (error) {
     console.error("Error deleting file from object storage:", error);
@@ -93,7 +105,13 @@ export async function deleteFile(fileUrl: string): Promise<boolean> {
 export async function isObjectStorageReady(): Promise<boolean> {
   try {
     // List a few objects to verify connection
-    await objectStorage.listObjects(BUCKET_NAME, { prefix: '' });
+    const listResult = await objectStorage.list({ prefix: '' });
+    
+    if (listResult.err) {
+      console.error(`List operation failed: ${listResult.err.message}`);
+      return false;
+    }
+    
     return true;
   } catch (error) {
     console.error("Object storage is not accessible:", error);
@@ -108,8 +126,14 @@ export async function isObjectStorageReady(): Promise<boolean> {
  */
 export async function getObject(objectKey: string): Promise<Buffer | null> {
   try {
-    const data = await objectStorage.getObject(BUCKET_NAME, objectKey);
-    return data;
+    const downloadResult = await objectStorage.download(objectKey);
+    
+    if (downloadResult.err) {
+      console.error(`Download failed: ${downloadResult.err.message}`);
+      return null;
+    }
+    
+    return downloadResult.data;
   } catch (error) {
     console.error(`Error getting object ${objectKey}:`, error);
     return null;
