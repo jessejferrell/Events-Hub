@@ -24,7 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle, Check } from "lucide-react";
+import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Tooltip,
@@ -39,6 +39,15 @@ export default function PaymentConnectionsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [recoveryResult, setRecoveryResult] = useState<{
+    recovered: boolean;
+    message: string;
+    accountId?: string;
+    alreadyConnected?: boolean;
+    error?: string;
+  } | null>(null);
 
   // Fetch Stripe configuration
   const { data: stripeConfig, isLoading } = useQuery({
@@ -82,16 +91,6 @@ export default function PaymentConnectionsPage() {
     retryDelay: 1000,
     staleTime: 30000, // Refresh every 30 seconds
   });
-  
-  // Recovery process - attempt to recover a pending Stripe connection from the session
-  const [isRecovering, setIsRecovering] = useState(false);
-  const [recoveryResult, setRecoveryResult] = useState<{
-    recovered: boolean;
-    message: string;
-    accountId?: string;
-    alreadyConnected?: boolean;
-    error?: string;
-  } | null>(null);
 
   // Redirect to Stripe Connect flow
   const handleConnectStripe = () => {
@@ -162,9 +161,6 @@ export default function PaymentConnectionsPage() {
       });
   };
   
-  // State for disconnect processing
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
-  
   // Simplified disconnect function to avoid security triggers
   const handleDisconnectStripe = () => {
     setIsDisconnecting(true);
@@ -199,7 +195,7 @@ export default function PaymentConnectionsPage() {
       });
   };
   
-  // Function to attempt recovering a Stripe connection - memoize to prevent useEffect dependency issues
+  // Function to attempt recovering a Stripe connection
   const handleRecoverConnection = useCallback(async () => {
     if (isRecovering) return;
     
@@ -267,7 +263,6 @@ export default function PaymentConnectionsPage() {
     console.log("=====================================");
     
     // If we have a code parameter, this indicates we've been redirected from Stripe
-    // or we're being redirected back from Stripe OAuth
     if (code) {
       console.log("DETECTED: Stripe authorization code present");
       
@@ -281,7 +276,6 @@ export default function PaymentConnectionsPage() {
       );
       
       // Always force a refresh of the connection status when we return with a code
-      // This ensures the UI updates regardless of other params
       console.log("Forcibly refreshing connection status after OAuth redirect");
       toast({
         title: "Checking connection status",
@@ -322,13 +316,11 @@ export default function PaymentConnectionsPage() {
       refetchStatus();
     } else if (error === "true") {
       // If we get an error, let's try an immediate recovery just in case
-      // the error is just a UI issue and the account was actually connected
       console.log("SHOWING ERROR TOAST");
       console.log("Connection error detected in URL");
       console.log("Error message:", message);
       
       // Always try to recover when there's an error
-      // The connection might have succeeded despite the error
       console.log("Attempting automatic recovery after error");
       handleRecoverConnection();
       
@@ -383,421 +375,309 @@ export default function PaymentConnectionsPage() {
       description: "Checking your Stripe account connection status...",
     });
   };
-  
-  // Diagnostic function for troubleshooting
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
-  const [diagnosticData, setDiagnosticData] = useState<any>(null);
-  
-  const runDiagnostics = async () => {
-    try {
-      setDiagnosticData("Loading...");
-      
-      // Collect all diagnostic data in a structured way
-      const diagnostics: Record<string, any> = {};
-      
-      // 1. Environment info
-      diagnostics.environment = {
-        hostname: window.location.hostname,
-        protocol: window.location.protocol,
-        pathname: window.location.pathname,
-        userAgent: navigator.userAgent,
-        timestamp: new Date().toISOString(),
-        href: window.location.href,
-        isProduction: window.location.hostname.includes('mosspointmainstreet.org'),
-        screenWidth: window.innerWidth,
-        screenHeight: window.innerHeight,
-      };
-      
-      // 2. Stripe Account Status
-      try {
-        const statusRes = await fetch("/api/stripe/account-status");
-        const statusText = await statusRes.text();
-        
-        try {
-          diagnostics.connectionStatus = JSON.parse(statusText);
-        } catch (parseError) {
-          diagnostics.connectionStatus = {
-            error: "Failed to parse JSON response",
-            rawResponse: statusText,
-            statusCode: statusRes.status
-          };
-        }
-      } catch (statusError) {
-        diagnostics.connectionStatus = {
-          error: statusError instanceof Error ? statusError.message : String(statusError),
-          fetchFailed: true
-        };
-      }
-      
-      // 3. Stripe Config
-      try {
-        const configRes = await fetch("/api/stripe/config");
-        const configText = await configRes.text();
-        
-        try {
-          diagnostics.stripeConfig = JSON.parse(configText);
-        } catch (parseError) {
-          diagnostics.stripeConfig = {
-            error: "Failed to parse JSON response",
-            rawResponse: configText,
-            statusCode: configRes.status
-          };
-        }
-      } catch (configError) {
-        diagnostics.stripeConfig = {
-          error: configError instanceof Error ? configError.message : String(configError),
-          fetchFailed: true
-        };
-      }
-      
-      // 4. User info (without sensitive data)
-      diagnostics.user = user ? {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        hasStripeAccount: !!user.stripeAccountId,
-        stripeAccountIdLength: user.stripeAccountId ? user.stripeAccountId.length : 0,
-      } : null;
-      
-      // Set all collected data
-      setDiagnosticData(diagnostics);
-      
-      toast({
-        title: "Diagnostics complete",
-        description: "Comprehensive diagnostic information has been collected",
-      });
-    } catch (error) {
-      console.error("Diagnostic error:", error);
-      setDiagnosticData({
-        error: error instanceof Error ? error.message : String(error)
-      });
-      toast({
-        title: "Diagnostics failed",
-        description: "Failed to collect diagnostic information",
-        variant: "destructive",
-      });
-    }
-  };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <>
       <Navbar />
-      
-      <main className="flex-grow container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">Payment Connections</h1>
+      <main className="container max-w-screen-lg px-4 py-8 mx-auto">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Payment Connections</h1>
+            <p className="text-muted-foreground mt-1">
+              Connect your Stripe account to receive payments directly
+            </p>
+          </div>
+          <HelpToggleButton />
         </div>
         
-        {/* Stripe Connect Card */}
-        <Card className="max-w-3xl">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <CardTitle>Stripe Connect</CardTitle>
-              <ContextualHelp topic={HELP_TOPICS.STRIPE_CONNECT} />
-            </div>
-            <CardDescription>
-              Connect your Stripe account to accept payments directly to your bank account.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading || isLoadingConnection ? (
-              <div className="space-y-4">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-5/6" />
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-10 w-40 mt-4" />
-              </div>
-            ) : isConnected ? (
-              <div>
-                <div className="mb-4 p-4 bg-green-50 rounded-md border border-green-200">
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-lg font-medium text-green-800 mb-2">Connection Details</h3>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={handleManualRefresh} 
-                      className="text-green-700 hover:text-green-800 hover:bg-green-100"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-1" />
-                      Refresh
-                    </Button>
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="md:w-2/3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Stripe Connect</CardTitle>
+                <CardDescription>
+                  Connect your account to Stripe to receive payments directly to your bank account
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading || isLoadingConnection ? (
+                  <div className="p-4 space-y-4">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-10 w-40 mt-4" />
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-green-700 w-40">Account ID:</span>
-                      <span className="text-sm text-green-800">{connectionStatus?.accountId}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-green-700 w-40">Details Submitted:</span>
-                      <span className="text-sm text-green-800">{connectionStatus?.detailsSubmitted ? 'Yes' : 'No'}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-green-700 w-40">Charges Enabled:</span>
-                      <span className="text-sm text-green-800">{connectionStatus?.chargesEnabled ? 'Yes' : 'No'}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-green-700 w-40">Payouts Enabled:</span>
-                      <span className="text-sm text-green-800">{connectionStatus?.payoutsEnabled ? 'Yes' : 'No'}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <p className="text-neutral-600 mb-4">
-                  Your Stripe account is successfully connected to City Event Hub. 
-                  Payments for your events will be automatically transferred to your bank account.
-                  {!connectionStatus?.detailsSubmitted && (
-                    <span className="text-amber-600 block mt-2">
-                      <AlertCircle className="h-4 w-4 inline mr-1" />
-                      Please complete your account setup in the Stripe Dashboard to enable payments.
-                    </span>
-                  )}
-                </p>
-                
-
-                            {diagnosticData.stripeConfig?.clientId ? 
-                              <span className="bg-green-100 text-green-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Config OK</span> : 
-                              <span className="bg-red-100 text-red-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Config Issue</span>
-                            }
-                          </p>
-                          <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-1 overflow-auto max-h-24">
-                            {JSON.stringify(diagnosticData.stripeConfig, null, 2)}
-                          </pre>
+                ) : isConnected ? (
+                  <div>
+                    <div className="mb-4 p-4 bg-green-50 rounded-md border border-green-200">
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-lg font-medium text-green-800 mb-2">Connection Details</h3>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={handleManualRefresh} 
+                          className="text-green-700 hover:text-green-800 hover:bg-green-100"
+                        >
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                          Refresh
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <span className="text-sm font-medium text-green-700 w-40">Account ID:</span>
+                          <span className="text-sm text-green-800">{connectionStatus?.accountId}</span>
                         </div>
-                        
-                        <div className="mb-4">
-                          <p className="font-medium flex items-center">
-                            <span className="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full">Connection Status</span>
-                            {diagnosticData.connectionStatus?.connected ? 
-                              <span className="bg-green-100 text-green-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Connected</span> : 
-                              <span className="bg-red-100 text-red-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Not Connected</span>
-                            }
-                          </p>
-                          <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-1 overflow-auto max-h-32">
-                            {JSON.stringify(diagnosticData.connectionStatus, null, 2)}
-                          </pre>
+                        <div className="flex items-center">
+                          <span className="text-sm font-medium text-green-700 w-40">Details Submitted:</span>
+                          <span className="text-sm text-green-800">{connectionStatus?.detailsSubmitted ? 'Yes' : 'No'}</span>
                         </div>
-                        
-                        <div className="flex justify-between mt-3">
-                          <Button
-                            onClick={runDiagnostics}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <RefreshCw className="mr-1 h-3 w-3" />
-                            Refresh
-                          </Button>
-                          
-                          <Button
-                            onClick={() => {
-                              const diagData = JSON.stringify(diagnosticData, null, 2);
-                              const blob = new Blob([diagData], { type: 'application/json' });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `stripe-diagnostics-${new Date().toISOString().slice(0,10)}.json`;
-                              document.body.appendChild(a);
-                              a.click();
-                              document.body.removeChild(a);
-                              URL.revokeObjectURL(url);
-                            }}
-                            variant="outline"
-                            size="sm"
-                            className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                          >
-                            <ArrowRight className="mr-1 h-3 w-3" />
-                            Export
-                          </Button>
+                        <div className="flex items-center">
+                          <span className="text-sm font-medium text-green-700 w-40">Charges Enabled:</span>
+                          <span className="text-sm text-green-800">{connectionStatus?.chargesEnabled ? 'Yes' : 'No'}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="text-sm font-medium text-green-700 w-40">Payouts Enabled:</span>
+                          <span className="text-sm text-green-800">{connectionStatus?.payoutsEnabled ? 'Yes' : 'No'}</span>
                         </div>
                       </div>
-                    ) : (
-                      <p className="text-sm text-gray-500">No diagnostic data available</p>
-                    )}
-                  </div>
-                )}
-                <div className="flex space-x-4">
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => window.open("https://dashboard.stripe.com", "_blank")}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Open Stripe Dashboard
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                {connectionStatus && (
-                  <div className="mb-4 p-3 border rounded-md bg-amber-50 border-amber-200">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5 text-amber-600" />
-                      <p className="text-amber-800 font-medium">
-                        {connectionStatus.connected 
-                          ? "Your account is already connected to Stripe" 
-                          : connectionStatus.error
-                            ? `Connection issue: ${connectionStatus.message || connectionStatus.error}`
-                            : "Your account is not connected to Stripe"}
-                      </p>
                     </div>
-                    {!connectionStatus.connected && !connectionStatus.error && (
-                      <p className="text-sm text-amber-700 mt-2">
-                        If you recently connected your account but it's not showing here, try clicking "Recover Connection" below.
-                      </p>
-                    )}
-                    {connectionStatus.connected && (
-                      <div className="mt-2">
-                        <p className="text-sm text-amber-700 mb-2">Account ID: {connectionStatus.accountId}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="text-amber-700 border-amber-300 hover:bg-amber-100"
-                            onClick={handleManualRefresh}
-                          >
-                            <RefreshCw className="h-4 w-4 mr-1" />
-                            Refresh Status
-                          </Button>
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-blue-700 border-blue-300 hover:bg-blue-100"
-                            onClick={() => {
-                              if (showDiagnostics) {
-                                setShowDiagnostics(false);
-                                setDiagnosticData(null);
-                              } else {
-                                setShowDiagnostics(true);
-                                runDiagnostics();
-                              }
-                            }}
-                          >
-                            <Terminal className="h-4 w-4 mr-1" />
-                            {showDiagnostics ? "Hide" : "Show"} Diagnostics
-                          </Button>
-                          
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="text-red-700 border-red-300 hover:bg-red-100"
-                            onClick={handleDisconnectStripe}
-                            disabled={isDisconnecting}
-                          >
-                            {isDisconnecting ? "Disconnecting..." : "Disconnect"}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <p className="text-neutral-600 mb-4">
-                  By connecting with Stripe, you can accept credit and debit card payments directly to your bank account. 
-                  Stripe charges standard processing fees of 2.9% + 30¢ per successful transaction.
-                </p>
-                
-                {/* Connection error alert */}
-                {window.location.search.includes('error=true') && (
-                  <div className="mb-4 p-4 bg-amber-50 rounded-md border border-amber-200">
-                    <h3 className="text-lg font-medium text-amber-800 mb-2 flex items-center">
-                      <AlertCircle className="h-5 w-5 mr-2" />
-                      Connection Issue
-                    </h3>
-                    <p className="text-sm text-amber-700 mb-2">
-                      We received an error message during the connection process, but this may be incorrect.
+                    
+                    <p className="text-neutral-600 mb-4">
+                      Your Stripe account is successfully connected to City Event Hub. 
+                      Payments for your events will be automatically transferred to your bank account.
+                      {!connectionStatus?.detailsSubmitted && (
+                        <span className="text-amber-600 block mt-2">
+                          <AlertCircle className="h-4 w-4 inline mr-1" />
+                          Please complete your account setup in the Stripe Dashboard to enable payments.
+                        </span>
+                      )}
                     </p>
-                    <ul className="text-sm text-amber-700 list-disc list-inside mb-3">
-                      <li>If you completed the Stripe authorization, try the "Recover Connection" button</li>
-                      <li>If you see "Connection Failed" but Stripe confirmed your account setup, this is likely a session issue that can be fixed automatically</li>
-                    </ul>
+
+                    <div className="flex space-x-4">
+                      <Button
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => window.open("https://dashboard.stripe.com", "_blank")}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open Stripe Dashboard
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-neutral-600 mb-4">
+                      Connect your Stripe account to receive payments directly for your events. This allows you to manage your own pricing, 
+                      payment schedules, and receive funds directly to your bank account.
+                    </p>
+
+                    <div className="p-4 bg-blue-50 rounded-md border border-blue-200 mb-4">
+                      <h3 className="text-md font-medium text-blue-800 flex items-center mb-2">
+                        <BadgeCheck className="h-5 w-5 mr-2 text-blue-600" />
+                        Benefits of connecting Stripe
+                      </h3>
+                      <ul className="list-disc pl-5 text-sm text-blue-800 space-y-1">
+                        <li>Receive payments directly to your bank account</li>
+                        <li>Set your own pricing and event options</li>
+                        <li>Access detailed transaction and payout reporting</li>
+                        <li>Control your refund and cancellation policies</li>
+                      </ul>
+                    </div>
+
                     <div className="flex flex-wrap gap-3">
                       <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleRecoverConnection}
-                        disabled={isRecovering}
-                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                        onClick={handleConnectStripe}
+                        disabled={isRedirecting}
+                        className="gap-2"
                       >
-                        {isRecovering ? (
+                        {isRedirecting ? (
                           <>
-                            <div className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                            Recovering...
+                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                            Connecting...
                           </>
                         ) : (
                           <>
-                            <RefreshCw className="h-4 w-4 mr-1" />
-                            Recover Connection
+                            Connect with Stripe
                           </>
                         )}
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleManualRefresh}
-                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Check Status
-                      </Button>
+                      
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                            disabled={isRecovering}
+                          >
+                            {isRecovering ? (
+                              <>
+                                <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2" />
+                                Recovering...
+                              </>
+                            ) : "Recover Connection"}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Recover Stripe Connection</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              If you've connected your Stripe account but it's not showing as connected, 
+                              this will attempt to recover the connection from your browser session.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleRecoverConnection}>Continue</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      
                       <Button
                         variant="outline"
-                        size="sm"
-                        onClick={() => window.history.replaceState({}, document.title, window.location.pathname)}
-                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                        className="text-neutral-600 border-neutral-200 hover:bg-neutral-50 hover:text-neutral-700"
+                        onClick={handleManualRefresh}
                       >
-                        Clear Message
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Refresh Status
                       </Button>
                     </div>
                     
-                    {/* Show recovery result if available */}
+                    {/* Recovery result info */}
                     {recoveryResult && (
-                      <div className={`mt-3 p-3 rounded-md ${
-                        recoveryResult.recovered 
-                          ? "bg-green-100 border border-green-200 text-green-800"
-                          : "bg-amber-100 border border-amber-200 text-amber-800"
+                      <div className={`mt-4 p-3 rounded-md border ${
+                        recoveryResult.recovered ? 'bg-green-50 border-green-200' : 
+                        recoveryResult.alreadyConnected ? 'bg-blue-50 border-blue-200' : 
+                        recoveryResult.error ? 'bg-red-50 border-red-200' : 
+                        'bg-amber-50 border-amber-200'
                       }`}>
-                        <p className="text-sm font-medium">
+                        <p className={`font-medium ${
+                          recoveryResult.recovered ? 'text-green-700' : 
+                          recoveryResult.alreadyConnected ? 'text-blue-700' : 
+                          recoveryResult.error ? 'text-red-700' : 
+                          'text-amber-700'
+                        }`}>
                           {recoveryResult.recovered 
-                            ? "Successfully recovered your Stripe connection!"
-                            : "Recovery not needed"}
+                            ? 'Connection successfully recovered!' 
+                            : recoveryResult.alreadyConnected
+                              ? 'Your account is already connected'
+                              : recoveryResult.error
+                                ? 'Recovery error: ' + recoveryResult.error
+                                : recoveryResult.message || 'No recovery needed'}
                         </p>
-                        <p className="text-xs mt-1">
-                          {recoveryResult.message}
-                        </p>
+                        {recoveryResult.accountId && (
+                          <p className="text-sm mt-1 text-neutral-600">
+                            Account ID: {recoveryResult.accountId}
+                          </p>
+                        )}
                       </div>
                     )}
+                  </>
+                )}
+
+                {connectionStatus?.connected && (
+                  <div className="mt-6 border-t border-gray-200 pt-6">
+                    <h3 className="font-medium text-gray-900 mb-3">Disconnect Account</h3>
+                    <p className="text-neutral-600 text-sm mb-4">
+                      If you need to disconnect your Stripe account, you can do so by clicking the button below.
+                      This will remove the connection between your account and the platform.
+                    </p>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          className="bg-white border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={isDisconnecting}
+                        >
+                          {isDisconnecting ? (
+                            <>
+                              <div className="animate-spin h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full mr-2" />
+                              Disconnecting...
+                            </>
+                          ) : "Disconnect Stripe Account"}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Disconnecting your Stripe account will prevent you from receiving payments.
+                            Any existing payouts will still be processed according to Stripe's schedule.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={handleDisconnectStripe}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            Disconnect
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="md:w-1/3">
+            <Card>
+              <CardHeader>
+                <CardTitle>About Stripe Connect</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Stripe Connect allows you to receive payments directly to your bank account for events you create on the platform.
+                </p>
                 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      className="bg-indigo-600 hover:bg-indigo-700"
-                      disabled={isRedirecting}
-                    >
-                      {isRedirecting ? "Redirecting..." : "Connect with Stripe"}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Connect with Stripe</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        You will be redirected to Stripe to complete the connection process. 
-                        After connecting, payments for your events will be sent directly to your bank account.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleConnectStripe}>Continue</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                <div className="space-y-4">
+                  <div className="flex items-start">
+                    <div className="bg-green-100 p-2 rounded-full mr-3 mt-0.5">
+                      <BadgeCheck className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium">Direct Payouts</h4>
+                      <p className="text-xs text-muted-foreground">Payments go directly to your bank account.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start">
+                    <div className="bg-green-100 p-2 rounded-full mr-3 mt-0.5">
+                      <BadgeCheck className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium">Secure Processing</h4>
+                      <p className="text-xs text-muted-foreground">Industry-standard security for all transactions.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start">
+                    <div className="bg-green-100 p-2 rounded-full mr-3 mt-0.5">
+                      <BadgeCheck className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium">Transaction Management</h4>
+                      <p className="text-xs text-muted-foreground">View and manage all your transactions in one place.</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-6">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => window.open("https://stripe.com/connect", "_blank")}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Learn More
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
-      
       <Footer />
-    </div>
+    </>
   );
 }
