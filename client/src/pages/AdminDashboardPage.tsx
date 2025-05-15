@@ -2289,11 +2289,10 @@ export default function AdminDashboardPage() {
                                                   : "success"
                                         }
                                       >
+                                        {/* Display status with proper capitalization */}
                                         {event.status 
-                                          ? event.status.charAt(0).toUpperCase() + event.status.slice(1)
-                                          : !event.isActive 
-                                            ? "Draft" 
-                                            : "Active"
+                                          ? event.status.charAt(0).toUpperCase() + event.status.slice(1) 
+                                          : "Unknown"
                                         }
                                       </Badge>
                                     </td>
