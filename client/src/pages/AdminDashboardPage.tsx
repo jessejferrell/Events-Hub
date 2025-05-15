@@ -386,14 +386,15 @@ export default function AdminDashboardPage() {
   
   // Fetch all events for the Events tab
   const { data: allEvents, isLoading: isLoadingEvents, refetch: refetchEvents } = useQuery<Event[]>({
-    queryKey: ["/api/events", eventSearchQuery, eventStatusFilter],
+    queryKey: ["/api/admin/events", eventSearchQuery, eventStatusFilter],
     queryFn: async () => {
       let queryParams = new URLSearchParams();
       
       if (eventSearchQuery) queryParams.append("search", eventSearchQuery);
       if (eventStatusFilter !== "all") queryParams.append("status", eventStatusFilter);
       
-      const res = await fetch(`/api/events?${queryParams.toString()}`);
+      // Use the dedicated admin events endpoint which always shows all events including drafts
+      const res = await fetch(`/api/admin/events?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch events");
       return await res.json();
     },

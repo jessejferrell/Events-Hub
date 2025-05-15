@@ -324,7 +324,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all events (public)
   app.get("/api/events", async (req, res) => {
     try {
-      const { type, location, search, sortBy, isUpcoming, status } = req.query;
+      const { type, location, search, sortBy, isUpcoming, status, includeAllStatuses } = req.query;
+      
+      // Check if request is coming from admin dashboard
+      const isAdminRequest = req.headers.referer && req.headers.referer.includes('/admin');
+      
       const events = await storage.getEvents({
         type: type as string,
         location: location as string,
@@ -332,6 +336,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sortBy: sortBy as string,
         isUpcoming: isUpcoming === "true",
         status: status as string,
+        // Include all statuses (including drafts) if explicitly requested or if from admin
+        includeAllStatuses: includeAllStatuses === "true" || isAdminRequest,
       });
       res.json(events);
     } catch (error: any) {
@@ -1694,6 +1700,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch admin stats" });
+    }
+  });
+  
+  // Admin events endpoint (explicitly includes all events including drafts)
+  app.get("/api/admin/events", requireAdmin, async (req, res) => {
+    try {
+      const { type, location, search, sortBy, isUpcoming, status } = req.query;
+      const events = await storage.getEvents({
+        type: type as string,
+        location: location as string,
+        search: search as string,
+        sortBy: sortBy as string,
+        isUpcoming: isUpcoming === "true",
+        status: status as string,
+        // Always include all statuses for admin dashboard
+        includeAllStatuses: true,
+      });
+      res.json(events);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch events" });
     }
   });
   
