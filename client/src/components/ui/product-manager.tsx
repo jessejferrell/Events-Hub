@@ -335,67 +335,59 @@ export default function ProductManager({ eventId }: ProductManagerProps) {
     console.log(`Rendering ${products.length} ${type} products`);
 
     return (
-      <>
-        <div className="flex justify-end mb-4">
-          <Button onClick={() => handleAddProduct(type)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add {getTypeLabel(type)}
-          </Button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {products.map((product) => (
-            <Card key={`${product.id}-${product.name}`} className="overflow-hidden">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-base">{product.name}</CardTitle>
-                    <CardDescription className="mt-1 line-clamp-2">
-                      {product.description || "No description"}
-                    </CardDescription>
-                  </div>
-                  {product.isActive ? (
-                    <Badge variant="success">Active</Badge>
-                  ) : (
-                    <Badge variant="secondary">Inactive</Badge>
-                  )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {products.map((product) => (
+          <Card key={`${product.id}-${product.name}`} className="overflow-hidden">
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-base">{product.name}</CardTitle>
+                  <CardDescription className="mt-1 line-clamp-2">
+                    {product.description || "No description"}
+                  </CardDescription>
                 </div>
-              </CardHeader>
-              <CardContent className="pb-3">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Price:</span>
-                    <p className="font-medium">${product.price.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Quantity:</span>
-                    <p className="font-medium">
-                      {product.quantity === 0 ? "Unlimited" : product.quantity}
-                    </p>
-                  </div>
+                {product.isActive ? (
+                  <Badge variant="success">Active</Badge>
+                ) : (
+                  <Badge variant="secondary">Inactive</Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="pb-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Price:</span>
+                  <p className="font-medium">${product.price.toFixed(2)}</p>
                 </div>
-              </CardContent>
-              <CardFooter className="flex justify-end gap-2 pt-0">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => handleEditProduct(product)}
-                >
-                  <EditIcon className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => handleDeleteProduct(product)}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </>
+                <div>
+                  <span className="text-muted-foreground">Quantity:</span>
+                  <p className="font-medium">
+                    {product.quantity === 0 ? "Unlimited" : product.quantity}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2 pt-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleEditProduct(product)}
+              >
+                <EditIcon className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => handleDeleteProduct(product)}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
     );
   };
 
