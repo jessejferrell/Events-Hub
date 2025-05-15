@@ -32,6 +32,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ContextualHelp, HelpToggleButton } from "@/components/ui/contextual-help";
+import { HELP_TOPICS } from "@/contexts/help-context";
 
 export default function PaymentConnectionsPage() {
   const { user } = useAuth();
@@ -359,7 +361,10 @@ export default function PaymentConnectionsPage() {
         {/* Stripe Connect Card */}
         <Card className="max-w-3xl">
           <CardHeader>
-            <CardTitle>Stripe Connect</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle>Stripe Connect</CardTitle>
+              <ContextualHelp topic={HELP_TOPICS.STRIPE_CONNECT} />
+            </div>
             <CardDescription>
               Connect your Stripe account to accept payments directly to your bank account.
             </CardDescription>

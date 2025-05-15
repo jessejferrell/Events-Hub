@@ -15,7 +15,7 @@ export interface HelpItem {
 }
 
 // Available help topics
-export const HELP_TOPICS = {
+const HELP_TOPICS = {
   STRIPE_CONNECT: "stripe_connect",
   EVENT_CREATION: "event_creation",
   TICKET_MANAGEMENT: "ticket_management",
@@ -23,6 +23,8 @@ export const HELP_TOPICS = {
   VENDOR_REGISTRATION: "vendor_registration",
   ACCOUNT_SETTINGS: "account_settings",
 } as const;
+
+export { HELP_TOPICS };
 
 type HelpTopicKey = keyof typeof HELP_TOPICS;
 type HelpTopicValue = typeof HELP_TOPICS[HelpTopicKey];
@@ -104,7 +106,7 @@ export function HelpProvider({ children }: { children: ReactNode }) {
   }, [showTooltips]);
 
   const toggleHelp = () => {
-    setIsHelpEnabled(prev => !prev);
+    setIsHelpEnabled((prev: boolean) => !prev);
   };
 
   const getHelpItem = (topicId: HelpTopicValue): HelpItem | undefined => {

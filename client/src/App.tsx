@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/hooks/use-auth";
 import { CartProvider } from "@/hooks/use-cart";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { HelpProvider } from "@/contexts/help-context";
 import HomePage from "@/pages/HomePage";
 import AuthPage from "@/pages/AuthPage";
 import EventsPage from "@/pages/EventsPage";
@@ -63,10 +64,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CartProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <HelpProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </HelpProvider>
         </CartProvider>
       </AuthProvider>
     </QueryClientProvider>
