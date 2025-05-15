@@ -46,6 +46,8 @@ export interface IStorage {
   updateUserStripeAccount(userId: number, stripeAccountId: string): Promise<User>;
   updateUserStripeCustomer(userId: number, stripeCustomerId: string): Promise<User>;
   updateUserStripeSubscription(userId: number, stripeSubscriptionId: string): Promise<User>;
+  // Analytics operations
+  countUsersWithStripeAccounts(): Promise<number>;
   updateUserProfile(userId: number, userData: Partial<InsertUser>): Promise<User>;
   updateUserLastLogin(userId: number): Promise<User>;
   

@@ -39,9 +39,91 @@ export function setupStripeRoutes(app: Express) {
   
   // Removed OAuth test endpoint for production
   
-  // Get Stripe public key
+  // Get Stripe public key and configuration
   app.get("/api/stripe/config", (req, res) => {
-    res.json({ publishableKey: process.env.VITE_STRIPE_PUBLIC_KEY });
+    try {
+      res.json({
+        publishableKey: process.env.VITE_STRIPE_PUBLIC_KEY,
+        clientId: process.env.STRIPE_CLIENT_ID,
+        // Generate redirect URIs based on environment
+        redirectUri: process.env.NODE_ENV !== 'production' 
+          ? "https://events-manager.replit.app/api/stripe/oauth-callback"
+          : "https://events.mosspointmainstreet.org/api/stripe/oauth-callback",
+        // Include version info for diagnostics
+        version: {
+          apiVersion: "2023-10-16",
+          app: "city-event-hub-1.0"
+        }
+      });
+    } catch (error) {
+      console.error("Error in Stripe config endpoint:", error);
+      res.status(500).json({ error: "Failed to get Stripe configuration" });
+    }
+  });
+  
+  // Diagnostic endpoint for troubleshooting
+  app.get("/api/stripe/diagnostics", async (req, res) => {
+    // Only allow admins to access this endpoint
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    try {
+      const diagnostics: Record<string, any> = {};
+      
+      // Server environment information
+      diagnostics.environment = {
+        nodeEnv: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString(),
+        hostname: req.hostname,
+        protocol: req.protocol,
+        stripeClientIdExists: !!process.env.STRIPE_CLIENT_ID,
+        stripeClientIdPrefix: process.env.STRIPE_CLIENT_ID?.substring(0, 8),
+        stripeSecretKeyExists: !!process.env.STRIPE_SECRET_KEY,
+        stripeSecretKeyPrefix: process.env.STRIPE_SECRET_KEY?.substring(0, 7),
+        stripeWebhookSecretExists: !!process.env.STRIPE_WEBHOOK_SECRET,
+        stripeOAuthKeyExists: !!process.env.STRIPE_OAUTH_KEY,
+        stripeOAuthKeyPrefix: process.env.STRIPE_OAUTH_KEY?.substring(0, 7),
+        isProduction: req.hostname.includes('mosspointmainstreet.org'),
+        apiVersion: "2023-10-16",
+      };
+      
+      // Test Stripe connection
+      const stripeTest: Record<string, any> = {};
+      
+      // Check Stripe connection
+      try {
+        const stripe = getStripe();
+        const balance = await stripe.balance.retrieve();
+        stripeTest.connectionSuccessful = true;
+        stripeTest.balanceAvailable = balance.available.map(b => ({
+          amount: b.amount,
+          currency: b.currency,
+        }));
+      } catch (error) {
+        stripeTest.connectionSuccessful = false;
+        stripeTest.connectionError = error instanceof Error ? error.message : String(error);
+      }
+      
+      diagnostics.stripeTest = stripeTest;
+      
+      // User Stripe accounts count
+      try {
+        const usersWithStripeAccounts = await storage.countUsersWithStripeAccounts();
+        diagnostics.userStats = {
+          usersWithStripeAccounts,
+        };
+      } catch (error) {
+        diagnostics.userStats = {
+          error: error instanceof Error ? error.message : String(error)
+        };
+      }
+      
+      res.json(diagnostics);
+    } catch (error) {
+      console.error('Error generating diagnostics:', error);
+      res.status(500).json({ error: 'Failed to generate diagnostic information' });
+    }
   });
   
   // Removed debug settings endpoint for production
