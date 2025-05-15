@@ -3,8 +3,12 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { log } from "./vite";
 
-// Extend the Stripe API version type to include Basil version
-// No need to redeclare StripeConfig, using TypeScript's type union for apiVersion
+// Helper function to create Stripe instance with proper typing
+function createStripeInstance(key: string) {
+  return new Stripe(key, {
+    apiVersion: "2023-10-16" as any, // Force type to avoid version mismatch with Stripe types
+  });
+}
 
 // Initialize Stripe with the secret key
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_example";
@@ -18,9 +22,7 @@ if (stripeSecretKey === "sk_test_example" || stripePublicKey === "pk_test_exampl
 function getStripe() {
   // Always use the current environment variable, not the cached value
   const currentKey = process.env.STRIPE_SECRET_KEY || stripeSecretKey;
-  return new Stripe(currentKey, {
-    apiVersion: "2023-10-16", // Use a standard stable API version
-  });
+  return createStripeInstance(currentKey);
 }
 
 // Create a singleton instance for regular use
@@ -244,9 +246,7 @@ export function setupStripeRoutes(app: Express) {
         log(`Using Stripe secret_key starting with: ${secretKey.substring(0, 8)}...`, "stripe");
         
         // Create a fresh Stripe instance with latest key
-        const freshStripe = new Stripe(secretKey, {
-          apiVersion: "2023-10-16",
-        });
+        const freshStripe = createStripeInstance(secretKey);
         
         log(`Created fresh Stripe instance for token exchange`, "stripe");
         
