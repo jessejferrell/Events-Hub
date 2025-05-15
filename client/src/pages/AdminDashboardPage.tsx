@@ -2281,6 +2281,7 @@ export default function AdminDashboardPage() {
                                       </div>
                                     </td>
                                     <td className="p-4 align-middle">
+                                      {console.log("Event status:", event.id, event.title, event.status)}
                                       <Badge 
                                         variant={
                                           event.status === "draft" 
@@ -2295,9 +2296,17 @@ export default function AdminDashboardPage() {
                                         }
                                       >
                                         {/* Display status with proper capitalization */}
-                                        {event.status 
-                                          ? event.status.charAt(0).toUpperCase() + event.status.slice(1) 
-                                          : "Unknown"
+                                        {event.status === "draft" 
+                                          ? "Draft" 
+                                          : event.status === "upcoming"
+                                            ? "Upcoming"
+                                            : event.status === "completed"
+                                              ? "Completed"
+                                              : event.status === "cancelled"
+                                                ? "Cancelled"
+                                                : event.status
+                                                  ? event.status.charAt(0).toUpperCase() + event.status.slice(1)
+                                                  : "Unknown"
                                         }
                                       </Badge>
                                     </td>
