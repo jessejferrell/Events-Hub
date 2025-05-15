@@ -24,7 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle, Terminal, RefreshCcw, Check, ArrowRight, Link } from "lucide-react";
+import { BadgeCheck, ExternalLink, RefreshCw, AlertCircle, Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Tooltip,
@@ -553,51 +553,7 @@ export default function PaymentConnectionsPage() {
                   )}
                 </p>
                 
-                {/* Diagnostic information */}
-                {showDiagnostics && (
-                  <div className="mt-2 mb-6 border border-gray-300 rounded-md p-3 bg-gray-50">
-                    <h3 className="text-sm font-medium mb-2">Diagnostic Information</h3>
-                    {diagnosticData === "Loading..." ? (
-                      <div className="flex items-center justify-center p-4">
-                        <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mr-2"></div>
-                        <p className="text-sm text-gray-500">Loading diagnostic information...</p>
-                      </div>
-                    ) : diagnosticData?.error ? (
-                      <div className="p-2 bg-red-50 border border-red-200 rounded-md">
-                        <p className="text-sm text-red-600 font-medium">Error occurred during diagnostics:</p>
-                        <p className="text-sm text-red-500">{diagnosticData.error}</p>
-                      </div>
-                    ) : diagnosticData ? (
-                      <div className="text-sm text-gray-700">
-                        <div className="mb-4">
-                          <p className="font-medium flex items-center">
-                            <span className="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full">Environment</span>
-                            {diagnosticData.environment?.isProduction ? 
-                              <span className="bg-amber-100 text-amber-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Production</span> : 
-                              <span className="bg-green-100 text-green-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Development</span>
-                            }
-                          </p>
-                          <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-1 mb-2 overflow-auto max-h-28">
-                            {JSON.stringify(diagnosticData.environment, null, 2)}
-                          </pre>
-                        </div>
-                        
-                        <div className="mb-4">
-                          <p className="font-medium flex items-center">
-                            <span className="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full">User Info</span>
-                            {diagnosticData.user?.hasStripeAccount ? 
-                              <span className="bg-green-100 text-green-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Stripe Connected</span> : 
-                              <span className="bg-red-100 text-red-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Not Connected</span>
-                            }
-                          </p>
-                          <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-1 mb-2 overflow-auto max-h-24">
-                            {JSON.stringify(diagnosticData.user, null, 2)}
-                          </pre>
-                        </div>
-                        
-                        <div className="mb-4">
-                          <p className="font-medium flex items-center">
-                            <span className="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full">Stripe Config</span>
+
                             {diagnosticData.stripeConfig?.clientId ? 
                               <span className="bg-green-100 text-green-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Config OK</span> : 
                               <span className="bg-red-100 text-red-800 text-xs font-medium mx-2 px-2.5 py-0.5 rounded-full">Config Issue</span>
