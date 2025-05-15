@@ -86,7 +86,11 @@ export default function ProductManager({ eventId }: ProductManagerProps) {
     queryFn: async () => {
       const res = await fetch(`/api/products?eventId=${eventId}`);
       if (!res.ok) throw new Error("Failed to fetch products");
-      return res.json();
+      const data = await res.json();
+      console.log("Products:", {
+        all: data,
+      });
+      return data;
     },
     enabled: !!eventId,
   });
@@ -97,10 +101,20 @@ export default function ProductManager({ eventId }: ProductManagerProps) {
   const addons = products.filter((p: Product) => p.type === "addon");
   const vendorSpots = products.filter((p: Product) => p.type === "vendor_spot");
   const volunteerShifts = products.filter((p: Product) => p.type === "volunteer_shift");
+  
+  // Log filtered products for debugging
+  console.log("Products:", {
+    tickets,
+    merchandise,
+    addons,
+    vendors: vendorSpots,
+    volunteers: volunteerShifts,
+  });
 
   // Create product mutation
   const createProductMutation = useMutation({
     mutationFn: async (data: ProductFormValues) => {
+      console.log("Creating product:", data);
       const res = await apiRequest("POST", "/api/products", data);
       if (!res.ok) {
         const error = await res.json();
@@ -108,13 +122,15 @@ export default function ProductManager({ eventId }: ProductManagerProps) {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Product created successfully:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/products", eventId] });
       toast({ title: "Success", description: "Product created successfully" });
       setIsDialogOpen(false);
       form.reset();
     },
     onError: (error: Error) => {
+      console.error("Failed to create product:", error);
       toast({ 
         title: "Error", 
         description: error.message || "Failed to create product", 
