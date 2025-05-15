@@ -360,7 +360,20 @@ export default function PaymentConnectionsPage() {
     }
   }, [toast, connectionStatus?.connected]);
   
+  // Make connection status more robust and handle errors better
   const isConnected = connectionStatus?.connected;
+  
+  // Show connection error alert if needed
+  useEffect(() => {
+    if (connectionError) {
+      console.error("Connection status error:", connectionError);
+      toast({
+        title: "Connection status error",
+        description: "There was an issue checking your Stripe connection. Please try refreshing the page.",
+        variant: "destructive",
+      });
+    }
+  }, [connectionError, toast]);
   
   // Manual refresh function
   const handleManualRefresh = () => {
@@ -369,6 +382,49 @@ export default function PaymentConnectionsPage() {
       title: "Refreshing connection status",
       description: "Checking your Stripe account connection status...",
     });
+  };
+  
+  // Diagnostic function for troubleshooting
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnosticData, setDiagnosticData] = useState<any>(null);
+  
+  const runDiagnostics = async () => {
+    try {
+      setDiagnosticData("Loading...");
+      
+      // Fetch connection status directly
+      const statusRes = await fetch("/api/stripe/account-status");
+      const statusData = await statusRes.json();
+      
+      // Get environment info
+      const envInfo = {
+        hostname: window.location.hostname,
+        protocol: window.location.protocol,
+        pathname: window.location.pathname,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+      };
+      
+      setDiagnosticData({
+        connectionStatus: statusData,
+        environment: envInfo,
+      });
+      
+      toast({
+        title: "Diagnostics complete",
+        description: "Diagnostic information has been collected",
+      });
+    } catch (error) {
+      console.error("Diagnostic error:", error);
+      setDiagnosticData({
+        error: error instanceof Error ? error.message : String(error)
+      });
+      toast({
+        title: "Diagnostics failed",
+        description: "Failed to collect diagnostic information",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -404,15 +460,34 @@ export default function PaymentConnectionsPage() {
                 <div className="mb-4 p-4 bg-green-50 rounded-md border border-green-200">
                   <div className="flex justify-between items-start">
                     <h3 className="text-lg font-medium text-green-800 mb-2">Connection Details</h3>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={handleManualRefresh} 
-                      className="text-green-700 hover:text-green-800 hover:bg-green-100"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-1" />
-                      Refresh
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => {
+                          if (showDiagnostics) {
+                            setShowDiagnostics(false);
+                            setDiagnosticData(null);
+                          } else {
+                            setShowDiagnostics(true);
+                            runDiagnostics();
+                          }
+                        }}
+                        className="text-blue-700 hover:text-blue-800 hover:bg-blue-100"
+                      >
+                        <Terminal className="h-4 w-4 mr-1" />
+                        {showDiagnostics ? "Hide Diagnostics" : "Diagnostics"}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={handleManualRefresh} 
+                        className="text-green-700 hover:text-green-800 hover:bg-green-100"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Refresh
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center">
@@ -463,9 +538,16 @@ export default function PaymentConnectionsPage() {
                       <p className="text-amber-800 font-medium">
                         {connectionStatus.connected 
                           ? "Your account is already connected to Stripe" 
-                          : "Your account is not connected to Stripe"}
+                          : connectionStatus.error
+                            ? `Connection issue: ${connectionStatus.message || connectionStatus.error}`
+                            : "Your account is not connected to Stripe"}
                       </p>
                     </div>
+                    {!connectionStatus.connected && !connectionStatus.error && (
+                      <p className="text-sm text-amber-700 mt-2">
+                        If you recently connected your account but it's not showing here, try clicking "Recover Connection" below.
+                      </p>
+                    )}
                     {connectionStatus.connected && (
                       <div className="mt-2">
                         <p className="text-sm text-amber-700 mb-2">Account ID: {connectionStatus.accountId}</p>
@@ -478,6 +560,24 @@ export default function PaymentConnectionsPage() {
                           >
                             <RefreshCw className="h-4 w-4 mr-1" />
                             Refresh Status
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-700 border-blue-300 hover:bg-blue-100"
+                            onClick={() => {
+                              if (showDiagnostics) {
+                                setShowDiagnostics(false);
+                                setDiagnosticData(null);
+                              } else {
+                                setShowDiagnostics(true);
+                                runDiagnostics();
+                              }
+                            }}
+                          >
+                            <Terminal className="h-4 w-4 mr-1" />
+                            {showDiagnostics ? "Hide" : "Show"} Diagnostics
                           </Button>
                           
                           <Button 
