@@ -2281,33 +2281,15 @@ export default function AdminDashboardPage() {
                                       </div>
                                     </td>
                                     <td className="p-4 align-middle">
-                                      {console.log("Event status:", event.id, event.title, event.status)}
                                       <Badge 
                                         variant={
                                           event.status === "draft" 
                                             ? "secondary" 
-                                            : event.status === "upcoming" 
-                                              ? "success" 
-                                              : event.status === "completed" 
-                                                ? "warning"
-                                                : event.status === "cancelled"
-                                                  ? "destructive"
-                                                  : "success"
+                                            : "success"
                                         }
                                       >
-                                        {/* Display status with proper capitalization */}
-                                        {event.status === "draft" 
-                                          ? "Draft" 
-                                          : event.status === "upcoming"
-                                            ? "Upcoming"
-                                            : event.status === "completed"
-                                              ? "Completed"
-                                              : event.status === "cancelled"
-                                                ? "Cancelled"
-                                                : event.status
-                                                  ? event.status.charAt(0).toUpperCase() + event.status.slice(1)
-                                                  : "Unknown"
-                                        }
+                                        {/* Simple Live/Draft indicator */}
+                                        {event.status === "draft" ? "Draft" : "Live"}
                                       </Badge>
                                     </td>
                                     <td className="p-4 align-middle">
