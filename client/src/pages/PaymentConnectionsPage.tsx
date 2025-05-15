@@ -51,14 +51,36 @@ export default function PaymentConnectionsPage() {
   });
 
   // Check for Stripe account connection status
-  const { data: connectionStatus, isLoading: isLoadingConnection, refetch: refetchStatus } = useQuery({
+  const { 
+    data: connectionStatus, 
+    isLoading: isLoadingConnection, 
+    refetch: refetchStatus,
+    error: connectionError
+  } = useQuery({
     queryKey: ["/api/stripe/account-status"],
     queryFn: async () => {
-      const res = await fetch("/api/stripe/account-status");
-      if (!res.ok) throw new Error("Failed to fetch Stripe account status");
-      return await res.json();
+      try {
+        console.log("Fetching account status from API...");
+        const res = await fetch("/api/stripe/account-status");
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error(`Account status API error (${res.status}):`, errorText);
+          throw new Error(errorText || "Failed to fetch Stripe account status");
+        }
+        
+        const data = await res.json();
+        console.log("Account status API response:", data);
+        return data;
+      } catch (error) {
+        console.error("Error in account status query:", error);
+        throw error;
+      }
     },
     enabled: !!user,
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 30000, // Refresh every 30 seconds
   });
   
   // Recovery process - attempt to recover a pending Stripe connection from the session

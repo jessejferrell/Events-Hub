@@ -841,22 +841,60 @@ export function setupStripeRoutes(app: Express) {
 
     try {
       if (!req.user.stripeAccountId) {
+        log(`User ${req.user.id} has no Stripe account ID`, "stripe");
         return res.json({ connected: false });
       }
       
-      // Retrieve the account to get its current status
-      const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
+      log(`Checking Stripe account status for user ${req.user.id} with account ID ${req.user.stripeAccountId}`, "stripe");
       
-      return res.json({
-        connected: true,
-        accountId: account.id,
-        detailsSubmitted: account.details_submitted,
-        chargesEnabled: account.charges_enabled,
-        payoutsEnabled: account.payouts_enabled
-      });
+      // Create a fresh Stripe instance with latest key to ensure we're using valid credentials
+      const freshStripe = createStripeInstance(process.env.STRIPE_SECRET_KEY || stripeSecretKey);
+      
+      try {
+        // Retrieve the account to get its current status
+        const account = await freshStripe.accounts.retrieve(req.user.stripeAccountId);
+        
+        log(`Successfully retrieved Stripe account ${account.id} for user ${req.user.id}`, "stripe");
+        
+        return res.json({
+          connected: true,
+          accountId: account.id,
+          detailsSubmitted: account.details_submitted,
+          chargesEnabled: account.charges_enabled,
+          payoutsEnabled: account.payouts_enabled
+        });
+      } catch (stripeError: any) {
+        // Handle case where account may not exist anymore or is invalid
+        log(`Stripe API error retrieving account ${req.user.stripeAccountId}: ${stripeError.message}`, "stripe");
+        
+        if (stripeError.code === 'account_invalid' || stripeError.code === 'resource_missing') {
+          // The account no longer exists or is invalid
+          log(`Marking invalid Stripe account ${req.user.stripeAccountId} as disconnected`, "stripe");
+          
+          // Update user record to remove the invalid account ID
+          await storage.updateUserStripeAccount(req.user.id, "");
+          
+          return res.json({ 
+            connected: false, 
+            error: "Account no longer valid",
+            message: "Your Stripe account is no longer valid or available. Please reconnect."
+          });
+        }
+        
+        // For other errors, return a generic error
+        return res.status(500).json({ 
+          connected: false,
+          message: "Failed to retrieve Stripe account status",
+          error: stripeError.message
+        });
+      }
     } catch (error: any) {
-      log(`Error retrieving Stripe account: ${error.message}`, "stripe");
-      return res.status(500).json({ message: "Failed to retrieve Stripe account status" });
+      log(`Error in account status endpoint: ${error.message}`, "stripe");
+      return res.status(500).json({ 
+        connected: false,
+        message: "Failed to retrieve Stripe account status",
+        error: error.message
+      });
     }
   });
 
