@@ -7,7 +7,7 @@ import { log } from "./vite";
 declare module 'stripe' {
   namespace Stripe {
     interface StripeConfig {
-      apiVersion: string;
+      apiVersion: string | "2025-04-30.basil";
     }
   }
 }
@@ -39,198 +39,16 @@ export function setupStripeRoutes(app: Express) {
   // List all available env vars for debugging (without revealing secrets)
   const envVarKeys = Object.keys(process.env).filter(key => key.includes('STRIPE'));
   log(`Available Stripe env vars: ${envVarKeys.join(', ')}`, "stripe");
-  // Test endpoint for Stripe API connectivity
-  app.get("/api/stripe/test-connection", async (req, res) => {
-    try {
-      // Test Stripe API connectivity directly
-      log("Testing Stripe API connectivity...", "stripe");
-      
-      // Use Stripe's own API for testing, which is more secure than third-party services
-      const balance = await stripe.balance.retrieve();
-      
-      res.json({
-        success: true,
-        message: "Stripe API is connected and working properly",
-        balance: {
-          available: balance.available.length,
-          pending: balance.pending.length,
-          object: balance.object
-        }
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Stripe connection test failed: ${errorMessage}`, "stripe");
-      res.status(500).json({
-        success: false,
-        error: errorMessage
-      });
-    }
-  });
+  // Removed API test endpoint for production
   
-  // DIRECT TEST: This endpoint specifically tests the OAuth token exchange
-  app.get("/api/stripe/test-oauth", async (req, res) => {
-    try {
-      // This is just a test endpoint - we're not using a real code
-      // Just testing if we can reach the token endpoint with our credentials
-      const clientId = process.env.STRIPE_CLIENT_ID;
-      const secretKey = process.env.STRIPE_SECRET_KEY;
-      
-      if (!clientId || !secretKey) {
-        return res.status(500).json({ 
-          success: false, 
-          error: "Missing credentials",
-          haveClientId: !!clientId,
-          haveSecretKey: !!secretKey 
-        });
-      }
-      
-      // Log credentials format but never the full values
-      console.log("Client ID format:", clientId.substring(0, 6) + "..." + clientId.substring(clientId.length - 4));
-      console.log("Secret key format:", secretKey.substring(0, 6) + "..." + secretKey.substring(secretKey.length - 4));
-      
-      // TEST APPROACH 1: Using Stripe SDK directly
-      try {
-        console.log("TEST 1: Using Stripe SDK directly");
-        const stripeTest = new Stripe(secretKey, {
-          apiVersion: "2025-04-30.basil" as any,
-        });
-        
-        // Try to do a token exchange with a fake code
-        try {
-          const tokenResult = await stripeTest.oauth.token({
-            grant_type: 'authorization_code',
-            code: 'fake_code_for_testing',
-          });
-          console.log("Unexpectedly got success response from SDK:", tokenResult);
-        } catch (sdkError) {
-          // Should fail with invalid_grant error which is expected and correct
-          console.log("SDK test got expected error:", sdkError.message);
-        }
-      } catch (stripeInitError) {
-        console.error("Failed to initialize Stripe:", stripeInitError);
-      }
-      
-      // TEST APPROACH 2: Using URLSearchParams + fetch (original approach)
-      console.log("TEST 2: Using URLSearchParams + fetch");
-      const params = new URLSearchParams();
-      params.append('grant_type', 'authorization_code');
-      params.append('code', 'fake_code_for_testing');
-      params.append('client_id', clientId);
-      params.append('client_secret', secretKey);
-      
-      console.log("Making test token request");
-      
-      const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: params.toString()
-      });
-      
-      console.log("Got response status:", tokenResponse.status);
-      
-      const responseBody = await tokenResponse.text();
-      let parsedBody;
-      try {
-        parsedBody = JSON.parse(responseBody);
-      } catch (e) {
-        parsedBody = { unparseable: responseBody };
-      }
-      
-      // Return detailed test results
-      return res.json({
-        success: true,
-        tests: {
-          sdkTest: "See server logs for details",
-          directFetchTest: {
-            status: tokenResponse.status,
-            statusText: tokenResponse.statusText,
-            body: parsedBody
-          }
-        },
-        credentials: {
-          clientId: {
-            prefix: clientId.substring(0, 6),
-            suffix: clientId.substring(clientId.length - 4),
-            length: clientId.length
-          },
-          secretKey: {
-            prefix: secretKey.substring(0, 6),
-            suffix: secretKey.substring(secretKey.length - 4),
-            length: secretKey.length
-          }
-        }
-      });
-    } catch (error) {
-      console.error("OAuth TEST FAILED:", error);
-      return res.status(500).json({
-        success: false,
-        error: error.message,
-        stack: error.stack
-      });
-    }
-  });
+  // Removed OAuth test endpoint for production
   
   // Get Stripe public key
   app.get("/api/stripe/config", (req, res) => {
     res.json({ publishableKey: process.env.VITE_STRIPE_PUBLIC_KEY });
   });
   
-  // Debug endpoint to check Stripe settings
-  app.get("/api/stripe/settings", (req, res) => {
-    // Return all the relevant settings for debugging
-    const clientId = process.env.STRIPE_CLIENT_ID || '';
-    const secretKey = process.env.STRIPE_SECRET_KEY || '';
-    
-    // Calculate the production and development domains
-    const productionDomain = "https://events.mosspointmainstreet.org";
-    const replitAppDomain = "https://events-manager.replit.app";
-    
-    // THESE ARE THE EXACT URLS THAT MUST BE REGISTERED IN STRIPE DASHBOARD
-    // Webhook endpoints
-    const prodWebhookUrl = `${productionDomain}/api/stripe/webhook`;
-    const devWebhookUrl = `${replitAppDomain}/api/stripe/webhook`;
-    
-    // OAuth redirect endpoints (separate from webhooks)
-    const prodOAuthRedirectUrl = `${productionDomain}/api/stripe/oauth-callback`;
-    const devOAuthRedirectUrl = `${replitAppDomain}/api/stripe/oauth-callback`;
-    
-    // Generate sample OAuth URLs to verify
-    const stripeOAuthUrl = new URL('https://dashboard.stripe.com/oauth/authorize');
-    stripeOAuthUrl.searchParams.append('response_type', 'code');
-    stripeOAuthUrl.searchParams.append('client_id', clientId || 'CLIENT_ID');
-    stripeOAuthUrl.searchParams.append('scope', 'read_write');
-    
-    // In development mode
-    const devOAuthUrl = new URL(stripeOAuthUrl.toString());
-    devOAuthUrl.searchParams.append('redirect_uri', devOAuthRedirectUrl);
-    
-    // In production mode
-    const prodOAuthUrl = new URL(stripeOAuthUrl.toString());
-    prodOAuthUrl.searchParams.append('redirect_uri', prodOAuthRedirectUrl);
-    
-    res.json({
-      clientId: clientId ? clientId.substring(0, 4) + '...' + clientId.substring(clientId.length - 4) : 'missing',
-      secretKey: secretKey ? secretKey.substring(0, 4) + '...' + secretKey.substring(secretKey.length - 4) : 'missing',
-      productionDomain,
-      replitAppDomain,
-      currentDomain: req.protocol + '://' + req.get('host'),
-      replit_domains: process.env.REPLIT_DOMAINS || '',
-      // The EXACT URLs to register in Stripe Dashboard
-      webhookUrls: [
-        prodWebhookUrl,
-        devWebhookUrl
-      ],
-      oauthRedirectUrls: [
-        prodOAuthRedirectUrl,
-        devOAuthRedirectUrl
-      ],
-      // Sample OAuth URLs for verification (with sensitive data removed)
-      devOAuthUrlExample: devOAuthUrl.toString().replace(/client_id=[^&]+/, 'client_id=HIDDEN'),
-      prodOAuthUrlExample: prodOAuthUrl.toString().replace(/client_id=[^&]+/, 'client_id=HIDDEN')
-    });
-  });
+  // Removed debug settings endpoint for production
 
   // Start Stripe Connect OAuth flow for event owners
   app.get("/api/stripe/connect", async (req, res) => {
