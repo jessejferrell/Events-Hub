@@ -512,34 +512,15 @@ export default function PaymentConnectionsPage() {
                 <div className="mb-4 p-4 bg-green-50 rounded-md border border-green-200">
                   <div className="flex justify-between items-start">
                     <h3 className="text-lg font-medium text-green-800 mb-2">Connection Details</h3>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        onClick={() => {
-                          if (showDiagnostics) {
-                            setShowDiagnostics(false);
-                            setDiagnosticData(null);
-                          } else {
-                            setShowDiagnostics(true);
-                            runDiagnostics();
-                          }
-                        }}
-                        className="text-blue-700 hover:text-blue-800 hover:bg-blue-100"
-                      >
-                        <Terminal className="h-4 w-4 mr-1" />
-                        {showDiagnostics ? "Hide Diagnostics" : "Diagnostics"}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        onClick={handleManualRefresh} 
-                        className="text-green-700 hover:text-green-800 hover:bg-green-100"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Refresh
-                      </Button>
-                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={handleManualRefresh} 
+                      className="text-green-700 hover:text-green-800 hover:bg-green-100"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Refresh
+                    </Button>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center">
