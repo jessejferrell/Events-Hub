@@ -68,6 +68,18 @@ export const helpItems: Record<HelpTopicValue, HelpItem> = {
     title: "Account Settings",
     content: "Manage your account preferences, notification settings, and connected services to customize your experience.",
     illustration: settingsIllustration
+  },
+  [HELP_TOPICS.EVENT_TICKETS]: {
+    id: HELP_TOPICS.EVENT_TICKETS,
+    title: "Event Tickets",
+    content: "Purchase tickets to attend your favorite events. Select the quantity and complete your purchase securely.",
+    illustration: eventIllustration
+  },
+  [HELP_TOPICS.CHECKOUT]: {
+    id: HELP_TOPICS.CHECKOUT,
+    title: "Checkout",
+    content: "Complete your purchase securely with our streamlined checkout process. Your payment information is protected by Stripe's secure payment processing.",
+    illustration: paymentIllustration
   }
 };
 
