@@ -26,6 +26,7 @@ const HELP_TOPICS = {
   CHECKOUT: "checkout",
   EVENT_CALENDAR: "event_calendar",
   EVENT_FILTERING: "event_filtering",
+  MY_EVENTS: "my_events",
 } as const;
 
 export { HELP_TOPICS };

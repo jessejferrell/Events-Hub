@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/dialog";
 import { Calendar, Clock, MapPin, Edit, Trash2, PlusCircle, Copy, Eye } from "lucide-react";
 import EventForm from "@/components/ui/event-form";
+import { ContextualHelp } from "@/components/ui/contextual-help";
+import { HELP_TOPICS } from "@/contexts/help-context";
 import { format } from "date-fns";
 
 export default function MyEventsPage() {

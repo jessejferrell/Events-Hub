@@ -1772,9 +1772,10 @@ export function setupStripeRoutes(app: Express) {
         error: "All token exchange methods failed",
         message: "Failed to exchange code for token using multiple approaches"
       });
-    } catch (error) {
-      console.error(`Error in direct token exchange: ${error.message}`, error);
-      return res.status(500).json({ error: error.message || "Unknown error occurred" });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error(`Error in direct token exchange: ${errorMessage}`, error);
+      return res.status(500).json({ error: errorMessage });
     }
   });
   
