@@ -2231,6 +2231,20 @@ export default function AdminDashboardPage() {
                                               src={event.imageUrl} 
                                               alt={event.title}
                                               className="h-10 w-10 object-cover rounded"
+                                              onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                                const parent = e.currentTarget.parentElement;
+                                                if (parent) {
+                                                  const fallback = document.createElement('div');
+                                                  fallback.className = 'h-10 w-10 flex items-center justify-center';
+                                                  fallback.innerHTML = `
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                  `;
+                                                  parent.appendChild(fallback);
+                                                }
+                                              }}
                                             />
                                           ) : (
                                             <Calendar className="h-5 w-5 text-primary" />

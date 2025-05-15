@@ -285,15 +285,36 @@ export default function EventDetailsPage() {
               {/* Event Details */}
               <div className="lg:col-span-2">
                 {/* Event Image */}
-                <div className="aspect-video bg-gray-200 rounded-lg mb-6 flex items-center justify-center">
+                <div className="aspect-video bg-gray-200 rounded-lg mb-6 flex items-center justify-center overflow-hidden">
                   {event.imageUrl ? (
                     <img 
                       src={event.imageUrl} 
                       alt={event.title} 
                       className="w-full h-full object-cover rounded-lg"
+                      onError={(e) => {
+                        // Hide the broken image and show a fallback
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const fallback = document.createElement('div');
+                          fallback.className = 'flex flex-col items-center justify-center w-full h-full';
+                          fallback.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-gray-400 mt-2 text-lg">${event.title}</span>
+                          `;
+                          parent.appendChild(fallback);
+                        }
+                      }}
                     />
                   ) : (
-                    <span className="text-gray-400">Event Image</span>
+                    <div className="flex flex-col items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-gray-400 mt-2 text-lg">Event Image</span>
+                    </div>
                   )}
                 </div>
                 

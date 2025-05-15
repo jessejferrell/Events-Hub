@@ -119,8 +119,28 @@ export default function HomePage() {
                             src={event.imageUrl} 
                             alt={event.title} 
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            onError={(e) => {
+                              // Hide the broken image and show a fallback
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                // Remove gradient overlay if it exists
+                                const overlay = parent.querySelector('.gradient-overlay');
+                                if (overlay) overlay.remove();
+                                
+                                // Add fallback content
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center';
+                                fallback.innerHTML = `
+                                  <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-primary/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                `;
+                                parent.appendChild(fallback);
+                              }
+                            }}
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-70"></div>
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-70 gradient-overlay"></div>
                         </>
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
