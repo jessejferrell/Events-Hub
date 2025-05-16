@@ -55,9 +55,6 @@ const vendorFormSchema = z.object({
   
   // Event logistics
   preferredLocation: z.string().optional(),
-  needsElectricity: z.boolean().default(false),
-  needsWater: z.boolean().default(false),
-  specialRequirements: z.string().optional(),
   
   // Terms agreement
   agreeToTerms: z.boolean().refine(val => val === true, {
@@ -140,9 +137,6 @@ export default function VendorRegistrationPage() {
       
       // Event logistics
       preferredLocation: vendorProfile?.preferredLocation || `${user?.city || ''}, ${user?.state || ''}`.trim(),
-      needsElectricity: vendorProfile?.needsElectricity || false,
-      needsWater: vendorProfile?.needsWater || false,
-      specialRequirements: vendorProfile?.specialRequirements || "",
       
       // Terms agreement
       agreeToTerms: false,
@@ -192,9 +186,6 @@ export default function VendorRegistrationPage() {
         vendorSpotId: cartItem?.product.id,
         profileId: profile.id,
         status: "pending",
-        specialRequirements: formData.specialRequirements,
-        needsElectricity: formData.needsElectricity,
-        needsWater: formData.needsWater,
         preferredLocation: formData.preferredLocation,
         productsDescription: formData.productsDescription,
       };
@@ -558,53 +549,7 @@ export default function VendorRegistrationPage() {
                 
                 {/* Event logistics */}
                 <div className="space-y-4 pt-4 border-t border-border">
-                  <h3 className="text-lg font-medium">Vendor Needs</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="needsElectricity"
-                      render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Electricity Required</FormLabel>
-                            <FormDescription>
-                              Check if you need access to electricity for your booth.
-                            </FormDescription>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="needsWater"
-                      render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Water Access Required</FormLabel>
-                            <FormDescription>
-                              Check if you need access to water for your booth.
-                            </FormDescription>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <h3 className="text-lg font-medium">Location Preference</h3>
                   
                   <FormField
                     control={form.control}
@@ -622,24 +567,7 @@ export default function VendorRegistrationPage() {
                       </FormItem>
                     )}
                   />
-                  
-                  <FormField
-                    control={form.control}
-                    name="specialRequirements"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Special Requirements (optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Any additional requests or requirements for your booth..."
-                            className="min-h-16"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
                 </div>
                 
                 {/* Terms and Conditions */}
