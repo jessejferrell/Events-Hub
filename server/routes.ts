@@ -981,6 +981,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Create vendor registration (protected)
+  app.post("/api/vendor-registrations", requireAuth, async (req, res) => {
+    try {
+      // Validate the request data
+      const { 
+        userId, 
+        eventId, 
+        vendorSpotId, 
+        profileId, 
+        status,
+        preferredLocation,
+        productsDescription 
+      } = req.body;
+      
+      // Ensure user can only create registrations for themselves
+      if (userId !== req.user.id) {
+        return res.status(403).json({ message: "You can only create registrations for yourself" });
+      }
+      
+      // Check if the vendor spot exists
+      const vendorSpot = await storage.getVendorSpot(vendorSpotId);
+      if (!vendorSpot) {
+        return res.status(404).json({ message: "Vendor spot not found" });
+      }
+      
+      // Check if the event exists
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Create registration
+      const registration = await db.insert(vendorRegistrations).values({
+        vendorProfileId: profileId,
+        vendorSpotId: vendorSpotId,
+        eventId: eventId,
+        status: status || "pending",
+        metadata: {
+          preferredLocation,
+          productsDescription
+        }
+      }).returning();
+      
+      // Return the created registration
+      res.status(201).json(registration[0]);
+    } catch (error: any) {
+      console.error("Error creating vendor registration:", error);
+      res.status(500).json({ message: error.message || "Failed to create vendor registration" });
+    }
+  });
+  
   // Get vendor registrations for an event (protected, event owner/admin only)
   app.get("/api/events/:eventId/vendor-registrations", requireAuth, async (req, res) => {
     try {
