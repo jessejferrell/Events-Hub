@@ -1143,25 +1143,54 @@ export class DatabaseStorage implements IStorage {
     
     // Search volunteer assignments
     if (searchVolunteerAssignments) {
-      const volunteerSql = `
-        SELECT 
-          va.id, 
-          'volunteer' as type, 
-          CONCAT('VA-', va.id) as reference, 
-          vp.user_id, 
-          va.event_id, 
-          va.status, 
-          0 as amount, 
-          va.created_at,
-          va.notes
-        FROM volunteer_assignments va
-        JOIN volunteer_profiles vp ON va.volunteer_profile_id = vp.id
-        WHERE 1=1 ${eventCondition} ${statusCondition}
-        ${filters.userId ? `AND vp.user_id = ${filters.userId}` : ''}
-        ${query ? `AND va.notes ILIKE '%${query}%'` : ''}
-      `;
+      // Use parameterized query builder instead of raw SQL
+      let volunteerQuery = db
+        .select({
+          id: volunteerAssignments.id,
+          type: sql`'volunteer'`.as('type'),
+          reference: sql`CONCAT('VA-', ${volunteerAssignments.id})`.as('reference'),
+          user_id: volunteerProfiles.userId,
+          event_id: volunteerAssignments.eventId,
+          status: volunteerAssignments.status,
+          amount: sql`0`.as('amount'),
+          created_at: volunteerAssignments.createdAt,
+          notes: volunteerAssignments.notes
+        })
+        .from(volunteerAssignments)
+        .innerJoin(
+          volunteerProfiles,
+          eq(volunteerAssignments.volunteerProfileId, volunteerProfiles.id)
+        );
       
-      const volunteerResults = await db.execute(sql.raw(volunteerSql));
+      // Apply the same conditions as before, but safely
+      const conditions = [];
+      
+      // Add event condition if provided
+      if (filters.eventId) {
+        conditions.push(eq(volunteerAssignments.eventId, filters.eventId));
+      }
+      
+      // Add status condition if provided
+      if (filters.status) {
+        conditions.push(eq(volunteerAssignments.status, filters.status));
+      }
+      
+      // Add user ID condition if provided
+      if (filters.userId) {
+        conditions.push(eq(volunteerProfiles.userId, filters.userId));
+      }
+      
+      // Add search condition if query is provided
+      if (query) {
+        conditions.push(ilike(volunteerAssignments.notes, `%${query}%`));
+      }
+      
+      // Apply all conditions
+      if (conditions.length > 0) {
+        volunteerQuery = volunteerQuery.where(and(...conditions));
+      }
+      
+      const volunteerResults = await volunteerQuery;
       results.push(...volunteerResults.rows);
     }
     
