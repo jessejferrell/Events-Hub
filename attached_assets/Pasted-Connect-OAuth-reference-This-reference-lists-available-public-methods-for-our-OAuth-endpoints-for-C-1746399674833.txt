@@ -36,9 +36,9 @@ For Standard accounts: GET https://connect.stripe.com/oauth/authorize
 Sends the user to Stripe to connect to your platform.
 
 Request
-Parameter	Description
-client_id	The unique identifier provided to your application, found in your application settings.
-response_type	The only option at the moment is code.
+Parameter       Description
+client_id       The unique identifier provided to your application, found in your application settings.
+response_type   The only option at the moment is code.
 redirect_uri
 Optional
 The URL for the authorize response redirect. If provided, this must exactly match one of the comma-separated redirect_uri values in your application settings. To protect yourself from certain forms of man-in-the-middle attacks, the live mode redirect_uri must use a secure HTTPS connection. Defaults to the redirect_uri in your application settings if not provided.
@@ -53,20 +53,20 @@ The following query string parameters are all optional—we use them to prefill 
 
 Note that some of these parameters apply only to Standard accounts (indicated).
 
-Parameter	Description
+Parameter       Description
 stripe_user[email]
 Recommended
 The user’s email address. Must be a valid email format.
 stripe_user[url]
 Recommended
 The URL for the user’s business. This can be the user’s website, a profile page within your application, or another publicly available profile for the business, such as a LinkedIn or Facebook profile. It must be URL-encoded and include a scheme (http or https). If you prefill this field, include a description of the user’s products or services and their contact information in the linked page. If we don’t have enough information, we’ll have to reach out to the user directly before initiating payouts.
-stripe_user[country]	Two-letter country code (for example, US or CA). Must be a country that Stripe currently supports.
-stripe_user[phone_number]	The business phone number. Must be 10 digits only. Must also prefill stripe_user[country] with the corresponding country.
-stripe_user[business_name]	The legal name of the business.
-stripe_user[business_type]	The type of the business. For Standard accounts, the value must be sole_prop, corporation, non_profit, partnership, or llc.
-stripe_user[first_name]	First name of the person filling out a Stripe application.
-stripe_user[last_name]	Last name of the person filling out a Stripe application.
-stripe_user[dob_day] stripe_user[dob_month] stripe_user[dob_year]	Day (0-31), month (1-12), and year (YYYY, greater than 1900) for the birth date of the person filling out a Stripe application. If you choose to pass these parameters, you must pass all three.
+stripe_user[country]    Two-letter country code (for example, US or CA). Must be a country that Stripe currently supports.
+stripe_user[phone_number]       The business phone number. Must be 10 digits only. Must also prefill stripe_user[country] with the corresponding country.
+stripe_user[business_name]      The legal name of the business.
+stripe_user[business_type]      The type of the business. For Standard accounts, the value must be sole_prop, corporation, non_profit, partnership, or llc.
+stripe_user[first_name] First name of the person filling out a Stripe application.
+stripe_user[last_name]  Last name of the person filling out a Stripe application.
+stripe_user[dob_day] stripe_user[dob_month] stripe_user[dob_year]       Day (0-31), month (1-12), and year (YYYY, greater than 1900) for the birth date of the person filling out a Stripe application. If you choose to pass these parameters, you must pass all three.
 stripe_user[street_address]
 Standard only
 Street address of the business.
@@ -82,15 +82,15 @@ Address postal code of the business. Must be a string. To prevent ambiguity, als
 stripe_user[physical_product]
 Standard only
 A string: true if the user sells a physical product, false otherwise.
-stripe_user[product_description]	A description of what the business is accepting payments for.
+stripe_user[product_description]        A description of what the business is accepting payments for.
 stripe_user[currency]
 Standard only
 Three-letter ISO code representing currency, in lowercase (for example, usd or cad). Must be a valid country and currency combination that Stripe supports. Must prefill stripe_user[country] with the corresponding country.
-stripe_user[first_name_kana]	The Kana variation of the first name of the person filling out a Stripe application. Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
-stripe_user[first_name_kanji]	The Kanji variation of the first name of the person filling out a Stripe application. Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
-stripe_user[last_name_kana]	The Kana variation of the last name of the person filling out a Stripe application. Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
-stripe_user[last_name_kanji]	The Kanji variation of the last name of the person filling out a Stripe application. Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
-stripe_user[gender]	The gender of the person filling out a Stripe application. (International regulations require either male or female.) Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
+stripe_user[first_name_kana]    The Kana variation of the first name of the person filling out a Stripe application. Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
+stripe_user[first_name_kanji]   The Kanji variation of the first name of the person filling out a Stripe application. Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
+stripe_user[last_name_kana]     The Kana variation of the last name of the person filling out a Stripe application. Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
+stripe_user[last_name_kanji]    The Kanji variation of the last name of the person filling out a Stripe application. Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
+stripe_user[gender]     The gender of the person filling out a Stripe application. (International regulations require either male or female.) Must prefill stripe_user[country] with JP, as this parameter is only relevant for Japan.
 stripe_user[block_kana]
 Standard only
 The Kana variation of the address block. This parameter is only relevant for Japan. You must prefill stripe_user[country] with JP and stripe_user[zip] with a valid Japanese postal code to use this parameter.
@@ -106,24 +106,24 @@ The Kanji variation of the address building. This parameter is only relevant for
 Response
 The user’s browser is redirected back to your configured redirect URI or the value you passed in the redirect_uri parameter. When successful, you receive the following query parameters:
 
-Parameter	Description
-code	An authorization code you can use in the next call to get an access token for your user. This can only be used once and expires in 5 minutes.
-scope	read_write or read_only, depending what you passed on the initial GET request.
-state	The value of the state parameter you provided on the initial GET request.
+Parameter       Description
+code    An authorization code you can use in the next call to get an access token for your user. This can only be used once and expires in 5 minutes.
+scope   read_write or read_only, depending what you passed on the initial GET request.
+state   The value of the state parameter you provided on the initial GET request.
 Error Response
 In case of an error, the user’s browser won’t be redirected except in the case of access_denied. Instead, errors will be returned in a JSON dictionary with the following fields:
 
-Parameter	Description
-error	A unique error code per error type.
-error_description	A human readable description of the error.
-state	The value of the state parameter you provided on the initial GET request.
+Parameter       Description
+error   A unique error code per error type.
+error_description       A human readable description of the error.
+state   The value of the state parameter you provided on the initial GET request.
 Error Codes
-Parameter	Description
-access_denied	User denied authorization.
-invalid_scope	Invalid scope parameter provided.
-invalid_redirect_uri	Provided redirect_uri parameter is an invalid URL or isn’t allowed by your application settings.
-invalid_request	Missing response_type parameter.
-unsupported_response_type	Unsupported response_type parameter. Currently the only supported response_type is code.
+Parameter       Description
+access_denied   User denied authorization.
+invalid_scope   Invalid scope parameter provided.
+invalid_redirect_uri    Provided redirect_uri parameter is an invalid URL or isn’t allowed by your application settings.
+invalid_request Missing response_type parameter.
+unsupported_response_type       Unsupported response_type parameter. Currently the only supported response_type is code.
 Complete the connection and get the account ID
 POST https://connect.stripe.com/oauth/token
 
@@ -151,41 +151,41 @@ When using a refresh token to request an access token, you can use either a test
 Note
 Per OAuth v2, this endpoint isn’t idempotent. Consuming an authorization code more than once revokes the account connection.
 
-Parameter	Description
-grant_type	authorization_code when turning an authorization code into an access token, or refresh_token when using a refresh token to get a new access token.
-code or refresh_token	The value of the code or refresh_token, depending on the grant_type.
+Parameter       Description
+grant_type      authorization_code when turning an authorization code into an access token, or refresh_token when using a refresh token to get a new access token.
+code or refresh_token   The value of the code or refresh_token, depending on the grant_type.
 scope
 Optional
 When requesting a new access token from a refresh token, any scope that has an equal or lesser scope as the refresh token. Has no effect when requesting an access token from an authorization code. Defaults to the scope of the refresh token.
 Response
-Parameter	Description
-scope	The scope granted to the access token, depending on the scope of the authorization code and scope parameter.
-stripe_user_id	The unique ID of the account you have been granted access to, as a string.
-livemode	Indicates whether the platform’s access to perform updates on behalf of the connected account includes livemode access, or is limited to testmode actions. This matches the livemode of the application used to authorize the OAuth request.
-token_type	Always has a value of bearer.
-access_token	
+Parameter       Description
+scope   The scope granted to the access token, depending on the scope of the authorization code and scope parameter.
+stripe_user_id  The unique ID of the account you have been granted access to, as a string.
+livemode        Indicates whether the platform’s access to perform updates on behalf of the connected account includes livemode access, or is limited to testmode actions. This matches the livemode of the application used to authorize the OAuth request.
+token_type      Always has a value of bearer.
+access_token    
 Deprecated
  Use the Stripe-Account header with your platform’s secret key (that can make requests on behalf of this Stripe account).
-stripe_publishable_key	
+stripe_publishable_key  
 Deprecated
  Use the Stripe-Account header with your platform’s publishable key (that can make requests on behalf of this Stripe account).
-refresh_token	
+refresh_token   
 Deprecated
  Can be used to get a new access token of an equal or lesser scope, or of a different live mode (where applicable).
 Error Response
-Parameter	Description
-error	A unique error code per error type.
-error_description	A human readable description of the error.
+Parameter       Description
+error   A unique error code per error type.
+error_description       A human readable description of the error.
 Error Codes
-Parameter	Description
-invalid_request	No code, refresh_token, or grant_type parameter provided (where required).
-invalid_grant	A variety of things can prompt this error:
+Parameter       Description
+invalid_request No code, refresh_token, or grant_type parameter provided (where required).
+invalid_grant   A variety of things can prompt this error:
 code doesn’t exist, is expired, has been used, or doesn’t belong to you
 refresh_token doesn’t exist or doesn’t belong to you
 API key mode (live or test key) doesn’t match the code or refresh_token mode
-unsupported_grant_type	Unsupported grant_type parameter specified. The only currently supported types are authorization_code and refresh_token.
-invalid_scope	Invalid scope parameter provided.
-unsupported_response_type	Unsupported response_type parameter. Currently the only supported response_type is code.
+unsupported_grant_type  Unsupported grant_type parameter specified. The only currently supported types are authorization_code and refresh_token.
+invalid_scope   Invalid scope parameter provided.
+unsupported_response_type       Unsupported response_type parameter. Currently the only supported response_type is code.
 
 API
 
@@ -208,26 +208,26 @@ Make this call using your secret API key as an Authorization header.
 const stripe = require('stripe')('sk_test_EKnKgpVVo8HimvCOehmVffb9');
 
 const response = await stripe.oauth.deauthorize({
-  client_id: 'ca_SA2UVkyz6X9NY4c0SEK2OepNXw9TAqoF',
+  client_id: '{{CLIENT_ID}}', // Replace with your actual client_id
   stripe_user_id: 'acct_0k3E00THkliK5W',
 });
 When revoking access to an account, you must use an API key that matches the mode (live or test) used to connect to the account. Use a live mode API key if a production client_id created the connection, or a test API key if a development client_id created it.
 
-Parameter	Description
-client_id	The client_id of the application that you’d like to disconnect the account from. The account must be connected to this application.
-stripe_user_id	The account you’d like to disconnect from.
+Parameter       Description
+client_id       The client_id of the application that you’d like to disconnect the account from. The account must be connected to this application.
+stripe_user_id  The account you’d like to disconnect from.
 Response
-Parameter	Description
-stripe_user_id	The unique ID of the account you have revoked access to, as a string. This is the same as the stripe_user_id you passed in. If this is returned, the revocation is successful.
+Parameter       Description
+stripe_user_id  The unique ID of the account you have revoked access to, as a string. This is the same as the stripe_user_id you passed in. If this is returned, the revocation is successful.
 Error Response
-Parameter	Description
-error	A unique error code per error type.
-error_description	A human readable description of the error.
+Parameter       Description
+error   A unique error code per error type.
+error_description       A human readable description of the error.
 Error Codes
 
-Parameter	Description
-invalid_request	No client_id or stripe_user_id parameter provided (where required).
-invalid_client	A variety of things can prompt this error:
+Parameter       Description
+invalid_request No client_id or stripe_user_id parameter provided (where required).
+invalid_client  A variety of things can prompt this error:
 client_id doesn’t belong to you
 stripe_user_id doesn’t exist or isn’t connected to your application
 API key mode (live or test key) doesn’t match the client_id mode
