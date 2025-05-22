@@ -1067,31 +1067,48 @@ export class DatabaseStorage implements IStorage {
     const searchVendorRegs = !filters.transactionType || filters.transactionType === 'vendor';
     const searchVolunteerAssignments = !filters.transactionType || filters.transactionType === 'volunteer';
     
-    // Build common filter conditions
-    const userCondition = filters.userId ? `AND user_id = ${filters.userId}` : '';
-    const eventCondition = filters.eventId ? `AND event_id = ${filters.eventId}` : '';
-    const statusCondition = filters.status ? `AND status = '${filters.status}'` : '';
-    const searchCondition = query ? `AND (order_number ILIKE '%${query}%' OR notes ILIKE '%${query}%')` : '';
-    
     // Search orders
     if (searchOrders) {
-      const orderSql = `
-        SELECT 
-          id, 
-          'order' as type, 
-          order_number as reference, 
-          user_id as user_id, 
-          event_id, 
-          status, 
-          total_amount as amount, 
-          created_at,
-          notes
-        FROM orders
-        WHERE 1=1 ${userCondition} ${eventCondition} ${statusCondition} ${searchCondition}
-      `;
+      // Use parameterized query builder instead of raw SQL
+      let orderQuery = db
+        .select({
+          id: orders.id,
+          type: sql`'order'`.as('type'),
+          reference: orders.orderNumber,
+          user_id: orders.userId,
+          event_id: orders.eventId,
+          status: orders.status,
+          amount: orders.totalAmount,
+          created_at: orders.createdAt,
+          notes: orders.notes
+        })
+        .from(orders)
+        .where(sql`1=1`);
       
-      const orderResults = await db.execute(sql.raw(orderSql));
-      results.push(...orderResults.rows);
+      // Add filters using parameterized conditions
+      if (filters.userId) {
+        orderQuery = orderQuery.where(eq(orders.userId, filters.userId));
+      }
+      
+      if (filters.eventId) {
+        orderQuery = orderQuery.where(eq(orders.eventId, filters.eventId));
+      }
+      
+      if (filters.status) {
+        orderQuery = orderQuery.where(eq(orders.status, filters.status));
+      }
+      
+      if (query) {
+        orderQuery = orderQuery.where(
+          or(
+            ilike(orders.orderNumber, `%${query}%`),
+            ilike(orders.notes, `%${query}%`)
+          )
+        );
+      }
+      
+      const orderResults = await orderQuery;
+      results.push(...orderResults);
     }
     
     // Search tickets
