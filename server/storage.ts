@@ -1096,24 +1096,41 @@ export class DatabaseStorage implements IStorage {
     
     // Search tickets
     if (searchTickets) {
-      const ticketSql = `
-        SELECT 
-          id, 
-          'ticket' as type, 
-          ticket_number as reference, 
-          user_id, 
-          event_id, 
-          status, 
-          price as amount, 
-          created_at,
-          NULL as notes
-        FROM tickets
-        WHERE 1=1 ${userCondition} ${eventCondition} ${statusCondition}
-        ${query ? `AND ticket_number ILIKE '%${query}%'` : ''}
-      `;
+      // Use parameterized query builder instead of raw SQL
+      let ticketQuery = db
+        .select({
+          id: tickets.id,
+          type: sql`'ticket'`.as('type'),
+          reference: tickets.ticketNumber,
+          user_id: tickets.userId,
+          event_id: tickets.eventId,
+          status: tickets.status,
+          amount: tickets.price,
+          created_at: tickets.createdAt,
+          notes: sql`NULL`.as('notes')
+        })
+        .from(tickets)
+        .where(sql`1=1`);
+
+      // Add filters using parameterized conditions
+      if (filters.userId) {
+        ticketQuery = ticketQuery.where(eq(tickets.userId, filters.userId));
+      }
       
-      const ticketResults = await db.execute(sql.raw(ticketSql));
-      results.push(...ticketResults.rows);
+      if (filters.eventId) {
+        ticketQuery = ticketQuery.where(eq(tickets.eventId, filters.eventId));
+      }
+      
+      if (filters.status) {
+        ticketQuery = ticketQuery.where(eq(tickets.status, filters.status));
+      }
+      
+      if (query) {
+        ticketQuery = ticketQuery.where(ilike(tickets.ticketNumber, `%${query}%`));
+      }
+      
+      const ticketResults = await ticketQuery;
+      results.push(...ticketResults);
     }
     
     // Search vendor registrations
