@@ -1825,52 +1825,50 @@ export function setupStripeRoutes(app: Express) {
         // Continue to next method
       }
       
-      // Third method: Direct API with cURL emulation
+      // Third method: Another direct API call with different configuration
       try {
-        console.log("Attempting token exchange using cURL approach...");
+        console.log("Attempting token exchange using third approach...");
         
-        // Convert code, CLIENT_ID, and SECRET_KEY to proper format
-        const formattedCode = encodeURIComponent(code);
+        // Create a new URL search params for the request
+        const params = new URLSearchParams();
+        params.append('client_secret', secretKey);
+        params.append('grant_type', 'authorization_code');
+        params.append('code', code as string);
         
-        const curlCommand = `curl https://connect.stripe.com/oauth/token \
--d client_secret=${secretKey} \
--d grant_type=authorization_code \
--d code=${formattedCode} \
--H "Content-Type: application/x-www-form-urlencoded"`;
+        // Make a direct HTTP request - no shell commands needed
+        const response = await fetch('https://connect.stripe.com/oauth/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params
+        });
         
-        console.log("Generated cURL command - sensitive info redacted");
-        
-        // Use Node's child_process to execute cURL
-        const { execSync } = require('child_process');
-        const curlOutput = execSync(curlCommand, { encoding: 'utf8' });
-        
-        console.log("cURL raw output:", curlOutput);
-        
-        let curlData;
-        try {
-          curlData = JSON.parse(curlOutput);
-        } catch (parseError) {
-          console.error("Failed to parse cURL output:", parseError);
-          throw new Error("Invalid JSON response from cURL");
+        if (!response.ok) {
+          console.error("Third approach failed with status:", response.status);
+          throw new Error(`API request failed with status: ${response.status}`);
         }
         
-        const connectedAccountId = curlData.stripe_user_id;
+        const responseData = await response.json();
+        console.log("Third approach raw response received");
+        
+        const connectedAccountId = responseData.stripe_user_id;
         
         if (!connectedAccountId) {
-          console.error("No stripe_user_id in cURL response:", curlData);
-          throw new Error("Missing stripe_user_id in cURL response");
+          console.error("No stripe_user_id in third approach response");
+          throw new Error("Missing stripe_user_id in response");
         }
         
         // Success! Return the account ID
-        console.log("cURL approach successful - account ID:", connectedAccountId);
+        console.log("Third approach successful - account ID:", connectedAccountId);
         return res.json({
           success: true,
-          method: "curl",
+          method: "third_approach",
           accountId: connectedAccountId,
-          message: "Successfully retrieved Stripe account ID using cURL"
+          message: "Successfully retrieved Stripe account ID using third approach"
         });
-      } catch (curlError) {
-        console.error("cURL approach failed:", curlError);
+      } catch (thirdApproachError) {
+        console.error("Third approach failed:", thirdApproachError);
       }
       
       // If we get here, all methods failed
