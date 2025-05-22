@@ -1118,27 +1118,51 @@ export class DatabaseStorage implements IStorage {
     
     // Search vendor registrations
     if (searchVendorRegs) {
-      const vendorSql = `
-        SELECT 
-          vr.id, 
-          'vendor' as type, 
-          CONCAT('VR-', vr.id) as reference, 
-          vp.user_id, 
-          vr.event_id, 
-          vr.status, 
-          vs.price as amount, 
-          vr.created_at,
-          vr.notes
-        FROM vendor_registrations vr
-        JOIN vendor_profiles vp ON vr.vendor_profile_id = vp.id
-        JOIN vendor_spots vs ON vr.vendor_spot_id = vs.id
-        WHERE 1=1 ${eventCondition} ${statusCondition}
-        ${filters.userId ? `AND vp.user_id = ${filters.userId}` : ''}
-        ${query ? `AND (vr.notes ILIKE '%${query}%' OR vr.products_description ILIKE '%${query}%')` : ''}
-      `;
+      // Use parameterized query builder instead of raw SQL
+      let vendorQuery = db
+        .select({
+          id: vendorRegistrations.id,
+          type: sql`'vendor'`.as('type'),
+          reference: sql`CONCAT('VR-', ${vendorRegistrations.id})`.as('reference'),
+          user_id: vendorProfiles.userId,
+          event_id: vendorRegistrations.eventId,
+          status: vendorRegistrations.status,
+          amount: vendorSpots.price,
+          created_at: vendorRegistrations.createdAt,
+          notes: vendorRegistrations.notes
+        })
+        .from(vendorRegistrations)
+        .innerJoin(vendorProfiles, eq(vendorRegistrations.vendorProfileId, vendorProfiles.id))
+        .innerJoin(vendorSpots, eq(vendorRegistrations.vendorSpotId, vendorSpots.id))
+        .where(() => {
+          const conditions = [];
+          
+          if (filters.eventId) {
+            conditions.push(eq(vendorRegistrations.eventId, filters.eventId));
+          }
+          
+          if (filters.status) {
+            conditions.push(eq(vendorRegistrations.status, filters.status));
+          }
+          
+          if (filters.userId) {
+            conditions.push(eq(vendorProfiles.userId, filters.userId));
+          }
+          
+          if (query) {
+            conditions.push(
+              or(
+                ilike(vendorRegistrations.notes, `%${query}%`),
+                ilike(vendorRegistrations.productsDescription, `%${query}%`)
+              )
+            );
+          }
+          
+          return and(...conditions);
+        });
       
-      const vendorResults = await db.execute(sql.raw(vendorSql));
-      results.push(...vendorResults.rows);
+      const vendorResults = await vendorQuery;
+      results.push(...vendorResults);
     }
     
     // Search volunteer assignments
