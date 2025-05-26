@@ -240,8 +240,20 @@ export default function EventForm({ event, onSuccess }: EventFormProps) {
   };
   
   // Handle step 2 completion (products management)
-  function handleCompleteStep2() {
-    toast({ title: "Success", description: "Event and products saved successfully" });
+  async function handleCompleteStep2() {
+    // Publish the event when completing the creation process
+    const eventId = event?.id || newEventId;
+    if (eventId) {
+      try {
+        await apiRequest("PUT", `/api/events/${eventId}`, { status: "published" });
+        toast({ title: "Success", description: "Event published successfully!" });
+      } catch (error) {
+        console.error("Error publishing event:", error);
+        toast({ title: "Warning", description: "Event saved but couldn't publish automatically. You can publish it later." });
+      }
+    } else {
+      toast({ title: "Success", description: "Event and products saved successfully" });
+    }
     if (onSuccess) onSuccess();
   }
 
