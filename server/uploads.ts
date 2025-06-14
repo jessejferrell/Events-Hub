@@ -23,14 +23,14 @@ export const upload = multer({
   },
 });
 
-// Check if object storage is configured and accessible
+// Check if Supabase storage is configured and accessible
 export async function setupUploads() {
   try {
     const isReady = await isObjectStorageReady();
     if (isReady) {
       console.log('Object storage is ready for uploads');
     } else {
-      console.warn('Object storage is not accessible. Uploads may fail.');
+      console.warn('Storage service is not accessible. Uploads may fail.');
     }
   } catch (error) {
     console.error('Error checking object storage:', error);

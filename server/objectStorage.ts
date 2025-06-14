@@ -1,15 +1,21 @@
-import { Client } from "@replit/object-storage";
+import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 import { promisify } from "util";
 import path from "path";
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 // Create a randomBytes function that returns a Promise
 const randomBytesAsync = promisify(randomBytes);
 
-// Initialize object storage client
-const objectStorage = new Client({
-  bucketName: "replit-objstore-59539edf-f9e5-470f-b744-2fd4b1b3c6f6"
-});
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Define the storage bucket name
+const STORAGE_BUCKET = 'uploads';
 
 /**
  * Generate a unique file name for storage
@@ -32,7 +38,7 @@ async function generateUniqueFileName(originalName: string): Promise<string> {
 }
 
 /**
- * Upload a file to object storage
+ * Upload a file to Supabase storage
  * @param fileBuffer File buffer content
  * @param originalFileName Original file name
  * @param contentType MIME type of the file
@@ -45,97 +51,139 @@ export async function uploadFile(
 ): Promise<string> {
   try {
     const uniqueFileName = await generateUniqueFileName(originalFileName);
-    const objectKey = `uploads/${uniqueFileName}`;
+    const filePath = `${uniqueFileName}`;
     
-    // Upload to object storage
-    const uploadResult = await objectStorage.upload(objectKey, fileBuffer, {
-      contentType: contentType,
-    });
+    // Upload to Supabase storage
+    const { data, error } = await supabase
+      .storage
+      .from(STORAGE_BUCKET)
+      .upload(filePath, fileBuffer, {
+        contentType,
+        upsert: false
+      });
     
-    if (uploadResult.err) {
-      throw new Error(`Upload failed: ${uploadResult.err.message}`);
+    if (error) {
+      throw new Error(`Upload failed: ${error.message}`);
+    }
+    
+    if (!data) {
+      throw new Error('Upload failed: No data returned');
     }
     
     // Get the public URL
-    const hostUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://events.mosspointmainstreet.org' 
-      : 'https://events-manager.replit.app';
+    const { data: publicUrlData } = supabase
+      .storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(filePath);
     
-    const publicUrl = `${hostUrl}/api/storage/${objectKey}`;
-    return publicUrl;
+    return publicUrlData.publicUrl;
   } catch (error) {
-    console.error("Error uploading file to object storage:", error);
-    throw new Error("Failed to upload file to object storage");
+    console.error("Error uploading file to storage:", error);
+    throw new Error("Failed to upload file to storage");
   }
 }
 
 /**
- * Delete a file from object storage
+ * Delete a file from Supabase storage
  * @param fileUrl URL of the file to delete
  * @returns true if deletion was successful
  */
 export async function deleteFile(fileUrl: string): Promise<boolean> {
   try {
-    // Extract the object key from the URL
-    const pathParts = fileUrl.split('/');
-    const startIndex = pathParts.indexOf('storage') + 1;
-    if (startIndex <= 0) return false;
+    // Extract the file path from the URL
+    const url = new URL(fileUrl);
+    const pathParts = url.pathname.split('/');
+    const fileName = pathParts[pathParts.length - 1];
     
-    const objectKey = pathParts.slice(startIndex).join('/');
+    // Delete from Supabase storage
+    const { error } = await supabase
+      .storage
+      .from(STORAGE_BUCKET)
+      .remove([fileName]);
     
-    // Delete from object storage
-    const deleteResult = await objectStorage.delete(objectKey);
-    
-    if (deleteResult.err) {
-      console.error(`Delete failed: ${deleteResult.err.message}`);
+    if (error) {
+      console.error(`Delete failed: ${error.message}`);
       return false;
     }
     
     return true;
   } catch (error) {
-    console.error("Error deleting file from object storage:", error);
+    console.error("Error deleting file from storage:", error);
     return false;
   }
 }
 
 /**
- * Check if the object storage is configured and accessible
- * @returns boolean indicating if object storage is ready
+ * Check if the Supabase storage is configured and accessible
+ * @returns boolean indicating if storage is ready
  */
 export async function isObjectStorageReady(): Promise<boolean> {
   try {
-    // List a few objects to verify connection
-    const listResult = await objectStorage.list({ prefix: '' });
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Supabase URL or key not configured');
+      return false;
+    }
     
-    if (listResult.err) {
-      console.error(`List operation failed: ${listResult.err.message}`);
+    // Check if the bucket exists
+    const { data, error } = await supabase
+      .storage
+      .getBucket(STORAGE_BUCKET);
+    
+    if (error) {
+      // If bucket doesn't exist, try to create it
+      if (error.message.includes('not found')) {
+        const { error: createError } = await supabase
+          .storage
+          .createBucket(STORAGE_BUCKET, {
+            public: true,
+            fileSizeLimit: 5 * 1024 * 1024 // 5MB
+          });
+          
+        if (createError) {
+          console.error(`Failed to create bucket: ${createError.message}`);
+          return false;
+        }
+        return true;
+      }
+      
+      console.error(`Storage check failed: ${error.message}`);
       return false;
     }
     
     return true;
   } catch (error) {
-    console.error("Object storage is not accessible:", error);
+    console.error("Storage service is not accessible:", error);
     return false;
   }
 }
 
 /**
- * Get an object from object storage
- * @param objectKey The key of the object to get
+ * Get an object from Supabase storage
+ * @param filePath The path of the file to get
  * @returns The object data as a Buffer
  */
-export async function getObject(objectKey: string): Promise<Buffer | null> {
+export async function getObject(filePath: string): Promise<Buffer | null> {
   try {
-    const downloadResult = await objectStorage.download(objectKey);
+    // Download from Supabase storage
+    const { data, error } = await supabase
+      .storage
+      .from(STORAGE_BUCKET)
+      .download(filePath);
     
-    if (downloadResult.err) {
-      console.error(`Download failed: ${downloadResult.err.message}`);
+    if (error) {
+      console.error(`Download failed: ${error.message}`);
       return null;
     }
     
-    return downloadResult.data;
+    if (!data) {
+      return null;
+    }
+    
+    // Convert blob to buffer
+    const arrayBuffer = await data.arrayBuffer();
+    return Buffer.from(arrayBuffer);
   } catch (error) {
-    console.error(`Error getting object ${objectKey}:`, error);
+    console.error(`Error getting object ${filePath}:`, error);
     return null;
   }
 }
