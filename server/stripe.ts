@@ -178,7 +178,7 @@ export function setupStripeRoutes(app: Express) {
         log(`Using development redirect URL: ${redirectUri}`, "stripe");
       } else {
         // In production
-        redirectUri = "https://events.mosspointmainstreet.org/api/stripe/oauth-callback";
+        redirectUri = process.env.REDIRECT_OAUTH_CALLBACK_URL;
         log(`Using production redirect URL: ${redirectUri}`, "stripe");
       }
       
