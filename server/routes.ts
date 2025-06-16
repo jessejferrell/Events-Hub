@@ -1393,9 +1393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Get domain from environment or request
-      const domain = process.env.REPLIT_DOMAINS 
-        ? process.env.REPLIT_DOMAINS.split(',')[0] 
-        : `${req.protocol}://${req.get('host')}`;
+      const domain = process.env.DOMAIN || `${process.env.NODE_ENV === 'production' ? 'https' : req.protocol}://${req.get('host')}`;
       
       // Create line items for Stripe Checkout
       const lineItems = products.map(product => {

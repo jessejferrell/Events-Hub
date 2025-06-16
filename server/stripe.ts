@@ -174,7 +174,7 @@ export function setupStripeRoutes(app: Express) {
       // In development on Replit, use events-manager.replit.app
       if (process.env.NODE_ENV !== 'production') {
         // OAuth redirect URL (different from webhook)
-        redirectUri = "http://localhost:5001/api/stripe/oauth-callback";
+        redirectUri = process.env.REDIRECT_DEV_STRIPE_OAUTH_CALLBACK_URL;
         log(`Using development redirect URL: ${redirectUri}`, "stripe");
       } else {
         // In production
