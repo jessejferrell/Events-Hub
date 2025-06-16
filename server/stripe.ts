@@ -169,18 +169,14 @@ export function setupStripeRoutes(app: Express) {
       log(`Using Stripe Client ID starting with: ${idPrefix}...`, "stripe");
 
       // Use different URLs for OAuth redirect vs webhooks
-      let redirectUri;
+      let redirectUri = process.env.REDIRECT_OAUTH_CALLBACK_URL || "https://events-manager.replit.app/api/stripe/oauth-callback";
       
       // In development on Replit, use events-manager.replit.app
       if (process.env.NODE_ENV !== 'production') {
         // OAuth redirect URL (different from webhook)
-        redirectUri = process.env.REDIRECT_DEV_STRIPE_OAUTH_CALLBACK_URL;
+        redirectUri = process.env.REDIRECT_DEV_STRIPE_OAUTH_CALLBACK_URL || "https://events-manager.replit.app/api/stripe/oauth-callback";
         log(`Using development redirect URL: ${redirectUri}`, "stripe");
-      } else {
-        // In production
-        redirectUri = process.env.REDIRECT_OAUTH_CALLBACK_URL;
-        log(`Using production redirect URL: ${redirectUri}`, "stripe");
-      }
+      }  
       
       // Log a clear message about URLs
       log(`Using appropriate OAuth redirect URLs (separate from webhook endpoints)`, "stripe");
