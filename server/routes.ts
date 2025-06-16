@@ -1249,6 +1249,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === CHECKOUT & ORDERS API ===
 
+  // Checkout success page
+  app.get("/checkout/success", async (req, res) => {
+    try {
+      const { order_id, session_id } = req.query;
+      
+      if (!order_id || !session_id) {
+        return res.status(400).send("Missing order_id or session_id");
+      }
+      
+      // Verify the checkout session
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        apiVersion: "2023-10-16" as any,
+      });
+      
+      const session = await stripe.checkout.sessions.retrieve(session_id as string);
+      
+      if (!session) {
+        return res.status(404).send("Invalid checkout session");
+      }
+      
+      // Update order status to paid
+      await storage.updateOrderStatus(Number(order_id), "completed");
+      await storage.updateOrderPaymentStatus(Number(order_id), "paid");
+      
+      // Redirect to the order confirmation page
+      res.redirect(`/orders/${order_id}?success=true`);
+    } catch (error: any) {
+      console.error("Checkout success error:", error);
+      res.status(500).send(`Error processing checkout: ${error.message}`);
+    }
+  });
+  
+  // Checkout cancel page
+  app.get("/checkout/cancel", async (req, res) => {
+    try {
+      const { order_id } = req.query;
+      
+      if (!order_id) {
+        return res.status(400).send("Missing order_id");
+      }
+      
+      // Update order status to cancelled
+      await storage.updateOrderStatus(Number(order_id), "cancelled");
+      await storage.updateOrderPaymentStatus(Number(order_id), "cancelled");
+      
+      // Redirect to the cart page
+      res.redirect(`/cart?cancelled=true`);
+    } catch (error: any) {
+      console.error("Checkout cancel error:", error);
+      res.status(500).send(`Error cancelling checkout: ${error.message}`);
+    }
+  });
+
   // Checkout endpoint (protected)
   app.post("/api/checkout", requireAuth, async (req, res) => {
     try {
@@ -1328,11 +1381,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const owner = await storage.getUser(event.ownerId);
-      
-      if (!owner || !owner.stripeAccountId) {
-        await storage.updateOrderStatus(order.id, "cancelled");
-        return res.status(400).json({ message: "Event owner has not connected with Stripe" });
-      }
+      console.log('owner', owner)
+      // if (!owner || !owner.stripeAccountId) {
+      //   await storage.updateOrderStatus(order.id, "cancelled");
+      //   return res.status(400).json({ message: "Event owner has not connected with Stripe" });
+      // }
       
       // Step 4: Create Stripe checkout session
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {

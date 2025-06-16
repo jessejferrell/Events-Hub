@@ -42,6 +42,13 @@ export function setupStripeRoutes(app: Express) {
   // Get Stripe public key and configuration
   app.get("/api/stripe/config", (req, res) => {
     try {
+
+      // redirect url should be in .env
+      //  add validation if prod if yes use the url else redirect_dev_stripe_oauth_callback
+      const redirectUrl = process.env.NODE_ENV === 'production'
+        ? process.env.STRIPE_OAUTH_CALLBACK_URL 
+        : process.env.REDIRECT_DEV_STRIPE_OAUTH_CALLBACK_URL;
+
       res.json({
         publishableKey: process.env.VITE_STRIPE_PUBLIC_KEY,
         clientId: process.env.STRIPE_CLIENT_ID,
@@ -167,7 +174,7 @@ export function setupStripeRoutes(app: Express) {
       // In development on Replit, use events-manager.replit.app
       if (process.env.NODE_ENV !== 'production') {
         // OAuth redirect URL (different from webhook)
-        redirectUri = "https://events-manager.replit.app/api/stripe/oauth-callback";
+        redirectUri = "http://localhost:5001/api/stripe/oauth-callback";
         log(`Using development redirect URL: ${redirectUri}`, "stripe");
       } else {
         // In production
