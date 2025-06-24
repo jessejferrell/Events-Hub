@@ -921,6 +921,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Update vendor profile by ID (protected)
+  app.put("/api/vendor-profile/:id", requireAuth, async (req, res) => {
+    try {
+      const profileId = parseInt(req.params.id);
+      
+      // Get the profile to check ownership
+      const profile = await storage.getVendorProfileById(profileId);
+      
+      if (!profile) {
+        return res.status(404).json({ message: "Vendor profile not found" });
+      }
+      
+      // Check if the user owns this profile or is an admin
+      if (profile.userId !== req.user.id && req.user.role !== "admin" && req.user.role !== "super_admin") {
+        return res.status(403).json({ message: "Not authorized to update this profile" });
+      }
+      
+      const updatedProfile = await storage.updateVendorProfile(profileId, req.body);
+      res.json(updatedProfile);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid profile data", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message || "Failed to update vendor profile" });
+    }
+  });
+  
   // Get vendor spots for an event
   app.get("/api/events/:eventId/vendor-spots", async (req, res) => {
     try {
@@ -1001,9 +1028,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check if the vendor spot exists
-      const vendorSpot = await storage.getVendorSpot(vendorSpotId);
+      // instead of checking vendorSpot make sure to pull it from products table
+      // where type = vendor_spot
+      let vendorSpot = await storage.getProducts(eventId, "vendor_spot", vendorSpotId);
       if (!vendorSpot) {
         return res.status(404).json({ message: "Vendor spot not found" });
+      }
+
+        console.log('vendorSpot', vendorSpot);
+
+      let vendorSpotRegistration = null;
+      if(vendorSpot){
+        vendorSpotRegistration = await storage.createVendorSpot({
+          eventId,
+          name: vendorSpot?.[0].name,
+          availableSpots: vendorSpot?.[0].quantity,
+          price: vendorSpot?.[0].price,
+          metadata: vendorSpot?.[0].metadata,
+          description: vendorSpot?.[0].description,
+          requirements: vendorSpot?.[0].requirements,
+        });
       }
       
       // Check if the event exists
@@ -1015,9 +1059,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create registration
       const registration = await db.insert(vendorRegistrations).values({
         vendorProfileId: profileId,
-        vendorSpotId: vendorSpotId,
+        vendorSpotId: vendorSpotRegistration?.id,
         eventId: eventId,
-        status: status || "pending",
+        status: "success",
         metadata: {
           preferredLocation,
           productsDescription

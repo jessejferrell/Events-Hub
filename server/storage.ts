@@ -68,6 +68,7 @@ export interface IStorage {
   
   // Vendor operations
   getVendorProfile(userId: number): Promise<VendorProfile | undefined>;
+  getVendorProfileById(id: number): Promise<VendorProfile | undefined>;
   createVendorProfile(profile: InsertVendorProfile): Promise<VendorProfile>;
   updateVendorProfile(id: number, profileData: Partial<InsertVendorProfile>): Promise<VendorProfile>;
   getVendorSpots(eventId: number): Promise<VendorSpot[]>;
@@ -442,13 +443,16 @@ export class DatabaseStorage implements IStorage {
 
   // === PRODUCT OPERATIONS ===
 
-  async getProducts(eventId: number, type?: string): Promise<Product[]> {
+  async getProducts(eventId: number, type?: string, id?: string): Promise<Product[]> {
     let queryBuilder = db.select().from(products).where(eq(products.eventId, eventId));
     
     if (type) {
       queryBuilder = queryBuilder.where(eq(products.type, type));
     }
-    
+    if (id) {
+      queryBuilder = queryBuilder.where(eq(products.id, id));
+    }
+
     return await queryBuilder;
   }
 
@@ -487,6 +491,11 @@ export class DatabaseStorage implements IStorage {
 
   async getVendorProfile(userId: number): Promise<VendorProfile | undefined> {
     const result = await db.select().from(vendorProfiles).where(eq(vendorProfiles.userId, userId));
+    return result[0];
+  }
+
+  async getVendorProfileById(id: number): Promise<VendorProfile | undefined> {
+    const result = await db.select().from(vendorProfiles).where(eq(vendorProfiles.id, id));
     return result[0];
   }
 

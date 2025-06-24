@@ -74,16 +74,18 @@ export default function CheckoutPage() {
     const searchParams = new URLSearchParams(window.location.search);
     const success = searchParams.get('success');
     const cancelled = searchParams.get('cancelled');
+    const orderId = searchParams.get('orderId');
     
-    if (success) {
+    if (success && orderId) {
+      // Redirect to the order success page with the order ID
+      navigate(`/orders/${orderId}?success=true`);
+    } else if (success) {
       toast({
         title: "Payment successful",
         description: "Your order has been processed successfully.",
       });
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
-      // Go to order confirmation page
-      navigate("/my-orders");
     } else if (cancelled) {
       toast({
         title: "Payment cancelled",

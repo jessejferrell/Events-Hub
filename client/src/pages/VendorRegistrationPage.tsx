@@ -143,6 +143,9 @@ export default function VendorRegistrationPage() {
     },
   });
   
+  // Get cart functions needed for navigation after submission
+  const { needsRegistration, getNextRegistrationPath } = useCart();
+
   // On submit mutation
   const submitMutation = useMutation({
     mutationFn: async (formData: VendorFormValues) => {
@@ -199,6 +202,9 @@ export default function VendorRegistrationPage() {
       return registrationResponse.json();
     },
     onSuccess: (data) => {
+      // Mark this cart item as having completed registration
+      setRegistrationStatus(id, 'complete', data);
+      
       toast({
         title: "Registration saved",
         description: "Your vendor registration information has been saved successfully.",
@@ -208,8 +214,6 @@ export default function VendorRegistrationPage() {
       setRegistrationStatus(id, 'complete', data);
       
       // Check if there are more registrations needed, or go to checkout
-      const { needsRegistration, getNextRegistrationPath } = useCart();
-      
       if (needsRegistration()) {
         navigate(getNextRegistrationPath());
       } else {
