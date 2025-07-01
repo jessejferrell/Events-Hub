@@ -141,12 +141,6 @@ export interface IStorage {
   searchTransactions(query: string, filters: { userId?: number; eventId?: number; transactionType?: string; status?: string }): Promise<any[]>;
   exportTransactions(filters: { userId?: number; eventId?: number; transactionType?: string; startDate?: Date; endDate?: Date; status?: string }): Promise<any[]>;
   
-  // Slot management methods
-  decreaseEventTicketSlots(eventId: number, quantity: number): Promise<void>;
-  decreaseProductQuantity(productId: number, quantity: number): Promise<void>;
-  decreaseVendorSpotSlots(vendorSpotId: number, quantity: number): Promise<void>;
-  decreaseVolunteerShiftSlots(volunteerShiftId: number, quantity: number): Promise<void>;
-  checkSlotAvailability(itemType: string, itemId: number, requestedQuantity: number): Promise<boolean>;
 
 }
 
@@ -1361,70 +1355,6 @@ export class DatabaseStorage implements IStorage {
     );
     
     return enhancedResults;
-  }
-
-  // Slot management implementations
-  async decreaseEventTicketSlots(eventId: number, quantity: number): Promise<void> {
-    await db
-      .update(events)
-      .set({ 
-        ticketsAvailable: sql`${events.ticketsAvailable} - ${quantity}`,
-        updatedAt: new Date()
-      })
-      .where(eq(events.id, eventId));
-  }
-
-  async decreaseProductQuantity(productId: number, quantity: number): Promise<void> {
-    await db
-      .update(products)
-      .set({ 
-        quantity: sql`${products.quantity} - ${quantity}`,
-        updatedAt: new Date()
-      })
-      .where(eq(products.id, productId));
-  }
-
-  async decreaseVendorSpotSlots(vendorSpotId: number, quantity: number): Promise<void> {
-    await db
-      .update(vendorSpots)
-      .set({ 
-        availableSpots: sql`${vendorSpots.availableSpots} - ${quantity}`,
-        updatedAt: new Date()
-      })
-      .where(eq(vendorSpots.id, vendorSpotId));
-  }
-
-  async decreaseVolunteerShiftSlots(volunteerShiftId: number, quantity: number): Promise<void> {
-    await db
-      .update(volunteerShifts)
-      .set({ 
-        availableSpots: sql`${volunteerShifts.availableSpots} - ${quantity}`,
-        updatedAt: new Date()
-      })
-      .where(eq(volunteerShifts.id, volunteerShiftId));
-  }
-
-  async checkSlotAvailability(itemType: string, itemId: number, requestedQuantity: number): Promise<boolean> {
-    switch (itemType) {
-      case "ticket":
-        const event = await db.select().from(events).where(eq(events.id, itemId)).limit(1);
-        return event[0]?.ticketsAvailable ? event[0].ticketsAvailable >= requestedQuantity : false;
-      
-      case "product":
-        const product = await db.select().from(products).where(eq(products.id, itemId)).limit(1);
-        return product[0]?.quantity ? product[0].quantity >= requestedQuantity : false;
-      
-      case "vendor_spot":
-        const vendorSpot = await db.select().from(vendorSpots).where(eq(vendorSpots.id, itemId)).limit(1);
-        return vendorSpot[0]?.availableSpots ? vendorSpot[0].availableSpots >= requestedQuantity : false;
-      
-      case "volunteer_shift":
-        const volunteerShift = await db.select().from(volunteerShifts).where(eq(volunteerShifts.id, itemId)).limit(1);
-        return volunteerShift[0]?.availableSpots ? volunteerShift[0].availableSpots >= requestedQuantity : false;
-      
-      default:
-        return false;
-    }
   }
 }
 

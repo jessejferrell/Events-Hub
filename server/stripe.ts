@@ -1142,6 +1142,31 @@ export function setupStripeRoutes(app: Express) {
         return res.status(400).json({ message: "Event owner has not connected with Stripe" });
       }
 
+      // Create order first
+      const orderData = {
+        userId: req.user.id,
+        eventId: eventId,
+        totalAmount: event.price * (quantity || 1),
+        paymentMethod: 'stripe',
+        status: 'pending',
+        paymentStatus: 'pending'
+      };
+      
+      const order = await storage.createOrder(orderData);
+      
+      // Create order item for the ticket
+      await storage.createOrderItem({
+        orderId: order.id,
+        itemId: eventId,
+        itemType: "ticket",
+        name: `${event.title} - Ticket`,
+        description: "Event ticket",
+        quantity: quantity || 1,
+        unitPrice: event.price,
+        totalPrice: event.price * (quantity || 1),
+        metadata: null
+      });
+
       // Use the correct domains as specified by the client
       const domain = "https://events.mosspointmainstreet.org";
       const replitAppDomain = "https://events-manager.replit.app";
@@ -1180,9 +1205,9 @@ export function setupStripeRoutes(app: Express) {
         },
         // Pass metadata to use in the webhook
         metadata: {
-          eventId: eventId.toString(),
+          orderId: order.id.toString(),
           userId: req.user.id.toString(),
-          quantity: (quantity || 1).toString(),
+          eventId: eventId.toString(),
         },
       });
 
@@ -1497,102 +1522,38 @@ export function setupStripeRoutes(app: Express) {
   async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
     try {
       const metadata = session.metadata as Record<string, string> || {};
-      const eventId = metadata.eventId;
+      const orderId = metadata.orderId;
       const userId = metadata.userId;
-      const orderItemsData = metadata.orderItems ? JSON.parse(metadata.orderItems) : null;
+      const eventId = metadata.eventId;
       
-      if (!eventId || !userId) {
+      if (!orderId || !userId || !eventId) {
         log(`Missing required metadata in session: ${JSON.stringify(metadata)}`, "stripe");
         return;
       }
       
-      // Get the event
-      const event = await storage.getEvent(parseInt(eventId));
-      if (!event) {
-        log(`Event not found: ${eventId}`, "stripe");
-        return;
-      }
-      
-      // Create an order first
       try {
+        // Get the order that was created during checkout
+        const orderIdInt = parseInt(orderId);
+        
+        // Update the order status to completed and add payment details
         const paymentIntent = session.payment_intent as string;
-        const orderData = {
-          userId: parseInt(userId),
-          eventId: parseInt(eventId),
-          totalAmount: (session.amount_total || 0) / 100, // convert from cents
-          paymentMethod: 'stripe',
-          status: "completed",
-          paymentStatus: "paid",
-          stripePaymentId: paymentIntent,
-          stripeSessionId: session.id,
-          metadata: {
-            checkoutSessionId: session.id,
-            orderItems: orderItemsData
-          }
-        };
+        await storage.updateOrderStatus(orderIdInt, "completed");
+        await storage.updateOrderPaymentStatus(orderIdInt, "paid", paymentIntent);
         
-        const order = await storage.createOrder(orderData);
-        log(`Order created: ${order.id} for event ${eventId}`, "stripe");
+        log(`Order ${orderIdInt} updated with payment details`, "stripe");
         
-        // Process order items and decrease slots
-        if (orderItemsData && Array.isArray(orderItemsData)) {
-          for (const item of orderItemsData) {
-            // Create order item
-            await storage.createOrderItem({
-              orderId: order.id,
-              itemId: item.itemId,
-              itemType: item.itemType,
-              name: item.name,
-              description: item.description || null,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-              metadata: item.metadata || null
-            });
-            
-            // Decrease slots for the purchased item
-            await decreaseSlots(item.itemType, item.itemId, item.quantity);
-            
-            log(`Order item created and slots decreased: ${item.itemType} ${item.itemId} (qty: ${item.quantity})`, "stripe");
-          }
-        } else {
-          // Fallback for simple ticket purchase (legacy compatibility)
-          const quantity = parseInt(metadata.quantity || '1');
+        // Get all order items to decrease slots
+        const orderItems = await storage.getOrderItems(orderIdInt);
+        
+        // Process each order item and decrease slots
+        for (const item of orderItems) {
+          // Decrease slots for the purchased item
+          await decreaseSlots(item.itemType, item.itemId, item.quantity);
           
-          // Create a ticket order item
-          await storage.createOrderItem({
-            orderId: order.id,
-            itemId: parseInt(eventId),
-            itemType: "ticket",
-            name: `${event.title} - Ticket`,
-            description: "Event ticket",
-            quantity: quantity,
-            unitPrice: (session.amount_total || 0) / 100 / quantity,
-            totalPrice: (session.amount_total || 0) / 100,
-            metadata: null
-          });
-          
-          // Decrease event ticket slots
-          await decreaseSlots("ticket", parseInt(eventId), quantity);
-          
-          // Also create the legacy ticket record for backward compatibility
-          const ticket = await storage.createTicket({
-            userId: parseInt(userId),
-            eventId: parseInt(eventId),
-            orderId: order.id,
-            status: "confirmed",
-            price: (session.amount_total || 0) / 100,
-            ticketType: 'standard',
-            metadata: {
-              quantity: quantity,
-              checkoutSessionId: session.id
-            }
-          });
-          
-          log(`Legacy ticket purchased: ${ticket.id} for event ${eventId}`, "stripe");
+          log(`Slots decreased for order item: ${item.itemType} ${item.itemId} (qty: ${item.quantity})`, "stripe");
         }
         
-        log(`Payment processing completed for order: ${order.id}`, "stripe");
+        log(`Payment processing completed for order: ${orderIdInt}`, "stripe");
       } catch (orderError: unknown) {
         const errorMessage = orderError instanceof Error ? orderError.message : String(orderError);
         log(`Error processing checkout: ${errorMessage}`, "stripe");
