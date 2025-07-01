@@ -1173,6 +1173,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Update volunteer profile by ID (protected)
+  app.put("/api/volunteer-profile/:id", requireAuth, async (req, res) => {
+    try {
+      const profileId = parseInt(req.params.id);
+      
+      // Get the profile to check ownership
+      const existingProfile = await storage.getVolunteerProfile(req.user.id);
+      
+      if (!existingProfile) {
+        return res.status(404).json({ message: "Volunteer profile not found" });
+      }
+      
+      if (existingProfile.id !== profileId) {
+        return res.status(403).json({ message: "Not authorized to update this profile" });
+      }
+      
+      const updatedProfile = await storage.updateVolunteerProfile(profileId, req.body);
+      res.json(updatedProfile);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to update volunteer profile" });
+    }
+  });
+  
   // Get volunteer shifts for an event
   app.get("/api/events/:eventId/volunteer-shifts", async (req, res) => {
     try {
@@ -1291,6 +1314,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create volunteer assignment (protected)
+  app.post("/api/volunteer-assignments", requireAuth, async (req, res) => {
+    try {
+      const { shiftId, volunteerShiftId, eventId, notes } = req.body;
+      const actualShiftId = shiftId || volunteerShiftId;
+      
+      if (!actualShiftId || !eventId) {
+        return res.status(400).json({ message: "shiftId and eventId are required" });
+      }
+      
+      // Get user's volunteer profile
+      const volunteerProfile = await storage.getVolunteerProfile(req.user.id);
+      if (!volunteerProfile) {
+        return res.status(400).json({ message: "Volunteer profile not found. Please create a volunteer profile first." });
+      }
+      
+      // Check if assignment already exists
+      const existingAssignments = await storage.getVolunteerAssignments({
+        userId: req.user.id,
+        shiftId: actualShiftId,
+        eventId
+      });
+      
+      if (existingAssignments.length > 0) {
+        return res.status(400).json({ message: "You are already assigned to this shift" });
+      }
+      
+      const assignmentData = {
+        volunteerProfileId: volunteerProfile.id,
+        shiftId: parseInt(actualShiftId),
+        eventId: parseInt(eventId),
+        status: "pending",
+        notes: notes || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      const newAssignment = await storage.createVolunteerAssignment(assignmentData);
+      res.status(201).json(newAssignment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to create volunteer assignment" });
+    }
+  });
+
   // === CHECKOUT & ORDERS API ===
 
   // Checkout success page
@@ -1379,6 +1446,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (eventIds.size === 0) {
         return res.status(400).json({ message: "No valid products found" });
+      }
+      
+      // Validate slot availability before creating order
+      for (const item of items) {
+        const product = products.find(p => p.id === item.productId);
+        const isAvailable = await storage.checkSlotAvailability(product.type, product.id, item.quantity);
+        
+        if (!isAvailable) {
+          return res.status(400).json({ 
+            message: `Insufficient availability for ${product.name}. Only limited slots remaining.`,
+            productId: product.id,
+            productName: product.name,
+            requestedQuantity: item.quantity
+          });
+        }
       }
       
       // Get the primary event for this order
@@ -1475,6 +1557,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderId: order.id.toString(),
           userId: req.user.id.toString(),
           eventId: eventId.toString(),
+          orderItems: JSON.stringify(items.map(item => {
+            const product = products.find(p => p.id === item.productId);
+            return {
+              itemId: product.id,
+              itemType: product.type,
+              name: product.name,
+              description: product.description,
+              quantity: item.quantity,
+              unitPrice: product.price,
+              totalPrice: product.price * item.quantity,
+              metadata: item.registrationData || null
+            };
+          })),
         },
       });
       
@@ -1575,8 +1670,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user tickets (protected)
   app.get("/api/my-tickets", requireAuth, async (req, res) => {
     try {
-      const tickets = await storage.getTicketsByUser(req.user.id);
-      res.json(tickets);
+      const ordersWithItems = await storage.getCompletedPaidOrdersWithItems(req.user.id);
+      
+      // Flatten order items from all orders
+      const allOrderItems = ordersWithItems.flatMap(order => 
+        order.items.map(item => ({
+          ...item,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          eventId: order.eventId,
+          eventTitle: order.eventTitle,
+          purchaseDate: order.createdAt,
+          orderStatus: order.status,
+          paymentStatus: order.paymentStatus
+        }))
+      );
+      
+      res.json(allOrderItems);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch tickets" });
     }

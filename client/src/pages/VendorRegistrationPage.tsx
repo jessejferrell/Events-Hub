@@ -68,9 +68,13 @@ export default function VendorRegistrationPage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { setRegistrationStatus, getCartItem } = useCart();
+  const { setRegistrationStatus, getCartItem, items } = useCart();
   const { toast } = useToast();
   const [isExistingProfile, setIsExistingProfile] = useState(false);
+  const [autoFilledData, setAutoFilledData] = useState({
+    businessName: false,
+    description: false,
+  });
   
   // Get the cart item
   const cartItem = getCartItem(id);
@@ -102,6 +106,32 @@ export default function VendorRegistrationPage() {
     queryKey: ['/api/vendor-profile'],
     enabled: !!user,
   });
+
+  // Check if there are other completed vendor registrations in cart to reuse data
+  const getReusableVendorData = (): VendorFormValues | null => {
+    const completedVendorItems = items.filter(item => 
+      item.product.type === 'vendor_spot' && 
+      item.id !== id && 
+      item.registrationData
+    );
+    
+    if (completedVendorItems.length > 0) {
+      const lastRegistration = completedVendorItems[completedVendorItems.length - 1];
+      return lastRegistration.registrationData as VendorFormValues;
+    }
+    return null;
+  };
+
+  const reusableData = getReusableVendorData();
+
+  // Helper function to safely get values with priority
+  const getFieldValue = (field: keyof VendorFormValues, userFallback = ""): any => {
+    const profileValue = vendorProfile?.[field as keyof typeof vendorProfile];
+    const reusableValue = reusableData?.[field];
+    const userValue = user?.[field as keyof typeof user] || userFallback;
+    
+    return profileValue || reusableValue || userValue || "";
+  };
   
   useEffect(() => {
     if (vendorProfile) {
@@ -109,42 +139,56 @@ export default function VendorRegistrationPage() {
     }
   }, [vendorProfile]);
   
-  // Set up the form with default values from existing profile or user profile
+  // Set up the form with intelligent auto-fill priority:
+  // 1. Existing vendor profile data
+  // 2. Recently completed vendor registration in same cart session
+  // 3. User profile data
   const form = useForm<VendorFormValues>({
     resolver: zodResolver(vendorFormSchema),
     defaultValues: {
-      // Contact Information
-      fullName: vendorProfile?.fullName || user?.name || "",
-      businessName: vendorProfile?.businessName || "",
-      businessAddress: vendorProfile?.businessAddress || user?.address || "",
-      businessAddressLine2: vendorProfile?.businessAddressLine2 || "",
-      city: vendorProfile?.city || user?.city || "",
-      state: vendorProfile?.state || user?.state || "",
-      zipCode: vendorProfile?.zipCode || user?.zipCode || "",
-      phoneNumber: vendorProfile?.phoneNumber || user?.phoneNumber || "",
-      email: vendorProfile?.email || user?.email || "",
+      // Contact Information - prioritize existing profile, then reusable data, then user data
+      fullName: getFieldValue('fullName', user?.name),
+      businessName: getFieldValue('businessName'),
+      businessAddress: getFieldValue('businessAddress', user?.address),
+      businessAddressLine2: getFieldValue('businessAddressLine2'),
+      city: getFieldValue('city', user?.city),
+      state: getFieldValue('state', user?.state),
+      zipCode: getFieldValue('zipCode', user?.zipCode),
+      phoneNumber: getFieldValue('phoneNumber', user?.phoneNumber),
+      email: getFieldValue('email', user?.email),
       
       // Promotional information
-      hasProvidedPromoInfo: vendorProfile?.hasProvidedPromoInfo || false,
-      websiteUrl: vendorProfile?.websiteUrl || "",
-      facebookUrl: vendorProfile?.facebookUrl || "",
-      instagramUrl: vendorProfile?.instagramUrl || "",
-      tiktokUrl: vendorProfile?.tiktokUrl || "",
-      otherPromoUrl: vendorProfile?.otherPromoUrl || "",
+      hasProvidedPromoInfo: getFieldValue('hasProvidedPromoInfo') || false,
+      websiteUrl: getFieldValue('websiteUrl'),
+      facebookUrl: getFieldValue('facebookUrl'),
+      instagramUrl: getFieldValue('instagramUrl'),
+      tiktokUrl: getFieldValue('tiktokUrl'),
+      otherPromoUrl: getFieldValue('otherPromoUrl'),
       
-      // Product/service description
-      productsDescription: vendorProfile?.productsDescription || vendorProfile?.description || "",
+      // Product/service description - prioritize existing profile, then reusable data
+      productsDescription: vendorProfile?.productsDescription || vendorProfile?.description || getFieldValue('productsDescription'),
       
       // Event logistics
-      preferredLocation: vendorProfile?.preferredLocation || `${user?.city || ''}, ${user?.state || ''}`.trim(),
+      preferredLocation: getFieldValue('preferredLocation', `${user?.city || ''}, ${user?.state || ''}`.trim()),
       
-      // Terms agreement
+      // Terms agreement - always reset to false for new registrations
       agreeToTerms: false,
     },
   });
+
+  // Track what data was auto-filled for UI indicators
+  useEffect(() => {
+    const businessNameAutoFilled = !!(vendorProfile?.businessName || reusableData?.businessName);
+    const descriptionAutoFilled = !!(vendorProfile?.productsDescription || vendorProfile?.description || reusableData?.productsDescription);
+    
+    setAutoFilledData({
+      businessName: businessNameAutoFilled,
+      description: descriptionAutoFilled,
+    });
+  }, [vendorProfile, reusableData]);
   
   // Get cart functions needed for navigation after submission
-  const { needsRegistration, getNextRegistrationPath } = useCart();
+  const { needsRegistration, getNextRegistrationPath, needsRegistrationExcluding, getNextRegistrationPathExcluding } = useCart();
 
   // On submit mutation
   const submitMutation = useMutation({
@@ -191,6 +235,22 @@ export default function VendorRegistrationPage() {
         status: "pending",
         preferredLocation: formData.preferredLocation,
         productsDescription: formData.productsDescription,
+        // Store form data for potential reuse in other registrations
+        fullName: formData.fullName,
+        businessName: formData.businessName,
+        businessAddress: formData.businessAddress,
+        businessAddressLine2: formData.businessAddressLine2,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode,
+        phoneNumber: formData.phoneNumber,
+        email: formData.email,
+        hasProvidedPromoInfo: formData.hasProvidedPromoInfo,
+        websiteUrl: formData.websiteUrl,
+        facebookUrl: formData.facebookUrl,
+        instagramUrl: formData.instagramUrl,
+        tiktokUrl: formData.tiktokUrl,
+        otherPromoUrl: formData.otherPromoUrl,
       };
       
       const registrationResponse = await apiRequest(
@@ -210,13 +270,19 @@ export default function VendorRegistrationPage() {
         description: "Your vendor registration information has been saved successfully.",
       });
       
-      // Mark this cart item as having completed registration
-      setRegistrationStatus(id, 'complete', data);
-      
-      // Check if there are more registrations needed, or go to checkout
-      if (needsRegistration()) {
-        navigate(getNextRegistrationPath());
+      // Check if there are more registrations needed (excluding the one we just completed)
+      if (needsRegistrationExcluding(id)) {
+        const nextPath = getNextRegistrationPathExcluding(id);
+        toast({
+          title: "Next registration required",
+          description: "Please complete the next registration.",
+        });
+        navigate(nextPath);
       } else {
+        toast({
+          title: "All registrations complete",
+          description: "Redirecting to checkout...",
+        });
         navigate("/checkout");
       }
     },
@@ -241,7 +307,9 @@ export default function VendorRegistrationPage() {
       </div>
     );
   }
-  
+
+  const hasAutoFilledData = isExistingProfile || !!reusableData;
+
   return (
     <div className="container py-8">
       <div className="max-w-3xl mx-auto">
@@ -249,17 +317,23 @@ export default function VendorRegistrationPage() {
           <CardHeader>
             <CardTitle>Vendor Registration</CardTitle>
             <CardDescription>
-              Please provide information about your business for the event: {cartItem.product.name}
+              Please provide information about your business for the event: {cartItem?.product?.name || 'Loading...'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isExistingProfile && (
+            {hasAutoFilledData && (
               <Alert className="mb-6">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Using Existing Profile</AlertTitle>
+                <AlertTitle>
+                  {isExistingProfile ? "Using Existing Profile" : "Using Previous Registration Data"}
+                </AlertTitle>
                 <AlertDescription>
-                  We've prefilled the form with your existing vendor profile information.
-                  You can make changes if needed.
+                  {isExistingProfile 
+                    ? "We've prefilled the form with your existing vendor profile information."
+                    : "We've prefilled the form with information from your previous vendor registration."
+                  } You can make changes if needed.
+                  {autoFilledData.businessName && " Business name has been auto-filled."}
+                  {autoFilledData.description && " Product description has been auto-filled."}
                 </AlertDescription>
               </Alert>
             )}
@@ -289,7 +363,14 @@ export default function VendorRegistrationPage() {
                     name="businessName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Business Name*</FormLabel>
+                        <FormLabel>
+                          Business Name*
+                          {autoFilledData.businessName && (
+                            <span className="ml-2 text-xs text-green-600 font-normal">
+                              (Auto-filled)
+                            </span>
+                          )}
+                        </FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -537,7 +618,14 @@ export default function VendorRegistrationPage() {
                     name="productsDescription"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-lg font-medium">Please describe your products and/or services:</FormLabel>
+                        <FormLabel className="text-lg font-medium">
+                          Please describe your products and/or services:
+                          {autoFilledData.description && (
+                            <span className="ml-2 text-xs text-green-600 font-normal">
+                              (Auto-filled)
+                            </span>
+                          )}
+                        </FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder="Tell us about what you'll be selling or offering at the event..."

@@ -6,7 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Ticket } from "@shared/schema";
+import { OrderItem } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -76,10 +76,10 @@ export default function UserProfilePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Fetch user tickets
-  const { data: tickets, isLoading: isLoadingTickets } = useQuery<Ticket[]>({
+  const { data: tickets, isLoading: isLoadingTickets } = useQuery<(OrderItem & { orderId: number; orderNumber: string; eventId: number; eventTitle: string; purchaseDate: string; orderStatus: string; paymentStatus: string })[]>({
     queryKey: ["/api/my-tickets"],
     queryFn: async () => {
-      const res = await fetch("/api/my-tickets");
+      const res = await apiRequest("GET", "/api/my-tickets");
       if (!res.ok) throw new Error("Failed to fetch tickets");
       return await res.json();
     },
@@ -512,40 +512,42 @@ export default function UserProfilePage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Item</TableHead>
                         <TableHead>Event</TableHead>
-                        <TableHead>Date</TableHead>
                         <TableHead>Quantity</TableHead>
                         <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Order</TableHead>
                         <TableHead>Purchase Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tickets.map((ticket) => (
-                        <TableRow key={ticket.id}>
+                      {tickets.map((item) => (
+                        <TableRow key={item.id}>
                           <TableCell className="font-medium">
-                            {/* This would ideally fetch the event title, but we'll use a placeholder for now */}
-                            Event #{ticket.eventId}
+                            <div>
+                              <div className="font-medium">{item.name}</div>
+                              {item.description && (
+                                <div className="text-sm text-gray-500">{item.description}</div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center">
                               <Calendar className="h-4 w-4 mr-1 text-gray-500" />
-                              {/* We don't have the event date directly in tickets, this would come from joined data */}
-                              <span>-</span>
+                              {item.eventTitle}
                             </div>
                           </TableCell>
-                          <TableCell>{ticket.quantity}</TableCell>
-                          <TableCell>${ticket.amount.toFixed(2)}</TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>${item.totalPrice.toFixed(2)}</TableCell>
                           <TableCell>
-                            <Badge variant={
-                              ticket.status === "purchased" ? "default" : 
-                              ticket.status === "cancelled" ? "destructive" : 
-                              "secondary"
-                            }>
-                              {ticket.status}
-                            </Badge>
+                            <div className="text-sm">
+                              <div className="font-medium">#{item.orderNumber}</div>
+                              <Badge variant="default" className="mt-1">
+                                {item.paymentStatus}
+                              </Badge>
+                            </div>
                           </TableCell>
-                          <TableCell>{format(new Date(ticket.purchaseDate), "MMM d, yyyy")}</TableCell>
+                          <TableCell>{format(new Date(item.purchaseDate), "MMM d, yyyy")}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

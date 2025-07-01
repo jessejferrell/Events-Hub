@@ -27,6 +27,8 @@ type CartContextType = {
   getCartItem: (id: string) => CartItem | undefined;
   needsRegistration: () => boolean;
   getNextRegistrationPath: () => string;
+  getNextRegistrationPathExcluding: (excludeItemId: string) => string;
+  needsRegistrationExcluding: (excludeItemId: string) => boolean;
   getSmartCartNextAction: () => { action: 'register' | 'checkout', path: string, message: string };
   checkoutMutation: any;
   hasRegistrationType: (type: string) => boolean;
@@ -197,7 +199,44 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // If no registrations needed, go to checkout
     return '/checkout';
   };
-  
+
+  // Get next registration path excluding a specific item (for post-completion navigation)
+  const getNextRegistrationPathExcluding = (excludeItemId: string): string => {
+    // Find first vendor item that needs registration (excluding the specified item)
+    const pendingVendorItem = items.find(item => 
+      item.id !== excludeItemId &&
+      item.product.type === 'vendor_spot' && 
+      getRegistrationStatus(item.id) === 'pending'
+    );
+    
+    if (pendingVendorItem) {
+      return `/registration/vendor/${pendingVendorItem.id}`;
+    }
+    
+    // Find first volunteer item that needs registration (excluding the specified item)
+    const pendingVolunteerItem = items.find(item => 
+      item.id !== excludeItemId &&
+      item.product.type === 'volunteer_shift' && 
+      getRegistrationStatus(item.id) === 'pending'
+    );
+    
+    if (pendingVolunteerItem) {
+      return `/registration/volunteer/${pendingVolunteerItem.id}`;
+    }
+    
+    // If no registrations needed, go to checkout
+    return '/checkout';
+  };
+
+  // Check if any items need registration excluding a specific item
+  const needsRegistrationExcluding = (excludeItemId: string): boolean => {
+    return items.some(item => {
+      if (item.id === excludeItemId) return false; // Skip the excluded item
+      const status = getRegistrationStatus(item.id);
+      return status === 'pending';
+    });
+  };
+
   // Smart cart - determines what to do next in the cart flow based on cart contents
   const getSmartCartNextAction = (): { action: 'register' | 'checkout', path: string, message: string } => {
     // Check if cart has any items that need registration
@@ -284,6 +323,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         getCartItem,
         needsRegistration,
         getNextRegistrationPath,
+        getNextRegistrationPathExcluding,
+        needsRegistrationExcluding,
         getSmartCartNextAction,
         checkoutMutation,
         hasRegistrationType,

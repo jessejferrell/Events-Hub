@@ -1499,7 +1499,7 @@ export function setupStripeRoutes(app: Express) {
       const metadata = session.metadata as Record<string, string> || {};
       const eventId = metadata.eventId;
       const userId = metadata.userId;
-      const quantity = metadata.quantity || '1';
+      const orderItemsData = metadata.orderItems ? JSON.parse(metadata.orderItems) : null;
       
       if (!eventId || !userId) {
         log(`Missing required metadata in session: ${JSON.stringify(metadata)}`, "stripe");
@@ -1525,30 +1525,74 @@ export function setupStripeRoutes(app: Express) {
           paymentStatus: "paid",
           stripePaymentId: paymentIntent,
           stripeSessionId: session.id,
-          metadata: { 
+          metadata: {
             checkoutSessionId: session.id,
-            quantity: parseInt(quantity)
+            orderItems: orderItemsData
           }
         };
         
         const order = await storage.createOrder(orderData);
         log(`Order created: ${order.id} for event ${eventId}`, "stripe");
         
-        // Now create the ticket record
-        const ticket = await storage.createTicket({
-          userId: parseInt(userId),
-          eventId: parseInt(eventId),
-          orderId: order.id,
-          status: "confirmed",
-          price: (session.amount_total || 0) / 100, // convert from cents
-          ticketType: 'standard',
-          metadata: { 
-            quantity: parseInt(quantity),
-            checkoutSessionId: session.id
+        // Process order items and decrease slots
+        if (orderItemsData && Array.isArray(orderItemsData)) {
+          for (const item of orderItemsData) {
+            // Create order item
+            await storage.createOrderItem({
+              orderId: order.id,
+              itemId: item.itemId,
+              itemType: item.itemType,
+              name: item.name,
+              description: item.description || null,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              metadata: item.metadata || null
+            });
+            
+            // Decrease slots for the purchased item
+            await decreaseSlots(item.itemType, item.itemId, item.quantity);
+            
+            log(`Order item created and slots decreased: ${item.itemType} ${item.itemId} (qty: ${item.quantity})`, "stripe");
           }
-        });
+        } else {
+          // Fallback for simple ticket purchase (legacy compatibility)
+          const quantity = parseInt(metadata.quantity || '1');
+          
+          // Create a ticket order item
+          await storage.createOrderItem({
+            orderId: order.id,
+            itemId: parseInt(eventId),
+            itemType: "ticket",
+            name: `${event.title} - Ticket`,
+            description: "Event ticket",
+            quantity: quantity,
+            unitPrice: (session.amount_total || 0) / 100 / quantity,
+            totalPrice: (session.amount_total || 0) / 100,
+            metadata: null
+          });
+          
+          // Decrease event ticket slots
+          await decreaseSlots("ticket", parseInt(eventId), quantity);
+          
+          // Also create the legacy ticket record for backward compatibility
+          const ticket = await storage.createTicket({
+            userId: parseInt(userId),
+            eventId: parseInt(eventId),
+            orderId: order.id,
+            status: "confirmed",
+            price: (session.amount_total || 0) / 100,
+            ticketType: 'standard',
+            metadata: {
+              quantity: quantity,
+              checkoutSessionId: session.id
+            }
+          });
+          
+          log(`Legacy ticket purchased: ${ticket.id} for event ${eventId}`, "stripe");
+        }
         
-        log(`Ticket purchased: ${ticket.id} for event ${eventId}`, "stripe");
+        log(`Payment processing completed for order: ${order.id}`, "stripe");
       } catch (orderError: unknown) {
         const errorMessage = orderError instanceof Error ? orderError.message : String(orderError);
         log(`Error processing checkout: ${errorMessage}`, "stripe");
@@ -1557,6 +1601,33 @@ export function setupStripeRoutes(app: Express) {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       log(`Error handling checkout completion: ${errorMessage}`, "stripe");
+    }
+  }
+
+  // Helper function to decrease slots based on item type
+  async function decreaseSlots(itemType: string, itemId: number, quantity: number) {
+    try {
+      switch (itemType) {
+        case "ticket":
+          await storage.decreaseEventTicketSlots(itemId, quantity);
+          break;
+        case "product":
+        case "merchandise":
+          await storage.decreaseProductQuantity(itemId, quantity);
+          break;
+        case "vendor_spot":
+          await storage.decreaseVendorSpotSlots(itemId, quantity);
+          break;
+        case "volunteer_shift":
+          await storage.decreaseVolunteerShiftSlots(itemId, quantity);
+          break;
+        default:
+          log(`Unknown item type for slot decrease: ${itemType}`, "stripe");
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Error decreasing slots for ${itemType} ${itemId}: ${errorMessage}`, "stripe");
+      throw error; // Re-throw to handle at higher level
     }
   }
   
