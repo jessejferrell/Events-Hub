@@ -1565,11 +1565,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               itemId: product.id,
               itemType: product.type,
               name: product.name,
-              description: product.description,
               quantity: item.quantity,
               unitPrice: product.price,
-              totalPrice: product.price * item.quantity,
-              metadata: item.registrationData || null
+              totalPrice: product.price * item.quantity
             };
           })),
         },
