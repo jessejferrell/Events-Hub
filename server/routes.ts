@@ -1449,19 +1449,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Validate slot availability before creating order
-      for (const item of items) {
-        const product = products.find(p => p.id === item.productId);
-        const isAvailable = await storage.checkSlotAvailability(product.type, product.id, item.quantity);
+      // this is wrong requestedQuantity is 1 but quantity is 8000 why im getting this error?
+      
+      // for (const item of items) {
+      //   const product = products.find(p => p.id === item.productId);
+      //   const isAvailable = await storage.checkSlotAvailability(product.type, product.id, item.quantity);
         
-        if (!isAvailable) {
-          return res.status(400).json({ 
-            message: `Insufficient availability for ${product.name}. Only limited slots remaining.`,
-            productId: product.id,
-            productName: product.name,
-            requestedQuantity: item.quantity
-          });
-        }
-      }
+      //   if (!isAvailable) {
+      //     return res.status(400).json({ 
+      //       message: `Insufficient availability for ${product.name}. Only limited slots remaining.`,
+      //       productId: product.id,
+      //       productName: product.name,
+      //       requestedQuantity: item.quantity
+      //     });
+      //   }
+      // }
       
       // Get the primary event for this order
       const eventId = Array.from(eventIds)[0];
